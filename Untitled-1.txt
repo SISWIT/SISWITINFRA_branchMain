@@ -1,0 +1,10 @@
+<div class="tooltip-container">
+  <span class="tooltip-trigger">Hover Me</span>
+  <div class="tooltip-content">This is a tooltip explanation.</div>
+</div>
+
+<!-- For an icon -->
+<div class="tooltip-container">
+  <i class="fas fa-info-circle tooltip-trigger"></i> <!-- Example Font Awesome icon -->
+  <div class="tooltip-content">Information about this icon.</div>
+</div>
