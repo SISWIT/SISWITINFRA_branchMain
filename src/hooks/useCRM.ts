@@ -426,6 +426,47 @@ export function useCreateActivity() {
     },
   });
 }
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Activity> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("activities")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast({ title: "Activity updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating activity", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useDeleteActivity() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("activities").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast({ title: "Activity deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting activity", description: error.message, variant: "destructive" });
+    },
+  });
+}
 
 // Products
 export function useProducts() {
