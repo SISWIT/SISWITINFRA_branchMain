@@ -762,6 +762,92 @@ export function useDeleteContract() {
     },
   });
 }
+
+//adding tempates  page function
+// ... existing imports
+
+export function useCreateContractTemplate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (template: Omit<Partial<ContractTemplate>, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase
+        .from("contract_templates")
+        .insert({
+          name: template.name || '',
+          content: template.content || '',
+          is_active: template.is_active ?? true,
+          created_by: user?.id,
+          // --- FIX START ---
+          // The database requires a 'type'. We default to 'general' 
+          // since the UI doesn't have a specific field for it yet.
+          type: template.type || 'general', 
+          // --- FIX END ---
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
+      toast({ title: "Template created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error creating template", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useUpdateContractTemplate() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ContractTemplate> & { id: string }) => {
+      // We explicitly pull out fields to ensure type safety, 
+      // or we can just pass 'updates' if we are sure it matches the table shape.
+      const { data, error } = await supabase
+        .from("contract_templates")
+        .update({
+           name: updates.name,
+           content: updates.content,
+           is_active: updates.is_active,
+           type: updates.type, // Include type here just in case we edit it later
+        })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
+      toast({ title: "Template updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating template", description: error.message, variant: "destructive" });
+    },
+  });
+}
+export function useDeleteContractTemplate() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("contract_templates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
+      toast({ title: "Template deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting template", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 // Dashboard Stats
 export function useDashboardStats() {
   return useQuery({

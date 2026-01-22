@@ -6,10 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider } from "@/hooks/useAuth";
 import { EmployeeRoute } from "@/components/auth/ProtectedRoute";
-<<<<<<< HEAD
-=======
 
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Solutions from "./pages/Solutions";
@@ -20,25 +17,16 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
-<<<<<<< HEAD
-=======
 
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 import DocumentsDashboard from "./pages/documents/DocumentsDashboard";
 import DocumentTemplatesPage from "./pages/documents/DocumentTemplatesPage";
 import DocumentHistoryPage from "./pages/documents/DocumentHistoryPage";
 import DocumentCreatePage from "./pages/documents/DocumentCreatePage";
 import PendingSignaturesPage from "./pages/documents/PendingSignaturesPage";
-<<<<<<< HEAD
-import CPQDashboard from "./pages/cpq/CPQDashboard";
-import CLMDashboard from "./pages/clm/CLMDashboard";
-import CRMLayout from "./pages/crm/CRMLayout";
-import LeadsPage from "./pages/crm/LeadsPage";
-import PipelinePage from "./pages/crm/PipelinePage";
-=======
 
 import CLMDashboard from "./pages/clm/CLMDashboard";
-import ContractsPage from "./pages/clm/ContractsPage"; // File not found
+import ContractsPage from "./pages/clm/ContractsPage"; 
+import TemplatesPage from "./pages/clm/TemplatesPage"; 
 
 import CRMLayout from "./pages/crm/CRMLayout";
 import LeadsPage from "./pages/crm/LeadsPage";
@@ -49,7 +37,6 @@ import ContactsPage from "./pages/crm/ContactsPage";
 import ActivitiesPage from "./pages/crm/ActivitiesPage";
 
 import CPQDashboard from "./pages/cpq/CPQDashboard";
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 import ProductsPage from "./pages/cpq/ProductsPage";
 import QuoteDetailPage from "./pages/cpq/QuoteDetailPage";
 import QuotesListPage from "./pages/cpq/QuotesListPage";
@@ -59,7 +46,6 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-<<<<<<< HEAD
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -97,7 +83,7 @@ const App = () => (
               <EmployeeRoute>
                 <QuotesListPage />
               </EmployeeRoute>
-            }/>
+            } />
             <Route path="dashboard/cpq/quotes/:id/edit" element={
               <EmployeeRoute>
                 <QuoteBuilderPage />
@@ -114,7 +100,7 @@ const App = () => (
                 <QuoteBuilderPage />
               </EmployeeRoute>
             } />
-            
+
 
             <Route path="/dashboard/clm" element={
               <EmployeeRoute>
@@ -126,6 +112,18 @@ const App = () => (
                 <CRMLayout />
               </EmployeeRoute>
             } />
+            <Route path="/dashboard/clm/contracts" element={
+              <EmployeeRoute>
+                <ContractsPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/clm/Templates" element={
+              <EmployeeRoute>
+                <TemplatesPage />
+              </EmployeeRoute>
+            } />
+
+
             <Route path="/dashboard/crm/leads" element={
               <EmployeeRoute>
                 <LeadsPage />
@@ -136,7 +134,28 @@ const App = () => (
                 <PipelinePage />
               </EmployeeRoute>
             } />
-            
+            <Route path="/dashboard/crm/accounts" element={
+              <EmployeeRoute>
+                <AccountsPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/crm/contacts" element={
+              <EmployeeRoute>
+                <ContactsPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/crm/opportunities" element={
+              <EmployeeRoute>
+                <OpportunitiesPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/crm/activities" element={
+              <EmployeeRoute>
+                <ActivitiesPage />
+              </EmployeeRoute>
+            } />
+
+
             <Route path="/dashboard/analytics" element={
               <EmployeeRoute>
                 <Dashboard />
@@ -183,157 +202,3 @@ const App = () => (
 );
 
 export default App;
-=======
-  <TooltipProvider>
-  <Toaster />
-  <Sonner />
-  <BrowserRouter>
-  <ScrollToTop />
-  <AuthProvider>
-  <Routes>
-  {/* Public routes - accessible by everyone */}
-  <Route path="/" element={<Index />} />
-  <Route path="/products" element={<Products />} />
-  <Route path="/solutions" element={<Solutions />} />
-  <Route path="/pricing" element={<Pricing />} />
-  <Route path="/about" element={<About />} />
-  <Route path="/contact" element={<Contact />} />
-  <Route path="/auth" element={<Auth />} />
-  <Route path="/unauthorized" element={<Unauthorized />} />
-  
-  {/* Employee-only routes */}
-  <Route path="/dashboard" element={
-    <EmployeeRoute>
-    <Dashboard />
-    </EmployeeRoute>
-  } />
-  <Route path="/dashboard/cpq" element={
-    <EmployeeRoute>
-    <CPQDashboard />
-    </EmployeeRoute>
-  } />
-  <Route path="/dashboard/cpq/products" element={
-    <EmployeeRoute>
-    <ProductsPage />
-    </EmployeeRoute>
-  } />
-  <Route path="/dashboard/cpq/quotes" element={
-    <EmployeeRoute>
-    <QuotesListPage />
-    </EmployeeRoute>
-  }/>
-  <Route path="dashboard/cpq/quotes/:id/edit" element={
-    <EmployeeRoute>
-    <QuoteBuilderPage />
-    </EmployeeRoute>}
-    />
-    <Route path="dashboard/cpq/quotes/:id" element={
-      <EmployeeRoute>
-      <QuoteDetailPage />
-      </EmployeeRoute>}
-      />
-      
-      <Route path="/dashboard/cpq/quotes/new" element={
-        <EmployeeRoute>
-        <QuoteBuilderPage />
-        </EmployeeRoute>
-      } />
-      
-      
-      <Route path="/dashboard/clm" element={
-        <EmployeeRoute>
-        <CLMDashboard />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm" element={
-        <EmployeeRoute>
-        <CRMLayout />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/clm/contracts" element={
-        <EmployeeRoute>
-        <ContractsPage />
-        </EmployeeRoute>
-      } />
-      
-      
-      <Route path="/dashboard/crm/leads" element={
-        <EmployeeRoute>
-        <LeadsPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm/pipeline" element={
-        <EmployeeRoute>
-        <PipelinePage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm/accounts" element={
-        <EmployeeRoute>
-        <AccountsPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm/contacts" element={
-        <EmployeeRoute>
-        <ContactsPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm/opportunities" element={
-        <EmployeeRoute>
-        <OpportunitiesPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/crm/activities" element={
-        <EmployeeRoute>
-        <ActivitiesPage />
-        </EmployeeRoute>
-      } />
-      
-      
-      <Route path="/dashboard/analytics" element={
-        <EmployeeRoute>
-        <Dashboard />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/admin" element={
-        <EmployeeRoute>
-        <Dashboard />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/documents" element={
-        <EmployeeRoute>
-        <DocumentsDashboard />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/documents/create" element={
-        <EmployeeRoute>
-        <DocumentCreatePage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/documents/templates" element={
-        <EmployeeRoute>
-        <DocumentTemplatesPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/documents/history" element={
-        <EmployeeRoute>
-        <DocumentHistoryPage />
-        </EmployeeRoute>
-      } />
-      <Route path="/dashboard/documents/pending" element={
-        <EmployeeRoute>
-        <PendingSignaturesPage />
-        </EmployeeRoute>
-      } />
-      
-      {/* Catch-all */}
-      <Route path="*" element={<NotFound />} />
-      </Routes>
-      </AuthProvider>
-      </BrowserRouter>
-      </TooltipProvider>
-      </QueryClientProvider>
-    );
-    
-    export default App;
-    
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
