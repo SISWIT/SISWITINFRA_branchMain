@@ -6,13 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { supabase } from "@/integrations/supabase/client";
-<<<<<<< HEAD
-import { 
-  Calculator, FileText, Users, Settings, BarChart3, 
-=======
 import {
   Calculator, FileText, Users, Settings, BarChart3,
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
   Bell, Search, Plus, ArrowRight, TrendingUp, Clock,
   CheckCircle2, AlertCircle, Loader2, LogOut, FileStack
 } from "lucide-react";
@@ -57,11 +52,7 @@ const Dashboard = () => {
           .select("first_name, last_name, company")
           .eq("user_id", user.id)
           .maybeSingle();
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
         if (data) {
           setProfile(data);
         }
@@ -101,33 +92,19 @@ const Dashboard = () => {
                 <span className="text-primary-foreground font-bold text-lg">S</span>
               </div>
               <span className="text-xl font-bold text-foreground">
-<<<<<<< HEAD
-                Sirius<span className="text-gradient">infra</span>
-=======
                 SIS<span className="text-gradient">WIT</span>
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
               </span>
             </Link>
 
             <div className="flex items-center gap-4">
               {role && <RoleBadge role={role} />}
-<<<<<<< HEAD
-=======
 
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">
                   {firstName} {profile?.last_name || user.user_metadata?.last_name || ""}
                 </p>
                 <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
-<<<<<<< HEAD
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-=======
 
               <Button
                 variant="outline"
@@ -140,7 +117,6 @@ const Dashboard = () => {
               </Button>
             </div>
 
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
           </div>
         </div>
       </header>
@@ -163,11 +139,7 @@ const Dashboard = () => {
                   <Bell className="w-4 h-4 mr-2" />
                   Notifications
                 </Button>
-<<<<<<< HEAD
-                <Button  variant="hero" size="sm">
-=======
                 <Button variant="hero" size="sm">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                   <Plus className="w-4 h-4 mr-2" />
                   Quick Action
                 </Button>
@@ -242,22 +214,12 @@ const Dashboard = () => {
                         key={index}
                         className="p-4 hover:bg-secondary/50 transition-colors flex items-center gap-4"
                       >
-<<<<<<< HEAD
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          activity.status === "completed" 
-                            ? "bg-primary/10" 
-                            : activity.status === "pending"
-                            ? "bg-accent/10"
-                            : "bg-chart-3/10"
-                        }`}>
-=======
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activity.status === "completed"
                             ? "bg-primary/10"
                             : activity.status === "pending"
                               ? "bg-accent/10"
                               : "bg-chart-3/10"
                           }`}>
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                           {activity.status === "completed" ? (
                             <CheckCircle2 className="w-5 h-5 text-primary" />
                           ) : activity.status === "pending" ? (
@@ -270,22 +232,12 @@ const Dashboard = () => {
                           <div className="font-medium text-foreground">{activity.title}</div>
                           <div className="text-sm text-muted-foreground">{activity.time}</div>
                         </div>
-<<<<<<< HEAD
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                          activity.status === "completed"
-                            ? "bg-primary/10 text-primary"
-                            : activity.status === "pending"
-                            ? "bg-accent/10 text-accent"
-                            : "bg-chart-3/10 text-chart-3"
-                        }`}>
-=======
                         <span className={`text-xs font-medium px-2 py-1 rounded-full ${activity.status === "completed"
                             ? "bg-primary/10 text-primary"
                             : activity.status === "pending"
                               ? "bg-accent/10 text-accent"
                               : "bg-chart-3/10 text-chart-3"
                           }`}>
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                           {activity.status}
                         </span>
                       </div>
@@ -302,11 +254,7 @@ const Dashboard = () => {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-xl font-bold text-foreground mb-6">Your Modules</h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-<<<<<<< HEAD
-              <Link to="/dashboard/cpq" className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all">
-=======
               <Link to="/dashboard/cpq" className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all flex flex-col h-full">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                 <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Calculator className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -314,20 +262,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Configure products, set pricing rules, and generate professional quotes.
                 </p>
-<<<<<<< HEAD
-                <span className="text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
-=======
                 <span className="mt-auto text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-<<<<<<< HEAD
-              <Link to="/dashboard/clm" className="group p-6 rounded-xl bg-card border border-border hover:border-accent/30 hover:shadow-card-hover transition-all">
-=======
               <Link to="/dashboard/clm" className="group p-6 rounded-xl bg-card border border-border hover:border-accent/30 hover:shadow-card-hover transition-all flex flex-col h-full">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                 <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <FileText className="w-7 h-7 text-accent-foreground" />
                 </div>
@@ -335,20 +275,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Create, track, and manage contracts throughout their lifecycle.
                 </p>
-<<<<<<< HEAD
-                <span className="text-accent font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
-=======
                 <span className="mt-auto text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-<<<<<<< HEAD
-              <Link to="/dashboard/crm" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-3/30 hover:shadow-card-hover transition-all">
-=======
               <Link to="/dashboard/crm" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-3/30 hover:shadow-card-hover transition-all flex flex-col h-full">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                 <div className="w-14 h-14 rounded-xl bg-chart-3 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Users className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -356,20 +288,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Manage leads, track opportunities, and build customer relationships.
                 </p>
-<<<<<<< HEAD
-                <span className="text-chart-3 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
-=======
                 <span className="mt-auto text-chart-3 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-<<<<<<< HEAD
-              <Link to="/dashboard/documents" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-4/30 hover:shadow-card-hover transition-all">
-=======
               <Link to="/dashboard/documents" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-4/30 hover:shadow-card-hover transition-all flex flex-col h-full">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                 <div className="w-14 h-14 rounded-xl bg-chart-4 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <FileStack className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -377,11 +301,7 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate documents at scale with smart templates and automation.
                 </p>
-<<<<<<< HEAD
-                <span className="text-chart-4 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
-=======
                 <span className="mt-auto text-chart-4 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
@@ -394,8 +314,4 @@ const Dashboard = () => {
   );
 };
 
-<<<<<<< HEAD
 export default Dashboard;
-=======
-export default Dashboard;
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
