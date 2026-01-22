@@ -426,8 +426,7 @@ export function useCreateActivity() {
     },
   });
 }
-<<<<<<< HEAD
-=======
+
 export function useUpdateActivity() {
   const queryClient = useQueryClient();
   
@@ -469,7 +468,6 @@ export function useDeleteActivity() {
     },
   });
 }
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 
 // Products
 export function useProducts() {
@@ -743,9 +741,8 @@ export function useUpdateContract() {
     },
   });
 }
-<<<<<<< HEAD
 
-=======
+
 // Delete contract missing
 // added...
 export function useDeleteContract() {
@@ -765,7 +762,6 @@ export function useDeleteContract() {
     },
   });
 }
->>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 // Dashboard Stats
 export function useDashboardStats() {
   return useQuery({
