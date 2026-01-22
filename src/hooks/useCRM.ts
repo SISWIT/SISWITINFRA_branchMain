@@ -426,6 +426,50 @@ export function useCreateActivity() {
     },
   });
 }
+<<<<<<< HEAD
+=======
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Activity> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("activities")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast({ title: "Activity updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating activity", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useDeleteActivity() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("activities").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+      toast({ title: "Activity deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting activity", description: error.message, variant: "destructive" });
+    },
+  });
+}
+>>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 
 // Products
 export function useProducts() {
@@ -699,7 +743,29 @@ export function useUpdateContract() {
     },
   });
 }
+<<<<<<< HEAD
 
+=======
+// Delete contract missing
+// added...
+export function useDeleteContract() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("contracts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast({ title: "Contract deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting contract", description: error.message, variant: "destructive" });
+    },
+  });
+}
+>>>>>>> ffb08206c89006f37cd80255d19add5a21332a59
 // Dashboard Stats
 export function useDashboardStats() {
   return useQuery({
