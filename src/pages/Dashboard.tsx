@@ -92,7 +92,7 @@ const Dashboard = () => {
                 <span className="text-primary-foreground font-bold text-lg">S</span>
               </div>
               <span className="text-xl font-bold text-foreground">
-                Sirius<span className="text-gradient">infra</span>
+                SIS<span className="text-gradient">WIT</span>
               </span>
             </Link>
 
@@ -254,7 +254,7 @@ const Dashboard = () => {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-xl font-bold text-foreground mb-6">Your Modules</h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Link to="/dashboard/cpq" className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all">
+              <Link to="/dashboard/cpq" className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all flex flex-col h-full">
                 <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Calculator className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -262,12 +262,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Configure products, set pricing rules, and generate professional quotes.
                 </p>
-                <span className="text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                <span className="mt-auto text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-              <Link to="/dashboard/clm" className="group p-6 rounded-xl bg-card border border-border hover:border-accent/30 hover:shadow-card-hover transition-all">
+              <Link to="/dashboard/clm" className="group p-6 rounded-xl bg-card border border-border hover:border-accent/30 hover:shadow-card-hover transition-all flex flex-col h-full">
                 <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <FileText className="w-7 h-7 text-accent-foreground" />
                 </div>
@@ -275,12 +275,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Create, track, and manage contracts throughout their lifecycle.
                 </p>
-                <span className="text-accent font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                <span className="mt-auto text-primary font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-              <Link to="/dashboard/crm" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-3/30 hover:shadow-card-hover transition-all">
+              <Link to="/dashboard/crm" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-3/30 hover:shadow-card-hover transition-all flex flex-col h-full">
                 <div className="w-14 h-14 rounded-xl bg-chart-3 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Users className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -288,12 +288,12 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Manage leads, track opportunities, and build customer relationships.
                 </p>
-                <span className="text-chart-3 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                <span className="mt-auto text-chart-3 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
 
-              <Link to="/dashboard/documents" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-4/30 hover:shadow-card-hover transition-all">
+              <Link to="/dashboard/documents" className="group p-6 rounded-xl bg-card border border-border hover:border-chart-4/30 hover:shadow-card-hover transition-all flex flex-col h-full">
                 <div className="w-14 h-14 rounded-xl bg-chart-4 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <FileStack className="w-7 h-7 text-primary-foreground" />
                 </div>
@@ -301,7 +301,7 @@ const Dashboard = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate documents at scale with smart templates and automation.
                 </p>
-                <span className="text-chart-4 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                <span className="mt-auto text-chart-4 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>

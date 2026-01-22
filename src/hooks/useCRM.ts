@@ -740,7 +740,25 @@ export function useUpdateContract() {
     },
   });
 }
-
+// Delete contract missing
+// added...
+export function useDeleteContract() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("contracts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast({ title: "Contract deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error deleting contract", description: error.message, variant: "destructive" });
+    },
+  });
+}
 // Dashboard Stats
 export function useDashboardStats() {
   return useQuery({

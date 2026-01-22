@@ -24,8 +24,8 @@ import DocumentHistoryPage from "./pages/documents/DocumentHistoryPage";
 import DocumentCreatePage from "./pages/documents/DocumentCreatePage";
 import PendingSignaturesPage from "./pages/documents/PendingSignaturesPage";
 
-import CPQDashboard from "./pages/cpq/CPQDashboard";
 import CLMDashboard from "./pages/clm/CLMDashboard";
+import ContractsPage from "./pages/clm/ContractsPage"; // File not found
 
 import CRMLayout from "./pages/crm/CRMLayout";
 import LeadsPage from "./pages/crm/LeadsPage";
@@ -35,6 +35,7 @@ import AccountsPage from "./pages/crm/AccountsPage";
 import ContactsPage from "./pages/crm/ContactsPage";
 import ActivitiesPage from "./pages/crm/ActivitiesPage";
 
+import CPQDashboard from "./pages/cpq/CPQDashboard";
 import ProductsPage from "./pages/cpq/ProductsPage";
 import QuoteDetailPage from "./pages/cpq/QuoteDetailPage";
 import QuotesListPage from "./pages/cpq/QuotesListPage";
@@ -110,6 +111,13 @@ const App = () => (
         <CRMLayout />
         </EmployeeRoute>
       } />
+      <Route path="/dashboard/clm/contracts" element={
+        <EmployeeRoute>
+        <ContractsPage />
+        </EmployeeRoute>
+      } />
+      
+      
       <Route path="/dashboard/crm/leads" element={
         <EmployeeRoute>
         <LeadsPage />
