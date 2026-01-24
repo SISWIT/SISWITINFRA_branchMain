@@ -106,7 +106,7 @@ const Products = () => {
                 <span className="text-gradient">Infinite Possibilities</span>
               </h1>
             <p className="text-lg text-muted-foreground">
-              Siriusinfra brings together CPQ, CLM, CRM, and Document Automation into a unified platform 
+              SISTWIT brings together CPQ, CLM, CRM, and Document Automation into a unified platform 
               that transforms how you sell, contract, and manage customers.
             </p>
             </div>

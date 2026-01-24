@@ -93,7 +93,9 @@ export function DashboardSidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         {!collapsed && (
-          <span className="font-bold text-xl text-gradient">Siriusinfra</span>
+          <span className="text-xl font-bold text-foreground">SIS
+            <span className="text-gradient">WIT</span>
+          </span>
         )}
         <Button
           variant="ghost"
@@ -137,6 +139,7 @@ export function DashboardSidebar() {
                     <NavLink
                       key={item.path}
                       to={item.path}
+                      end  /* <--- This is the fix added here */
                       className={({ isActive }) =>
                         cn(
                           "flex items-center gap-3 px-4 py-2 mx-2 rounded-lg transition-colors",
@@ -161,6 +164,7 @@ export function DashboardSidebar() {
       <div className="border-t border-border p-2">
         <NavLink
           to="/dashboard/settings"
+          end
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 px-4 py-2 rounded-lg transition-colors",

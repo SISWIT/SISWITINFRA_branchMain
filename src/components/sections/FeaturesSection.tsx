@@ -96,7 +96,7 @@ export function FeaturesSection() {
           <p className={`text-lg text-muted-foreground transition-all duration-700 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`} style={{ transitionDelay: '300ms' }}>
-            Siriusinfra brings together CPQ, CLM, and CRM into a unified platform, 
+            SISWIT brings together CPQ, CLM, and CRM into a unified platform, 
             eliminating data silos and creating seamless workflows across your entire organization.
           </p>
         </div>

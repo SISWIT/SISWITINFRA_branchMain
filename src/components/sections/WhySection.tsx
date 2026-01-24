@@ -102,7 +102,7 @@ export function WhySection() {
           }`}
         >
           <span className="text-primary font-semibold text-sm uppercase tracking-wider inline-block">
-            Why Choose Siriusinfra
+            Why Choose SISWIT
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mt-4 mb-6">
             Built for Enterprise,{" "}

@@ -70,7 +70,7 @@ export function HeroSection() {
 
             {/* Subheading */}
             <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-10 animate-fade-up" style={{ animationDelay: "0.2s" }}>
-              Siriusinfra empowers your business with intelligent automation, seamless integrations, and enterprise-grade security.
+              SISWIT empowers your business with intelligent automation, seamless integrations, and enterprise-grade security.
             </p>
 
             {/* CTA Buttons */}
