@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider } from "@/hooks/useAuth";
-import { EmployeeRoute } from "@/components/auth/ProtectedRoute";
+// 1. IMPORT ADMIN ROUTE HERE
+import { EmployeeRoute, AdminRoute } from "@/components/auth/ProtectedRoute";
 
 import Index from "./pages/Index";
 import Products from "./pages/Products";
@@ -41,6 +42,7 @@ import ProductsPage from "./pages/cpq/ProductsPage";
 import QuoteDetailPage from "./pages/cpq/QuoteDetailPage";
 import QuotesListPage from "./pages/cpq/QuotesListPage";
 import QuoteBuilderPage from "./pages/cpq/QuoteBuilderPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -63,7 +65,16 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Employee-only routes */}
+            {/* --- ADMIN ROUTES --- */}
+            {/* This matches the navigate("/admin") from your login form */}
+            <Route path="/admin" element={
+              <AdminRoute>
+                {/* Replace <Dashboard /> with your specific <AdminDashboard /> component when ready */}
+                <AdminDashboard /> 
+              </AdminRoute>
+            } />
+
+            {/* --- EMPLOYEE ROUTES --- */}
             <Route path="/dashboard" element={
               <EmployeeRoute>
                 <Dashboard />
@@ -161,11 +172,9 @@ const App = () => (
                 <Dashboard />
               </EmployeeRoute>
             } />
-            <Route path="/dashboard/admin" element={
-              <EmployeeRoute>
-                <Dashboard />
-              </EmployeeRoute>
-            } />
+            
+            {/* REMOVED the old /dashboard/admin route since we now have the dedicated /admin route above */}
+
             <Route path="/dashboard/documents" element={
               <EmployeeRoute>
                 <DocumentsDashboard />

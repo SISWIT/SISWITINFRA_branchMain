@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Moon, Sun, LogIn, LogOut, User } from "lucide-react";
+import { Menu, X, Moon, Sun, LogIn, LogOut, User, Shield, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { RoleBadge } from "@/components/ui/RoleBadge";
+import { AppRole } from "@/types/roles";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,8 +55,17 @@ export function Header() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Only show dashboard link for employees
-  const isEmployee = role === "employee";
+  // --- ROLE CHECKS WITH COMMENTS ---
+  // We check both the Enum and the string to be safe
+  const isEmployee = role === AppRole.EMPLOYEE;
+  const isAdmin = role === AppRole.ADMIN;
+
+  // Determine where the Logo should link to based on role
+  const getHomeLink = () => {
+    if (isAdmin) return "/admin";
+    if (isEmployee) return "/dashboard";
+    return "/";
+  };
 
   return (
     <header
@@ -67,8 +77,8 @@ export function Header() {
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo */}
-          <Link to={isEmployee ? "/dashboard" : "/"} className="flex items-center gap-2 group">
+          {/* Logo - Updates based on Role */}
+          <Link to={getHomeLink()} className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg group-hover:shadow-glow transition-all duration-300">
               <span className="text-primary-foreground font-bold text-lg">S</span>
             </div>
@@ -92,6 +102,8 @@ export function Header() {
                 {item.name}
               </Link>
             ))}
+
+            {/* Employee Dashboard Link */}
             {user && isEmployee && (
               <Link
                 to="/dashboard"
@@ -102,6 +114,21 @@ export function Header() {
                 }`}
               >
                 Dashboard
+              </Link>
+            )}
+
+            {/* Admin Panel Link - Visible in Top Menu for Admins */}
+            {user && isAdmin && (
+              <Link
+                to="/admin"
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  location.pathname.startsWith("/admin")
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                Admin Panel
               </Link>
             )}
           </div>
@@ -121,22 +148,42 @@ export function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
-                    <User className="h-4 w-4" />
-                    Account
+                    {/* --- ADMIN ICON CHANGE --- */}
+                    {/* If Admin, show Shield. If Client/Employee, show User icon */}
+                    {isAdmin ? <Shield className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                    
+                    {/* --- BUTTON TEXT CHANGE --- */}
+                    {isAdmin ? "Admin Portal" : "Account"}
+                    
+                    {/* Role Badge (appears after text) */}
                     {role && <RoleBadge role={role} size="sm" />}
                   </Button>
                 </DropdownMenuTrigger>
+                
                 <DropdownMenuContent align="end" className="w-48">
                   {isEmployee && (
                     <>
                       <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="cursor-pointer">
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
                           Dashboard
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
                   )}
+                  
+                  {/* --- ADMIN PANEL DROPDOWN ITEM --- */}
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Panel
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
                   <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
@@ -188,7 +235,8 @@ export function Header() {
           <div className="lg:hidden py-4 border-t border-border animate-fade-up">
             <div className="flex flex-col gap-2">
               {user && role && (
-                <div className="px-4 py-2 mb-2">
+                <div className="px-4 py-2 mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Signed in as:</span>
                   <RoleBadge role={role} />
                 </div>
               )}
@@ -206,6 +254,7 @@ export function Header() {
                   {item.name}
                 </Link>
               ))}
+
               {user && isEmployee && (
                 <Link
                   to="/dashboard"
@@ -219,6 +268,23 @@ export function Header() {
                   Dashboard
                 </Link>
               )}
+
+              {/* --- ADMIN PANEL: MOBILE --- */}
+              {user && isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    location.pathname.startsWith("/admin")
+                      ? "text-primary bg-primary/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin Panel
+                </Link>
+              )}
+              
               <div className="flex flex-col gap-2 pt-4 border-t border-border mt-2">
                 {user ? (
                   <Button variant="outline" onClick={handleSignOut} className="w-full">

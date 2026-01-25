@@ -184,7 +184,7 @@ const Auth = () => {
                 <span className="text-primary-foreground font-bold text-lg">S</span>
               </div>
               <span className="text-xl font-bold text-foreground">
-                Sirius<span className="text-gradient">infra</span>
+                SIS<span className="text-gradient">WIT</span>
               </span>
             </Link>
 

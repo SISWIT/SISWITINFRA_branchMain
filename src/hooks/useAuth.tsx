@@ -1,9 +1,9 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { AppRole } from "@/types/roles"; // Ensure this import exists
 
-export type AppRole = "employee" | "user";
-
+// 1. Update the Return Type in the Interface
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -18,7 +18,7 @@ interface AuthContextType {
   signIn: (
     email: string,
     password: string
-  ) => Promise<{ error: Error | null }>;
+  ) => Promise<{ data: { role: AppRole } | null; error: Error | null }>; // <--- UPDATED THIS LINE
   signOut: () => Promise<void>;
 }
 
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch role (approved = row exists)
+  // ... (keep fetchUserRole and useEffect exactly as they were) ...
   const fetchUserRole = async (userId: string) => {
     const { data, error } = await supabase
       .from("user_roles")
@@ -45,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 🔹 Auth state listener
   useEffect(() => {
     const {
       data: { subscription },
@@ -62,7 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Initial session load
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
@@ -77,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 🔹 Sign up (approval handled server-side)
+  // ... (keep signUp as it was) ...
   const signUp = async (
     email: string,
     password: string,
@@ -85,7 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lastName: string
   ) => {
     const redirectUrl = `${window.location.origin}/`;
-
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -97,11 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-
     return { error: error as Error | null };
   };
 
-  // 🔥 SIGN IN WITH APPROVAL CHECK
+  // 2. Update the signIn function implementation
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -109,23 +105,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      return { error: error as Error };
+      return { data: null, error: error as Error };
     }
 
-    // ✅ Approved = role row exists
+    // Approved = role row exists
     const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", data.user.id)
       .maybeSingle();
 
-    // ❌ Pending / not approved
+    // Pending / not approved
     if (roleError || !roleData) {
       await supabase.auth.signOut();
-      return { error: new Error("ACCOUNT_NOT_APPROVED") };
+      return { data: null, error: new Error("Your account has not been approved by an admin yet. Please contact support") };
     }
 
-    return { error: null };
+    // 3. RETURN THE ROLE HERE
+    return { data: { role: roleData.role as AppRole }, error: null };
   };
 
   const signOut = async () => {
@@ -149,3 +146,5 @@ export function useAuth() {
   }
   return context;
 }
+
+export { AppRole };
