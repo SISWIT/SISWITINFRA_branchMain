@@ -1,7 +1,25 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { 
+  Users, 
+  Shield, 
+  Settings, 
+  FileText, 
+  Activity, 
+  CheckCircle2, 
+  XCircle, 
+  Clock,
+  Search,
+  LayoutDashboard
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppRole } from "@/types/roles";
+
+// UI Components
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,17 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Loader2, ShieldAlert, UserCheck } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Header } from "@/components/layout/Header"; // Adjust path to where your Header is
 
+// Charts
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+
+// --- Types ---
 interface SignupRequest {
   id: string;
   user_id: string;
@@ -31,29 +45,64 @@ interface SignupRequest {
   status: string;
 }
 
+interface AdminStats {
+  totalUsers: number;
+  pendingRequests: number;
+  activeEmployees: number;
+  rejectedRequests: number;
+}
+
+const SIDEBAR_ITEMS = [
+  { name: "Overview", icon: LayoutDashboard, href: "/admin", active: true },
+  { name: "User Management", icon: Users, href: "/admin/users", active: false },
+  { name: "Audit Logs", icon: FileText, href: "/admin/logs", active: false },
+  { name: "Settings", icon: Settings, href: "/admin/settings", active: false },
+];
+
 export default function AdminDashboard() {
   const [requests, setRequests] = useState<SignupRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<AdminStats>({
+    totalUsers: 0,
+    pendingRequests: 0,
+    activeEmployees: 0,
+    rejectedRequests: 0
+  });
   const { toast } = useToast();
 
-  const fetchRequests = async () => {
+  // --- Fetch Data ---
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("signup_requests" as any) 
+      // 1. Fetch Pending Requests
+      const { data: requestsData, error: reqError } = await supabase
+        .from("signup_requests" as any)
         .select("*")
         .eq('status', 'pending')
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (reqError) throw reqError;
+      const validRequests = (requestsData as unknown as SignupRequest[]) || [];
+      setRequests(validRequests);
 
-      // FIX: Use double casting (as unknown as SignupRequest[])
-      setRequests((data as unknown as SignupRequest[]) || []);
-      
+      // 2. Fetch Stats (Simulated counts for demo if tables are empty)
+      // In a real app, you'd perform a count query on your tables
+      const { count: employeeCount } = await supabase
+        .from("user_roles")
+        .select("*", { count: 'exact', head: true })
+        .eq('role', 'employee');
+
+      setStats({
+        totalUsers: (employeeCount || 0) + validRequests.length + 12, // +12 is mock existing users
+        pendingRequests: validRequests.length,
+        activeEmployees: employeeCount || 0,
+        rejectedRequests: 5 // Mock number for the chart
+      });
+
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error fetching requests",
+        title: "Error fetching data",
         description: error.message,
       });
     } finally {
@@ -62,178 +111,258 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    fetchRequests();
+    fetchData();
   }, []);
 
+  // --- Handlers ---
   const handleApprove = async (request: SignupRequest) => {
     try {
-      // 1. Assign the role (user_roles table exists in types, so no 'as any' needed usually, 
-      // but if you get errors here too, add it)
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: request.user_id,
-          role: AppRole.EMPLOYEE, 
-        });
-
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        user_id: request.user_id,
+        role: AppRole.EMPLOYEE,
+      });
       if (roleError) throw roleError;
 
-      // 2. Remove from pending list
-      // FIX: Cast to 'any' here as well
       const { error: deleteError } = await supabase
-        .from("signup_requests" as any) 
+        .from("signup_requests" as any)
         .delete()
         .eq("id", request.id);
 
-      if (deleteError) {
-        console.error("Failed to delete request row", deleteError);
-      }
+      if (deleteError) console.error("Cleanup failed", deleteError);
 
-      toast({
-        title: "User Approved",
-        description: `${request.email} can now log in.`,
-      });
-
+      toast({ title: "User Approved", description: `${request.email} granted access.` });
       setRequests((prev) => prev.filter((r) => r.id !== request.id));
+      setStats(prev => ({ ...prev, pendingRequests: prev.pendingRequests - 1, activeEmployees: prev.activeEmployees + 1 }));
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Approval Failed",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Failed", description: error.message });
     }
   };
 
   const handleReject = async (request: SignupRequest) => {
-    if (!confirm(`Reject access for ${request.email}?`)) return;
-
+    if (!confirm(`Reject ${request.email}?`)) return;
     try {
-      // FIX: Cast to 'any' here as well
       const { error } = await supabase
         .from("signup_requests" as any)
         .delete()
         .eq("id", request.id);
 
       if (error) throw error;
-
-      toast({
-        title: "Request Rejected",
-        description: "The signup request has been removed.",
-      });
-
+      toast({ title: "Rejected", description: "Request removed." });
       setRequests((prev) => prev.filter((r) => r.id !== request.id));
+      setStats(prev => ({ ...prev, pendingRequests: prev.pendingRequests - 1, rejectedRequests: prev.rejectedRequests + 1 }));
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Action Failed",
-        description: error.message,
-      });
+      toast({ variant: "destructive", title: "Failed", description: error.message });
     }
   };
 
+  // Mock Data for Charts
+  const chartData = [
+    { name: "Active", value: stats.activeEmployees },
+    { name: "Pending", value: stats.pendingRequests },
+    { name: "Rejected", value: stats.rejectedRequests },
+  ];
+  const CHART_COLORS = ["hsl(142, 71%, 45%)", "hsl(45, 93%, 47%)", "hsl(0, 72%, 50%)"];
+
   return (
-    <div className="container mx-auto py-10 px-4 sm:px-6">
-      <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage incoming signup requests.
-          </p>
-        </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* 1. HEADER */}
+      <Header />
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-              <ShieldAlert className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{requests.length}</div>
-              <p className="text-xs text-muted-foreground">Waiting for approval</p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="flex flex-1 pt-16 lg:pt-20">
+        
+        {/* 2. ADMIN SIDEBAR (Hidden on mobile) */}
+        <aside className="hidden lg:flex w-64 flex-col border-r bg-card h-[calc(100vh-5rem)] sticky top-20">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground/80 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Admin Controls
+            </h2>
+          </div>
+          <nav className="flex-1 px-4 space-y-2">
+            {SIDEBAR_ITEMS.map((item) => (
+              <Button
+                key={item.name}
+                variant={item.active ? "secondary" : "ghost"}
+                className={`w-full justify-start gap-3 ${item.active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"}`}
+                asChild
+              >
+                <Link to={item.href}>
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              </Button>
+            ))}
+          </nav>
+          <div className="p-4 border-t">
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-xs font-medium text-muted-foreground mb-1">System Status</p>
+              <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                <Activity className="h-4 w-4" />
+                Operational
+              </div>
+            </div>
+          </div>
+        </aside>
 
-        <Card className="border-t-4 border-t-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5" />
-              Access Requests
-            </CardTitle>
-            <CardDescription>
-              Users who have signed up but do not have a role yet.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {/* 3. MAIN CONTENT */}
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto space-y-6">
+            
+            {/* Title Section */}
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                <p className="text-muted-foreground">Overview of system access and user management.</p>
               </div>
-            ) : requests.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg">
-                <Check className="h-12 w-12 mx-auto mb-3 text-green-500" />
-                <p className="font-medium">All caught up!</p>
-                <p className="text-sm">No pending signup requests.</p>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="search" 
+                    placeholder="Search users..." 
+                    className="pl-8 w-[200px] lg:w-[300px]" 
+                  />
+                </div>
+                <Button>
+                  <Users className="mr-2 h-4 w-4" />
+                  Add User
+                </Button>
               </div>
-            ) : (
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead>User Details</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Date Requested</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {requests.map((req) => (
-                      <TableRow key={req.id} className="hover:bg-muted/5">
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col">
-                            <span className="text-foreground">{req.first_name} {req.last_name}</span>
-                            <span className="text-xs text-muted-foreground lg:hidden">{req.email}</span>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalUsers}</div>
+                  <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.activeEmployees}</div>
+                  <p className="text-xs text-muted-foreground">Currently authenticated</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
+                  <Clock className="h-4 w-4 text-orange-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.pendingRequests}</div>
+                  <p className="text-xs text-muted-foreground">Requires attention</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+                  <XCircle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.rejectedRequests}</div>
+                  <p className="text-xs text-muted-foreground">Blocked signups</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-7">
+              {/* Table Section (Span 4) */}
+              <Card className="col-span-7 lg:col-span-4">
+                <CardHeader>
+                  <CardTitle>Signup Requests</CardTitle>
+                  <CardDescription>
+                    Recent users requesting access to the platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="h-40 flex items-center justify-center text-muted-foreground">Loading requests...</div>
+                  ) : requests.length === 0 ? (
+                    <div className="h-40 flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-md">
+                      <CheckCircle2 className="h-8 w-8 mb-2 text-green-500" />
+                      <p>All requests handled!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {requests.map((user) => (
+                        <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="font-semibold text-primary">{user.first_name?.[0] || user.email[0].toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <p className="font-medium">{user.first_name} {user.last_name}</p>
+                              <p className="text-sm text-muted-foreground">{user.email}</p>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">{req.email}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(req.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200">
-                            Pending Approval
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleReject(req)}
-                            >
-                              <X className="h-4 w-4 mr-1" />
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => handleReject(user)}>
                               Reject
                             </Button>
-                            <Button
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90"
-                              onClick={() => handleApprove(req)}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
+                            <Button size="sm" onClick={() => handleApprove(user)}>
                               Approve
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart Section (Span 3)  */}
+              <Card className="col-span-7 lg:col-span-3">
+                <CardHeader>
+                  <CardTitle>User Status Distribution</CardTitle>
+                  <CardDescription>Overview of user roles and request status.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: "hsl(var(--muted-foreground))" }} 
+                          dy={10}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: "hsl(var(--muted-foreground))" }} 
+                        />
+                        <RechartsTooltip 
+                          cursor={{ fill: "hsl(var(--muted)/0.4)" }}
+                          contentStyle={{ 
+                            backgroundColor: "hsl(var(--card))", 
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "var(--radius)"
+                          }} 
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {chartData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );

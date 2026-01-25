@@ -127,7 +127,7 @@ export function Header() {
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 }`}
               >
-                <Shield className="w-4 h-4" />
+                {/* <Shield className="w-4 h-4" /> */}
                 Admin Panel
               </Link>
             )}
