@@ -1,6 +1,15 @@
 import { useState } from "react";
-import { useAccounts, useCreateAccount, useUpdateAccount, useDeleteAccount } from "@/hooks/useCRM";
+import { useNavigate } from "react-router-dom";
+import {
+  useAccounts,
+  useCreateAccount,
+  useUpdateAccount,
+  useDeleteAccount,
+} from "@/hooks/useCRM";
+
 import { DataTable } from "@/components/crm/DataTable";
+import { DashboardLayout } from "@/components/crm/DashboardLayout";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,53 +21,76 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreHorizontal, Pencil, Trash2, Globe, Building2, MapPin } from "lucide-react";
+
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Globe,
+  Building2,
+  MapPin,
+  FileText,
+  Mail,
+} from "lucide-react";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
-import { format } from "date-fns";
 
-// Matches your Schema 'accounts' Row
+// matches accounts table
 export interface AccountRow {
   id: string;
   name: string;
   industry: string | null;
   website: string | null;
   phone: string | null;
+  email: string | null;
   annual_revenue: number | null;
   employee_count: number | null;
+  address: string | null;
   city: string | null;
+  state: string | null;
   country: string | null;
+  postal_code: string | null;
   description: string | null;
   created_at: string;
 }
 
 export default function AccountsPage() {
+  const navigate = useNavigate();
+
+  // data hooks
   const { data: accounts = [], isLoading } = useAccounts();
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
 
+  // ui state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null);
 
-  // Form matches Schema columns only
+  // form state
   const [formData, setFormData] = useState({
     name: "",
     industry: "",
     website: "",
     phone: "",
+    email: "",
     annual_revenue: "",
     employee_count: "",
+    address: "",
     city: "",
+    state: "",
     country: "",
+    postal_code: "",
     description: "",
   });
 
+  // open create dialog
   const openCreateDialog = () => {
     setEditingAccount(null);
     setFormData({
@@ -66,36 +98,50 @@ export default function AccountsPage() {
       industry: "",
       website: "",
       phone: "",
+      email: "",
       annual_revenue: "",
       employee_count: "",
+      address: "",
       city: "",
+      state: "",
       country: "",
+      postal_code: "",
       description: "",
     });
     setDialogOpen(true);
   };
 
-  const openEditDialog = (account: AccountRow) => {
-    setEditingAccount(account);
+  // open edit dialog
+  const openEditDialog = (acc: AccountRow) => {
+    setEditingAccount(acc);
     setFormData({
-      name: account.name,
-      industry: account.industry || "",
-      website: account.website || "",
-      phone: account.phone || "",
-      annual_revenue: account.annual_revenue ? account.annual_revenue.toString() : "",
-      employee_count: account.employee_count ? account.employee_count.toString() : "",
-      city: account.city || "",
-      country: account.country || "",
-      description: account.description || "",
+      name: acc.name,
+      industry: acc.industry || "",
+      website: acc.website || "",
+      phone: acc.phone || "",
+      email: acc.email || "",
+      annual_revenue: acc.annual_revenue?.toString() || "",
+      employee_count: acc.employee_count?.toString() || "",
+      address: acc.address || "",
+      city: acc.city || "",
+      state: acc.state || "",
+      country: acc.country || "",
+      postal_code: acc.postal_code || "",
+      description: acc.description || "",
     });
     setDialogOpen(true);
   };
 
+  // submit handler
   const handleSubmit = async () => {
     const payload = {
       ...formData,
-      annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
-      employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,
+      annual_revenue: formData.annual_revenue
+        ? parseFloat(formData.annual_revenue)
+        : null,
+      employee_count: formData.employee_count
+        ? parseInt(formData.employee_count)
+        : null,
     };
 
     if (editingAccount) {
@@ -103,22 +149,40 @@ export default function AccountsPage() {
     } else {
       await createAccount.mutateAsync(payload);
     }
+
     setDialogOpen(false);
   };
 
+  // table columns
   const columns = [
     {
       key: "name",
-      header: "Account Name",
+      header: "Account",
       cell: (acc: AccountRow) => (
         <div className="flex items-center gap-2">
-          <div className="bg-primary/10 p-2 rounded-full">
+          <div className="p-2 rounded-full bg-primary/10">
             <Building2 className="h-4 w-4 text-primary" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-medium">{acc.name}</span>
-            <span className="text-xs text-muted-foreground">{acc.industry}</span>
+          <div>
+            <div className="font-medium">{acc.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {acc.industry || "-"}
+            </div>
           </div>
+        </div>
+      ),
+    },
+    {
+      key: "contact",
+      header: "Contact",
+      cell: (acc: AccountRow) => (
+        <div className="text-sm text-muted-foreground space-y-1">
+          {acc.phone && <div>{acc.phone}</div>}
+          {acc.email && (
+            <div className="flex items-center gap-1">
+              <Mail className="h-3 w-3" /> {acc.email}
+            </div>
+          )}
         </div>
       ),
     },
@@ -127,12 +191,10 @@ export default function AccountsPage() {
       header: "Location",
       cell: (acc: AccountRow) => (
         <div className="flex items-center gap-1 text-muted-foreground">
-           {acc.city || acc.country ? <MapPin className="h-3 w-3" /> : null}
-           <span>
-             {[acc.city, acc.country].filter(Boolean).join(", ") || "-"}
-           </span>
+          {(acc.city || acc.country) && <MapPin className="h-3 w-3" />}
+          {[acc.city, acc.state, acc.country].filter(Boolean).join(", ") || "-"}
         </div>
-      )
+      ),
     },
     {
       key: "website",
@@ -140,35 +202,20 @@ export default function AccountsPage() {
       cell: (acc: AccountRow) =>
         acc.website ? (
           <a
-            href={acc.website.startsWith("http") ? acc.website : `https://${acc.website}`}
+            href={
+              acc.website.startsWith("http")
+                ? acc.website
+                : `https://${acc.website}`
+            }
             target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center text-blue-600 hover:underline"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
           >
-            <Globe className="mr-1 h-3 w-3" />
-            Link
+            <Globe className="h-3 w-3" /> Visit
           </a>
         ) : (
-          <span className="text-muted-foreground">-</span>
+          "-"
         ),
-    },
-    {
-      key: "revenue",
-      header: "Revenue",
-      cell: (acc: AccountRow) =>
-        acc.annual_revenue
-          ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(acc.annual_revenue)
-          : "-",
-    },
-    {
-      key: "created_at",
-      header: "Created",
-      cell: (acc: AccountRow) => {
-        if (!acc.created_at) return "-";
-        try {
-          return format(new Date(acc.created_at), "MMM d, yyyy");
-        } catch (e) { return "-"; }
-      },
     },
     {
       key: "actions",
@@ -176,21 +223,27 @@ export default function AccountsPage() {
       cell: (acc: AccountRow) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button size="icon" variant="ghost">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => openEditDialog(acc)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              <Pencil className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                navigate(`/dashboard/cpq/quotes/new?account_id=${acc.id}`)
+              }
+            >
+              <FileText className="mr-2 h-4 w-4" /> Create Quote
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => deleteAccount.mutate(acc.id)}
               className="text-destructive"
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -203,11 +256,13 @@ export default function AccountsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground">Manage your customer accounts</p>
+          <p className="text-muted-foreground">
+            Manage your customer accounts
+          </p>
         </div>
 
         <DataTable
-          data={accounts as unknown as AccountRow[]}
+          data={accounts as AccountRow[]}
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}
@@ -215,97 +270,181 @@ export default function AccountsPage() {
           searchPlaceholder="Search accounts..."
         />
 
+        {/* account form */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingAccount ? "Edit Account" : "Add Account"}</DialogTitle>
+              <DialogTitle>
+                {editingAccount ? "Edit Account" : "Add Account"}
+              </DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Account Name</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Acme Corp"
-                />
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Industry</Label>
-                  <Input
-                    value={formData.industry}
-                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+            <div className="space-y-6 py-4">
+              {/* basic info */}
+              <Section title="Basic Info">
+                <Grid cols={2}>
+                  <InputField
+                    label="Account Name *"
+                    placeholder="Acme Corp"
+                    value={formData.name}
+                    onChange={(v) => setFormData({ ...formData, name: v })}
+                  />
+                  <InputField
+                    label="Industry"
                     placeholder="Technology"
+                    value={formData.industry}
+                    onChange={(v) =>
+                      setFormData({ ...formData, industry: v })
+                    }
                   />
-                </div>
-                <div>
-                  <Label>Annual Revenue</Label>
-                  <Input
+                </Grid>
+              </Section>
+
+              {/* company size */}
+              <Section title="Company Size">
+                <Grid cols={2}>
+                  <InputField
+                    label="Annual Revenue"
                     type="number"
-                    value={formData.annual_revenue}
-                    onChange={(e) => setFormData({ ...formData, annual_revenue: e.target.value })}
                     placeholder="100000"
+                    value={formData.annual_revenue}
+                    onChange={(v) =>
+                      setFormData({ ...formData, annual_revenue: v })
+                    }
                   />
-                </div>
-              </div>
+                  <InputField
+                    label="Employees"
+                    type="number"
+                    placeholder="50"
+                    value={formData.employee_count}
+                    onChange={(v) =>
+                      setFormData({ ...formData, employee_count: v })
+                    }
+                  />
+                </Grid>
+              </Section>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Website</Label>
+              {/* contact */}
+              <Section title="Contact Info">
+                <Grid cols={3}>
                   <Input
-                    value={formData.website}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                     placeholder="acme.com"
+                    value={formData.website}
+                    onChange={(e) =>
+                      setFormData({ ...formData, website: e.target.value })
+                    }
                   />
-                </div>
-                <div>
-                  <Label>Phone</Label>
                   <Input
+                    placeholder="+1 234 567 890"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1 234..."
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                   />
-                </div>
-              </div>
-
-               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>City</Label>
                   <Input
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="New York"
+                    placeholder="info@acme.com"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                   />
-                </div>
-                <div>
-                  <Label>Country</Label>
-                  <Input
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    placeholder="USA"
-                  />
-                </div>
-              </div>
+                </Grid>
+              </Section>
 
-              <div className="grid gap-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Additional notes..."
+              {/* address */}
+              <Section title="Address">
+                <Input
+                  placeholder="123 Main Street"
+                  value={formData.address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                 />
-              </div>
+                <Grid cols={4}>
+                  <Input placeholder="City" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
+                  <Input placeholder="State" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} />
+                  <Input placeholder="Zip Code" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} />
+                  <Input placeholder="Country" value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
+                </Grid>
+              </Section>
+
+              {/* notes */}
+              <Section title="Description">
+                <Textarea
+                  rows={4}
+                  placeholder="Additional notes..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </Section>
             </div>
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={createAccount.isPending || updateAccount.isPending}>
-                {editingAccount ? "Update" : "Create"}
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={
+                  createAccount.isPending || updateAccount.isPending
+                }
+              >
+                {editingAccount ? "Update Account" : "Create Account"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
     </DashboardLayout>
+  );
+}
+
+// section wrapper
+function Section({ title, children }: any) {
+  return (
+    <div className="border rounded-lg p-4 space-y-4">
+      <h3 className="text-sm font-semibold text-muted-foreground">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+// responsive grid helper
+function Grid({ cols, children }: any) {
+  return (
+    <div
+      className={`grid gap-4 ${
+        cols === 2
+          ? "grid-cols-1 md:grid-cols-2"
+          : cols === 3
+          ? "grid-cols-1 md:grid-cols-3"
+          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// input with label + placeholder
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: any) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }

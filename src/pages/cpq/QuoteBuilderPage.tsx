@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Package, Plus, Minus, Trash2, Calculator, Save, Send, FileDown, ArrowLeft } from "lucide-react";
+import { Package, Plus, Minus, Trash2, Calculator, Save, Send, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface QuoteItem {
   id?: string;
@@ -33,11 +32,15 @@ export default function QuoteBuilderPage() {
   const opportunityId = searchParams.get("opportunity_id");
   const accountId = searchParams.get("account_id");
 
+  // Default valid_until to 30 days from now
+  const defaultValidDate = new Date();
+  defaultValidDate.setDate(defaultValidDate.getDate() + 30);
+
   const [quoteData, setQuoteData] = useState({
     account_id: accountId || "",
     contact_id: "",
     opportunity_id: opportunityId || "",
-    valid_until: "",
+    valid_until: defaultValidDate.toISOString().split('T')[0],
     terms: "Net 30 days",
     notes: "",
     discount_percent: 0,
@@ -47,7 +50,7 @@ export default function QuoteBuilderPage() {
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
 
-  // Fetch products
+  // 1. Fetch products
   const { data: products } = useQuery({
     queryKey: ["products-active"],
     queryFn: async () => {
@@ -57,37 +60,65 @@ export default function QuoteBuilderPage() {
     },
   });
 
-  // Fetch accounts
+  // 2. Fetch accounts (including address fields now)
   const { data: accounts } = useQuery({
     queryKey: ["accounts-list"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("id, name").order("name");
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id, name, address, city, state, postal_code, country")
+        .order("name");
       if (error) throw error;
       return data;
     },
   });
 
-  // Fetch contacts based on selected account
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", quoteData.account_id],
+  // 3. Fetch contacts based on selected account
+  const { data: contacts, isLoading: isLoadingContacts } = useQuery({
+    queryKey: ["contacts-list", quoteData.account_id], 
     queryFn: async () => {
-      const { data, error } = await supabase.from("contacts").select("id, first_name, last_name").eq("account_id", quoteData.account_id).order("first_name");
+      if (!quoteData.account_id) return [];
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id, first_name, last_name")
+        .eq("account_id", quoteData.account_id)
+        .order("first_name");
+        
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteData.account_id,
+    enabled: !!quoteData.account_id && quoteData.account_id !== "",
   });
 
-  // Fetch opportunities based on selected account
-  const { data: opportunities } = useQuery({
+  // 4. Fetch opportunities based on selected account
+  const { data: opportunities, isLoading: isLoadingOpportunities } = useQuery({
     queryKey: ["opportunities-list", quoteData.account_id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("opportunities").select("id, name, amount").eq("account_id", quoteData.account_id).order("name");
+      if (!quoteData.account_id) return [];
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select("id, name, amount")
+        .eq("account_id", quoteData.account_id)
+        .order("name");
+        
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteData.account_id,
+    enabled: !!quoteData.account_id && quoteData.account_id !== "",
   });
+
+  // Helper to get currently selected account details for display
+  const selectedAccountDetails = accounts?.find(a => a.id === quoteData.account_id);
+
+  // Handle Account Change specifically to reset dependent fields
+  const handleAccountChange = (newAccountId: string) => {
+    setQuoteData(prev => ({
+      ...prev,
+      account_id: newAccountId,
+      contact_id: "", // Reset contact
+      opportunity_id: "" // Reset opportunity
+    }));
+  };
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
@@ -103,7 +134,7 @@ export default function QuoteBuilderPage() {
     const newItem: QuoteItem = {
       product_id: product.id,
       product_name: product.name,
-      description: product.description,
+      description: product.description || "",
       quantity: 1,
       unit_price: product.unit_price,
       discount_percent: 0,
@@ -150,6 +181,7 @@ export default function QuoteBuilderPage() {
           subtotal,
           total: grandTotal,
           status,
+          // quote_number is usually generated by database triggers if not provided
         }])
         .select()
         .single();
@@ -225,17 +257,41 @@ export default function QuoteBuilderPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Account</Label>
-                    <Select value={quoteData.account_id} onValueChange={(v) => setQuoteData({ ...quoteData, account_id: v, contact_id: "", opportunity_id: "" })}>
+                    <Select 
+                      value={quoteData.account_id} 
+                      onValueChange={handleAccountChange}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                       <SelectContent>
                         {accounts?.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {/* Display full address context */}
+                    {selectedAccountDetails && (
+                      <div className="text-xs text-muted-foreground ml-1 p-2 bg-muted/50 rounded-md">
+                        <p className="font-medium">Bill To:</p>
+                        <p>{selectedAccountDetails.address}</p>
+                        <p>
+                          {[
+                            selectedAccountDetails.city, 
+                            selectedAccountDetails.state, 
+                            selectedAccountDetails.postal_code
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                        <p>{selectedAccountDetails.country}</p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Contact</Label>
-                    <Select value={quoteData.contact_id} onValueChange={(v) => setQuoteData({ ...quoteData, contact_id: v })} disabled={!quoteData.account_id}>
-                      <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
+                    <Select 
+                      value={quoteData.contact_id} 
+                      onValueChange={(v) => setQuoteData({ ...quoteData, contact_id: v })} 
+                      disabled={!quoteData.account_id || isLoadingContacts}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingContacts ? "Loading..." : "Select contact"} />
+                      </SelectTrigger>
                       <SelectContent>
                         {contacts?.map((c) => <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>)}
                       </SelectContent>
@@ -243,8 +299,14 @@ export default function QuoteBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Opportunity</Label>
-                    <Select value={quoteData.opportunity_id} onValueChange={(v) => setQuoteData({ ...quoteData, opportunity_id: v })} disabled={!quoteData.account_id}>
-                      <SelectTrigger><SelectValue placeholder="Select opportunity (optional)" /></SelectTrigger>
+                    <Select 
+                      value={quoteData.opportunity_id} 
+                      onValueChange={(v) => setQuoteData({ ...quoteData, opportunity_id: v })} 
+                      disabled={!quoteData.account_id || isLoadingOpportunities}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingOpportunities ? "Loading..." : "Select opportunity (optional)"} />
+                      </SelectTrigger>
                       <SelectContent>
                         {opportunities?.map((opp) => <SelectItem key={opp.id} value={opp.id}>{opp.name}</SelectItem>)}
                       </SelectContent>
@@ -271,7 +333,7 @@ export default function QuoteBuilderPage() {
                     <SelectContent>
                       {products?.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center justify-between gap-4 w-full">
                             <span>{p.name}</span>
                             <Badge variant="outline">{formatCurrency(p.unit_price)}</Badge>
                           </div>

@@ -9,9 +9,16 @@ interface AuthContextType {
   session: Session | null;
   role: AppRole | null;
   loading: boolean;
-  // SECURITY: Role parameter removed - roles are assigned server-side only
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
+  ) => Promise<{ error: Error | null }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -23,55 +30,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 🔹 Fetch role (approved = row exists)
   const fetchUserRole = async (userId: string) => {
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    if (!error && data) {
+    if (!error && data?.role) {
       setRole(data.role as AppRole);
+    } else {
+      setRole(null);
     }
   };
 
+  // 🔹 Auth state listener
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Defer role fetch to avoid deadlock
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-          }, 0);
-        } else {
-          setRole(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
         fetchUserRole(session.user.id);
+      } else {
+        setRole(null);
       }
+
+      setLoading(false);
+    });
+
+    // Initial session load
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
+
+      if (data.session?.user) {
+        fetchUserRole(data.session.user.id);
+      }
+
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // SECURITY: Role parameter removed - roles are assigned server-side only via database trigger
-  // This prevents privilege escalation attacks where users could set their own role
-  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
+  // 🔹 Sign up (approval handled server-side)
+  const signUp = async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
+  ) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -80,21 +94,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           first_name: firstName,
           last_name: lastName,
-          // SECURITY: Role is NOT passed from client - assigned server-side via handle_new_user_role trigger
         },
       },
     });
-    
+
     return { error: error as Error | null };
   };
 
+  // 🔥 SIGN IN WITH APPROVAL CHECK
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    
-    return { error: error as Error | null };
+
+    if (error) {
+      return { error: error as Error };
+    }
+
+    // ✅ Approved = role row exists
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    // ❌ Pending / not approved
+    if (roleError || !roleData) {
+      await supabase.auth.signOut();
+      return { error: new Error("ACCOUNT_NOT_APPROVED") };
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
@@ -103,7 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, role, loading, signUp, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -111,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

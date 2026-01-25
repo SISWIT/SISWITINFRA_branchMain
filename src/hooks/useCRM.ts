@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import type { Lead, Account, Contact, Opportunity, Activity, Product, Quote, QuoteItem, Contract, ContractTemplate } from "@/types/crm";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner"; // Assuming you use sonner or use-toast
 
 // Leads
 export function useLeads() {
@@ -47,10 +47,10 @@ export function useCreateLead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast({ title: "Lead created successfully" });
+      toast.success("Lead created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating lead", description: error.message, variant: "destructive" });
+      toast.error("Error creating lead: " + error.message);
     },
   });
 }
@@ -71,10 +71,10 @@ export function useUpdateLead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast({ title: "Lead updated successfully" });
+      toast.success("Lead updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating lead", description: error.message, variant: "destructive" });
+      toast.error("Error updating lead: " + error.message);
     },
   });
 }
@@ -89,10 +89,10 @@ export function useDeleteLead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast({ title: "Lead deleted successfully" });
+      toast.success("Lead deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting lead", description: error.message, variant: "destructive" });
+      toast.error("Error deleting lead: " + error.message);
     },
   });
 }
@@ -130,6 +130,7 @@ export function useCreateAccount() {
           city: account.city,
           state: account.state,
           country: account.country,
+          postal_code: account.postal_code, // ADDED: Now saves zip code
           description: account.description,
           owner_id: user?.id,
           created_by: user?.id,
@@ -141,10 +142,10 @@ export function useCreateAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast({ title: "Account created successfully" });
+      toast.success("Account created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating account", description: error.message, variant: "destructive" });
+      toast.error("Error creating account: " + error.message);
     },
   });
 }
@@ -165,10 +166,10 @@ export function useUpdateAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast({ title: "Account updated successfully" });
+      toast.success("Account updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating account", description: error.message, variant: "destructive" });
+      toast.error("Error updating account: " + error.message);
     },
   });
 }
@@ -183,23 +184,30 @@ export function useDeleteAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast({ title: "Account deleted successfully" });
+      toast.success("Account deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting account", description: error.message, variant: "destructive" });
+      toast.error("Error deleting account: " + error.message);
     },
   });
 }
 
 // Contacts
-export function useContacts() {
+// UPDATED: Now accepts an optional accountId to filter contacts
+export function useContacts(accountId?: string) {
   return useQuery({
-    queryKey: ["contacts"],
+    queryKey: ["contacts", accountId], // Include accountId in key to trigger refetch on change
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("contacts")
         .select("*, account:accounts(*)")
         .order("created_at", { ascending: false });
+      
+      if (accountId) {
+        query = query.eq("account_id", accountId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Contact[];
     },
@@ -233,10 +241,10 @@ export function useCreateContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast({ title: "Contact created successfully" });
+      toast.success("Contact created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating contact", description: error.message, variant: "destructive" });
+      toast.error("Error creating contact: " + error.message);
     },
   });
 }
@@ -257,10 +265,10 @@ export function useUpdateContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast({ title: "Contact updated successfully" });
+      toast.success("Contact updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating contact", description: error.message, variant: "destructive" });
+      toast.error("Error updating contact: " + error.message);
     },
   });
 }
@@ -275,23 +283,30 @@ export function useDeleteContact() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast({ title: "Contact deleted successfully" });
+      toast.success("Contact deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting contact", description: error.message, variant: "destructive" });
+      toast.error("Error deleting contact: " + error.message);
     },
   });
 }
 
 // Opportunities
-export function useOpportunities() {
+// UPDATED: Now accepts an optional accountId to filter opportunities
+export function useOpportunities(accountId?: string) {
   return useQuery({
-    queryKey: ["opportunities"],
+    queryKey: ["opportunities", accountId], // Include accountId in key
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("opportunities")
         .select("*, account:accounts(*), contact:contacts(*)")
         .order("created_at", { ascending: false });
+
+      if (accountId) {
+        query = query.eq("account_id", accountId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Opportunity[];
     },
@@ -324,10 +339,10 @@ export function useCreateOpportunity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
-      toast({ title: "Opportunity created successfully" });
+      toast.success("Opportunity created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating opportunity", description: error.message, variant: "destructive" });
+      toast.error("Error creating opportunity: " + error.message);
     },
   });
 }
@@ -348,10 +363,10 @@ export function useUpdateOpportunity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
-      toast({ title: "Opportunity updated successfully" });
+      toast.success("Opportunity updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating opportunity", description: error.message, variant: "destructive" });
+      toast.error("Error updating opportunity: " + error.message);
     },
   });
 }
@@ -366,10 +381,10 @@ export function useDeleteOpportunity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
-      toast({ title: "Opportunity deleted successfully" });
+      toast.success("Opportunity deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting opportunity", description: error.message, variant: "destructive" });
+      toast.error("Error deleting opportunity: " + error.message);
     },
   });
 }
@@ -419,10 +434,10 @@ export function useCreateActivity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast({ title: "Activity created successfully" });
+      toast.success("Activity created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating activity", description: error.message, variant: "destructive" });
+      toast.error("Error creating activity: " + error.message);
     },
   });
 }
@@ -443,10 +458,10 @@ export function useUpdateActivity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast({ title: "Activity updated successfully" });
+      toast.success("Activity updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating activity", description: error.message, variant: "destructive" });
+      toast.error("Error updating activity: " + error.message);
     },
   });
 }
@@ -461,10 +476,10 @@ export function useDeleteActivity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast({ title: "Activity deleted successfully" });
+      toast.success("Activity deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting activity", description: error.message, variant: "destructive" });
+      toast.error("Error deleting activity: " + error.message);
     },
   });
 }
@@ -506,10 +521,10 @@ export function useCreateProduct() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "Product created successfully" });
+      toast.success("Product created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating product", description: error.message, variant: "destructive" });
+      toast.error("Error creating product: " + error.message);
     },
   });
 }
@@ -569,10 +584,10 @@ export function useCreateQuote() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      toast({ title: "Quote created successfully" });
+      toast.success("Quote created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating quote", description: error.message, variant: "destructive" });
+      toast.error("Error creating quote: " + error.message);
     },
   });
 }
@@ -593,10 +608,10 @@ export function useUpdateQuote() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      toast({ title: "Quote updated successfully" });
+      toast.success("Quote updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating quote", description: error.message, variant: "destructive" });
+      toast.error("Error updating quote: " + error.message);
     },
   });
 }
@@ -628,7 +643,7 @@ export function useCreateQuoteItem() {
       queryClient.invalidateQueries({ queryKey: ["quote"] });
     },
     onError: (error) => {
-      toast({ title: "Error adding item", description: error.message, variant: "destructive" });
+      toast.error("Error adding item: " + error.message);
     },
   });
 }
@@ -646,7 +661,7 @@ export function useDeleteQuoteItem() {
       queryClient.invalidateQueries({ queryKey: ["quote"] });
     },
     onError: (error) => {
-      toast({ title: "Error removing item", description: error.message, variant: "destructive" });
+      toast.error("Error removing item: " + error.message);
     },
   });
 }
@@ -710,10 +725,10 @@ export function useCreateContract() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast({ title: "Contract created successfully" });
+      toast.success("Contract created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating contract", description: error.message, variant: "destructive" });
+      toast.error("Error creating contract: " + error.message);
     },
   });
 }
@@ -734,17 +749,14 @@ export function useUpdateContract() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast({ title: "Contract updated successfully" });
+      toast.success("Contract updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating contract", description: error.message, variant: "destructive" });
+      toast.error("Error updating contract: " + error.message);
     },
   });
 }
 
-
-// Delete contract missing
-// added...
 export function useDeleteContract() {
   const queryClient = useQueryClient();
   
@@ -755,17 +767,15 @@ export function useDeleteContract() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast({ title: "Contract deleted successfully" });
+      toast.success("Contract deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting contract", description: error.message, variant: "destructive" });
+      toast.error("Error deleting contract: " + error.message);
     },
   });
 }
 
-//adding tempates  page function
-// ... existing imports
-
+// Templates
 export function useCreateContractTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -779,11 +789,7 @@ export function useCreateContractTemplate() {
           content: template.content || '',
           is_active: template.is_active ?? true,
           created_by: user?.id,
-          // --- FIX START ---
-          // The database requires a 'type'. We default to 'general' 
-          // since the UI doesn't have a specific field for it yet.
           type: template.type || 'general', 
-          // --- FIX END ---
         })
         .select()
         .single();
@@ -792,10 +798,10 @@ export function useCreateContractTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast({ title: "Template created successfully" });
+      toast.success("Template created successfully");
     },
     onError: (error) => {
-      toast({ title: "Error creating template", description: error.message, variant: "destructive" });
+      toast.error("Error creating template: " + error.message);
     },
   });
 }
@@ -805,15 +811,13 @@ export function useUpdateContractTemplate() {
   
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContractTemplate> & { id: string }) => {
-      // We explicitly pull out fields to ensure type safety, 
-      // or we can just pass 'updates' if we are sure it matches the table shape.
       const { data, error } = await supabase
         .from("contract_templates")
         .update({
            name: updates.name,
            content: updates.content,
            is_active: updates.is_active,
-           type: updates.type, // Include type here just in case we edit it later
+           type: updates.type,
         })
         .eq("id", id)
         .select()
@@ -823,13 +827,14 @@ export function useUpdateContractTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast({ title: "Template updated successfully" });
+      toast.success("Template updated successfully");
     },
     onError: (error) => {
-      toast({ title: "Error updating template", description: error.message, variant: "destructive" });
+      toast.error("Error updating template: " + error.message);
     },
   });
 }
+
 export function useDeleteContractTemplate() {
   const queryClient = useQueryClient();
   
@@ -840,10 +845,10 @@ export function useDeleteContractTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast({ title: "Template deleted successfully" });
+      toast.success("Template deleted successfully");
     },
     onError: (error) => {
-      toast({ title: "Error deleting template", description: error.message, variant: "destructive" });
+      toast.error("Error deleting template: " + error.message);
     },
   });
 }
