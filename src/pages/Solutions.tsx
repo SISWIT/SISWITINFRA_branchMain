@@ -3,40 +3,45 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { 
+import {
   Building2, Rocket, Users, ArrowRight, Check,
   Briefcase, HeartPulse, Landmark, ShoppingCart,
   Factory, Plane, GraduationCap, Tv
 } from "lucide-react";
 import solutionsIndustries from "@/assets/solutions-industries.png";
+
+/* ---------------- DATA ---------------- */
+
 const businessSizes = [
   {
     id: "enterprise",
     icon: Building2,
     title: "Enterprise",
     subtitle: "1000+ employees",
-    description: "Scalable solutions designed for complex organizational structures with advanced security, compliance, and customization options.",
+    description:
+      "Scalable solutions for complex organizations with advanced security, compliance, and customization.",
     features: [
       "Unlimited users and storage",
-      "Advanced security controls (SSO, SCIM)",
-      "Custom integrations and APIs",
+      "Advanced security (SSO, SCIM)",
+      "Custom integrations & APIs",
       "Dedicated success manager",
       "24/7 priority support",
-      "On-premise deployment options",
+      "On-premise deployment",
     ],
   },
   {
     id: "midmarket",
     icon: Users,
     title: "Mid-Market",
-    subtitle: "100-999 employees",
-    description: "Powerful features with the flexibility to grow. Perfect for companies looking to standardize and scale their operations.",
+    subtitle: "100–999 employees",
+    description:
+      "Powerful tools with flexibility to scale as your business grows.",
     features: [
       "Up to 500 users",
-      "Role-based access controls",
+      "Role-based access",
       "Standard integrations",
-      "Onboarding assistance",
-      "Business hours support",
+      "Onboarding support",
+      "Business-hours support",
       "Cloud deployment",
     ],
   },
@@ -45,10 +50,11 @@ const businessSizes = [
     icon: Rocket,
     title: "Startups",
     subtitle: "Under 100 employees",
-    description: "Get started quickly with essential features and grow at your own pace with flexible pricing and easy upgrades.",
+    description:
+      "Launch fast with essential features and grow at your own pace.",
     features: [
       "Up to 50 users",
-      "Core CPQ, CLM, CRM features",
+      "CPQ, CLM, CRM core tools",
       "Essential integrations",
       "Self-service onboarding",
       "Email support",
@@ -57,142 +63,86 @@ const businessSizes = [
   },
 ];
 
-const industries = [
-  {
-    icon: Briefcase,
-    title: "Professional Services",
-    description: "Streamline proposals, contracts, and client management for consulting, legal, and accounting firms.",
-  },
-  {
-    icon: HeartPulse,
-    title: "Healthcare",
-    description: "HIPAA-compliant solutions for managing vendor contracts, equipment quotes, and patient relationships.",
-  },
-  {
-    icon: Landmark,
-    title: "Financial Services",
-    description: "Secure, compliant platform for managing complex financial products, contracts, and client portfolios.",
-  },
-  {
-    icon: ShoppingCart,
-    title: "Retail & E-commerce",
-    description: "Unified pricing, supplier contracts, and customer data management for omnichannel commerce.",
-  },
-  {
-    icon: Factory,
-    title: "Manufacturing",
-    description: "Complex product configuration, vendor management, and distributor relationship tools.",
-  },
-  {
-    icon: Plane,
-    title: "Travel & Hospitality",
-    description: "Dynamic pricing, partner contracts, and guest relationship management solutions.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Education",
-    description: "Enrollment management, vendor contracts, and stakeholder relationship tools for institutions.",
-  },
-  {
-    icon: Tv,
-    title: "Media & Entertainment",
-    description: "Rights management, talent contracts, and audience relationship solutions.",
-  },
-];
-
-interface Industry {
-  icon: React.ComponentType<{ className?: string }>;
+type Industry = {
+  icon: typeof Briefcase;
   title: string;
   description: string;
-}
+};
+
+const industries: Industry[] = [
+  { icon: Briefcase, title: "Professional Services", description: "Proposals, contracts & client management." },
+  { icon: HeartPulse, title: "Healthcare", description: "HIPAA-ready vendor & relationship tools." },
+  { icon: Landmark, title: "Financial Services", description: "Secure platforms for complex financial products." },
+  { icon: ShoppingCart, title: "Retail & E-commerce", description: "Unified pricing & supplier contracts." },
+  { icon: Factory, title: "Manufacturing", description: "Product configuration & distributor management." },
+  { icon: Plane, title: "Travel & Hospitality", description: "Dynamic pricing & partner contracts." },
+  { icon: GraduationCap, title: "Education", description: "Enrollment & vendor relationship tools." },
+  { icon: Tv, title: "Media & Entertainment", description: "Rights & talent contract management." },
+];
+
+/* ---------------- INDUSTRY SECTION ---------------- */
 
 const IndustrySolutions = ({ industries }: { industries: Industry[] }) => {
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
-  const sectionRef = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState<Set<number>>(new Set());
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
-    
+
     cardRefs.current.forEach((card, index) => {
       if (!card) return;
-      
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              setTimeout(() => {
-                setVisibleCards((prev) => new Set(prev).add(index));
-              }, index * 100); // Staggered delay
-              observer.unobserve(entry.target);
-            }
-          });
+
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setVisible((v) => new Set(v).add(index));
+            obs.disconnect();
+          }
         },
-        { threshold: 0.2, rootMargin: "0px 0px -50px 0px" }
+        { threshold: 0.2 }
       );
-      
-      observer.observe(card);
-      observers.push(observer);
+
+      obs.observe(card);
+      observers.push(obs);
     });
 
-    return () => observers.forEach((obs) => obs.disconnect());
+    return () => observers.forEach((o) => o.disconnect());
   }, []);
 
   return (
-    <section id="industries" ref={sectionRef} className="py-24 bg-secondary/30 overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 bg-secondary/30">
+      <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 animate-fade-in">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Industry-Specific Solutions
             </h2>
-            <p className="text-lg text-muted-foreground animate-fade-in" style={{ animationDelay: "0.1s" }}>
-              Deep expertise across verticals with pre-built templates, workflows, and integrations.
+            <p className="text-muted-foreground max-w-xl mx-auto lg:mx-0">
+              Built-in workflows and integrations designed for your industry.
             </p>
           </div>
-          <div className="hidden lg:block">
-            <img
-              src={solutionsIndustries}
-              alt="Connected industry solutions showing healthcare, finance, manufacturing, retail and more"
-              className="rounded-2xl"
-            />
-          </div>
+
+          <img
+            src={solutionsIndustries}
+            alt="Industry solutions"
+            className="hidden lg:block rounded-2xl"
+          />
         </div>
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {industries.map((industry, index) => (
+          {industries.map((item, i) => (
             <div
-              key={industry.title}
-              ref={(el) => (cardRefs.current[index] = el)}
-              className={`group p-6 rounded-xl bg-card border border-border transition-all duration-500 cursor-pointer
-                hover:border-primary/50 hover:shadow-glow hover:-translate-y-2 hover:scale-[1.02]
-                ${visibleCards.has(index) 
-                  ? "opacity-100 translate-y-0" 
-                  : "opacity-0 translate-y-8"
-                }`}
-              style={{ 
-                transitionDelay: visibleCards.has(index) ? "0ms" : `${index * 100}ms`,
-              }}
+              key={item.title}
+              ref={(el) => (cardRefs.current[i] = el)}
+              className={`p-6 rounded-xl bg-card border transition-all duration-500
+                ${visible.has(i) ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}
+                hover:-translate-y-2 hover:shadow-lg`}
             >
-              <div className="relative overflow-hidden">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4 
-                  group-hover:bg-primary/20 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
-                  <industry.icon className="w-7 h-7 text-primary transition-transform duration-300 group-hover:scale-110" />
-                </div>
-                <div className="absolute -inset-4 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 
-                  opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-xl" />
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <item.icon className="w-6 h-6 text-primary" />
               </div>
-              
-              <h3 className="text-lg font-semibold text-foreground mb-2 transition-colors duration-300 
-                group-hover:text-primary">
-                {industry.title}
-              </h3>
-              <p className="text-sm text-muted-foreground transition-colors duration-300 
-                group-hover:text-foreground/80">
-                {industry.description}
-              </p>
-              
-              <div className="h-0.5 bg-gradient-to-r from-primary/0 via-primary to-primary/0 
-                mt-4 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-center" />
+              <h3 className="font-semibold mb-2">{item.title}</h3>
+              <p className="text-sm text-muted-foreground">{item.description}</p>
             </div>
           ))}
         </div>
@@ -201,70 +151,55 @@ const IndustrySolutions = ({ industries }: { industries: Industry[] }) => {
   );
 };
 
+/* ---------------- MAIN PAGE ---------------- */
+
 const Solutions = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+
       <main className="pt-20">
-        {/* Hero */}
-        <section className="py-20 gradient-hero relative overflow-hidden">
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-            <div className="max-w-3xl mx-auto text-center">
-              <span className="text-primary font-semibold text-sm uppercase tracking-wider">
-                Solutions
-              </span>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mt-4 mb-6">
-                Tailored for Your{" "}
-                <span className="text-gradient">Business Needs</span>
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Whether you're a startup or a Fortune 500, Siriusinfra scales with you. 
-                Find the perfect solution for your industry and business size.
-              </p>
-            </div>
+        {/* HERO */}
+        <section className="py-20 gradient-hero text-center">
+          <div className="container mx-auto px-4 max-w-3xl">
+            <span className="text-primary text-sm font-semibold uppercase">
+              Solutions
+            </span>
+            <h1 className="text-4xl sm:text-5xl font-bold mt-4 mb-6">
+              Tailored for Your <span className="text-gradient">Business</span>
+            </h1>
+            <p className="text-muted-foreground">
+              From startups to enterprises, Siriusinfra grows with you.
+            </p>
           </div>
         </section>
 
-        {/* Business Size Solutions */}
-        <section className="py-24">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-                Solutions by Business Size
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Every organization is unique. We offer tailored packages to meet your specific needs and budget.
-              </p>
-            </div>
-
+        {/* BUSINESS SIZE */}
+        <section className="py-20">
+          <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-8">
               {businessSizes.map((size) => (
                 <div
                   key={size.id}
-                  id={size.id}
-                  className="group relative bg-card rounded-2xl p-8 border border-border shadow-card hover:shadow-card-hover hover:-translate-y-2 transition-all duration-500"
+                  className="bg-card p-8 rounded-2xl border hover:-translate-y-2 transition"
                 >
-                  <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center mb-6">
-                    <size.icon className="w-7 h-7 text-primary-foreground" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground mb-1">{size.title}</h3>
+                  <size.icon className="w-10 h-10 text-primary mb-4" />
+                  <h3 className="text-xl font-bold">{size.title}</h3>
                   <p className="text-sm text-muted-foreground mb-4">{size.subtitle}</p>
-                  <p className="text-muted-foreground mb-6">{size.description}</p>
+                  <p className="text-sm mb-6">{size.description}</p>
 
-                  <ul className="space-y-3 mb-8">
-                    {size.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-foreground">{feature}</span>
+                  <ul className="space-y-2 mb-6">
+                    {size.features.map((f) => (
+                      <li key={f} className="flex gap-2 text-sm">
+                        <Check className="w-4 h-4 text-primary" />
+                        {f}
                       </li>
                     ))}
                   </ul>
 
                   <Link to="/contact">
-                    <Button variant="hero" className="w-full group">
-                      Get Started
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    <Button className="w-full">
+                      Get Started <ArrowRight className="w-4 h-4 ml-1" />
                     </Button>
                   </Link>
                 </div>
@@ -273,27 +208,24 @@ const Solutions = () => {
           </div>
         </section>
 
-        {/* Industry Solutions */}
         <IndustrySolutions industries={industries} />
 
         {/* CTA */}
-        <section className="py-24 gradient-hero">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
-              Not sure which solution is right for you?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Our team will help you find the perfect fit for your organization.
-            </p>
-            <Link to="/contact">
-              <Button variant="hero" size="xl" className="group">
-                Talk to an Expert
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
+        <section className="py-20 gradient-hero text-center">
+          <h2 className="text-3xl font-bold mb-4">
+            Not sure what fits you?
+          </h2>
+          <p className="text-muted-foreground mb-6">
+            Let our experts guide you.
+          </p>
+          <Link to="/contact">
+            <Button size="lg">
+              Talk to an Expert <ArrowRight className="w-5 h-5 ml-1" />
+            </Button>
+          </Link>
         </section>
       </main>
+
       <Footer />
     </div>
   );

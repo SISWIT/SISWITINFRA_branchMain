@@ -5,84 +5,88 @@ import { Link } from "react-router-dom";
 import { 
   Calculator, FileText, Users, ArrowRight, Check, 
   Workflow, PenTool, Shield, BarChart3, Puzzle, 
-  Clock, FileCheck, AlertTriangle, RefreshCw,
-  Target, LineChart, Layers, Mail, FileStack,
-  Zap, History, Lock, Share2
+  RefreshCw, Target, LineChart, Mail, FileStack,
+  Zap, History, Share2
 } from "lucide-react";
 
-// Import branded capability images
-import cpqCapabilityMap from "@/assets/cpq-capability-map.jpg";
-import clmLifecycle from "@/assets/clm-lifecycle.jpg";
-import crmDiagram from "@/assets/crm-diagram.jpg";
-import automationVisual from "@/assets/automation-visual.jpg";
+// Module visuals → intentional branding instead of random screenshots
+import cpqCapabilityMap from "@/assets/cpq-capability-map.png";
+import clmLifecycle from "@/assets/clm-lifecycle.png";
+import crmDiagram from "@/assets/crm-diagram.png";
+import automationVisual from "@/assets/automation-visual.png";
 
+/* DATA MODELS */
+
+// Centralized config = scalable + readable
+// UI just consumes data, doesn’t make decisions
 const modules = [
   {
     id: "cpq",
     icon: Calculator,
     name: "CPQ",
     title: "Configure, Price, Quote",
-    description: "Accelerate your sales cycle with intelligent product configuration, dynamic pricing engines, and automated quote generation that closes deals faster.",
+    description: "Accelerate sales with intelligent configuration and dynamic pricing.",
     image: cpqCapabilityMap,
-    imageAlt: "CPQ Capability Map showing guided selling, product configuration, price adjustment, workflows, quote generation and asset ordering",
+    imageAlt: "CPQ Capability Map",
     features: [
-      { icon: Workflow, title: "Product Configuration", desc: "Visual product configurator with guided selling" },
-      { icon: Calculator, title: "Dynamic Pricing", desc: "Rule-based pricing with discount management" },
-      { icon: FileText, title: "Quote Automation", desc: "Generate professional quotes in seconds" },
-      { icon: Check, title: "Approval Workflows", desc: "Multi-level approval with notifications" },
+      { icon: Workflow, title: "Configurator", desc: "Visual guided selling" },
+      { icon: Calculator, title: "Dynamic Pricing", desc: "Rule-based discounts" },
+      { icon: FileText, title: "Auto Quotes", desc: "Generate in seconds" },
+      { icon: Check, title: "Approvals", desc: "Multi-level workflows" },
     ],
-    benefits: ["50% faster quote generation", "30% increase in deal size", "90% reduction in pricing errors"],
+    benefits: ["50% faster quotes", "30% larger deals", "No pricing errors"],
   },
   {
     id: "clm",
     icon: FileText,
     name: "CLM",
-    title: "Contract Lifecycle Management",
-    description: "Manage your entire contract lifecycle from creation to renewal with AI-powered templates, e-signatures, compliance tracking, and comprehensive audit trails.",
+    title: "Contract Management",
+    description: "Manage lifecycle from creation to renewal with AI and compliance.",
     image: clmLifecycle,
-    imageAlt: "Contract Lifecycle Management diagram showing contract request, reviewing, approval, execution, storage, records management, search, audit, and renewal stages",
+    imageAlt: "CLM Lifecycle",
     features: [
-      { icon: PenTool, title: "Contract Creation", desc: "Smart templates with clause library" },
-      { icon: FileCheck, title: "E-Signatures", desc: "Legally binding electronic signatures" },
-      { icon: Shield, title: "Compliance Tracking", desc: "Automated compliance monitoring" },
-      { icon: RefreshCw, title: "Renewal Management", desc: "Proactive renewal alerts and automation" },
+      { icon: PenTool, title: "Smart Templates", desc: "Clause library access" },
+      { icon: Users, title: "E-Signatures", desc: "Legally binding" },
+      { icon: Shield, title: "Compliance", desc: "Auto monitoring" },
+      { icon: RefreshCw, title: "Renewals", desc: "Proactive alerts" },
     ],
-    benefits: ["65% faster contract turnaround", "40% reduction in legal review time", "100% audit trail visibility"],
+    benefits: ["65% faster turnaround", "Less legal review", "100% audit trail"],
   },
   {
     id: "crm",
     icon: Users,
     name: "CRM",
-    title: "Customer Relationship Management",
-    description: "Build deeper customer relationships with a 360° view, intelligent pipeline management, predictive analytics, and seamless communication tools.",
+    title: "Customer Relations",
+    description: "Deepen relationships with 360° views and predictive analytics.",
     image: crmDiagram,
-    imageAlt: "CRM diagram showing invoice, campaign, lead, opportunity, quote, purchase order, sale order, and delivery modules",
+    imageAlt: "CRM Diagram",
     features: [
-      { icon: Target, title: "Lead Management", desc: "Capture, score, and nurture leads" },
-      { icon: LineChart, title: "Pipeline Tracking", desc: "Visual pipeline with forecasting" },
-      { icon: BarChart3, title: "Customer Analytics", desc: "Deep insights and reporting" },
-      { icon: Mail, title: "Communication Hub", desc: "Unified email and messaging" },
+      { icon: Target, title: "Lead Gen", desc: "Score & nurture" },
+      { icon: LineChart, title: "Pipeline", desc: "Visual forecasting" },
+      { icon: BarChart3, title: "Analytics", desc: "Deep insights" },
+      { icon: Mail, title: "Comms Hub", desc: "Unified messaging" },
     ],
-    benefits: ["45% improvement in lead conversion", "25% increase in customer retention", "360° customer visibility"],
+    benefits: ["45% better conversion", "Higher retention", "360° visibility"],
   },
   {
     id: "document-automation",
     icon: FileStack,
-    name: "Document Automation",
-    title: "Intelligent Document Generation",
-    description: "Create, manage, and deliver documents at scale with zero manual effort. Automate document workflows from generation to e-signature with enterprise-grade security.",
+    name: "Doc Gen",
+    title: "Intelligent Docs",
+    description: "Create and deliver documents at scale with zero manual effort.",
     image: automationVisual,
-    imageAlt: "Document automation visual showing connected workflow icons for automated document generation and processing",
+    imageAlt: "Automation Visual",
     features: [
-      { icon: Zap, title: "Dynamic Generation", desc: "Generate PDF & DOCX with smart templates" },
-      { icon: Workflow, title: "Conditional Logic", desc: "Variables & rules for personalized content" },
-      { icon: History, title: "Version Control", desc: "Complete audit trail & version history" },
-      { icon: Share2, title: "Secure Sharing", desc: "Encrypted storage & controlled access" },
+      { icon: Zap, title: "Dynamic Gen", desc: "PDF & DOCX" },
+      { icon: Workflow, title: "Logic", desc: "Smart variables" },
+      { icon: History, title: "History", desc: "Version control" },
+      { icon: Share2, title: "Secure", desc: "Encrypted sharing" },
     ],
-    benefits: ["80% reduction in document creation time", "Zero manual data entry errors", "Complete compliance visibility"],
+    benefits: ["80% less time", "Zero errors", "Full compliance"],
   },
 ];
 
+// Flat list - faster render, easier scanning
 const integrations = [
   "Salesforce", "HubSpot", "SAP", "Oracle", "Microsoft 365",
   "Slack", "DocuSign", "Stripe", "QuickBooks", "Zendesk"
@@ -90,148 +94,197 @@ const integrations = [
 
 const Products = () => {
   return (
-    <div className="min-h-screen bg-background">
+    // overflow-x-hidden avoids blur blobs causing sideways scroll
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header />
-      <main className="pt-20">
-        {/* Hero */}
-        <section className="py-20 gradient-hero relative overflow-hidden">
-          <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl" />
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+
+      <main>
+        {/* Hero Section */}
+        {/* Mobile: tighter padding. Desktop: full viewport feel */}
+        <section className="flex items-center justify-center relative overflow-hidden pt-20 pb-16 sm:min-h-screen sm:pt-24 sm:pb-0">
+          
+          {/* Decorative blob */}
+          {/* Hidden on mobile to reduce clutter and wasted space */}
+          <div className="hidden sm:block absolute top-1/2 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl -z-10" />
+
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <span className="text-primary font-semibold text-sm uppercase tracking-wider">
+              <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-wider animate-fade-up">
                 Products
               </span>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mt-4 mb-6">
+
+              {/* Responsive typography: Leading adjusted for mobile readability */}
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mt-4 mb-6 leading-tight animate-fade-up">
                 One Platform,{" "}
-                <span className="text-gradient">Infinite Possibilities</span>
+                <span className="text-gradient block sm:inline">
+                  Infinite Possibilities
+                </span>
               </h1>
-            <p className="text-lg text-muted-foreground">
-              SISTWIT brings together CPQ, CLM, CRM, and Document Automation into a unified platform 
-              that transforms how you sell, contract, and manage customers.
-            </p>
+
+              {/* Comfortable reading width on phones */}
+              <p className="text-base sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto px-2 sm:px-0">
+                SISWIT brings together CPQ, CLM, CRM, and Document Automation into a unified platform 
+                that transforms how you sell.
+              </p>
+
+              {/* Gentle scroll hint */}
+              <div className="animate-bounce mt-8 hidden sm:block">
+                <span className="text-xs text-muted-foreground">Scroll to explore</span>
+                <div className="w-5 h-8 border-2 border-muted-foreground/30 rounded-full mx-auto mt-2 flex justify-center p-1">
+                  <div className="w-1 h-2 bg-primary rounded-full" />
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Modules */}
+        {/* Product Modules */}
         {modules.map((module, index) => (
           <section
             key={module.id}
             id={module.id}
-            className={`py-24 ${index % 2 === 1 ? "bg-secondary/30" : ""}`}
+            // Mobile: py-12 (breathing room but not huge gaps) Desktop: Full screen focus.
+            className={`py-12 lg:min-h-screen flex flex-col justify-center ${
+              index % 2 === 0 ? "bg-secondary/30" : "bg-background"
+            }`}
           >
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div className={index % 2 === 1 ? "lg:order-2" : ""}>
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-                      <module.icon className="w-6 h-6 text-primary-foreground" />
+              {/* Mobile: Flex Column. Desktop: Grid */}
+              <div className="flex flex-col lg:grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+
+                {/* MOBILE LAYOUT LOGIC:
+                  We always want the TEXT to appear first on mobile so the user has context before seeing the diagram.
+                  On Desktop (lg), we use the Zig-Zag order
+                */}
+                <div className={`space-y-6 order-1 ${index % 2 === 1 ? "lg:order-2" : ""}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+                      <module.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                     </div>
                     <div>
-                      <span className="text-sm text-muted-foreground">{module.title}</span>
-                      <h2 className="text-3xl font-bold text-foreground">{module.name}</h2>
+                      <span className="text-xs sm:text-sm text-muted-foreground">
+                        {module.title}
+                      </span>
+                      <h2 className="text-2xl sm:text-3xl sm:text-4xl font-bold leading-tight">
+                        {module.name}
+                      </h2>
                     </div>
                   </div>
-                  <p className="text-lg text-muted-foreground mb-8">
+
+                  <p className="text-sm sm:text-lg text-muted-foreground max-w-lg">
                     {module.description}
                   </p>
 
                   {/* Benefits */}
-                  <div className="space-y-3 mb-8">
+                  <div className="space-y-2">
                     {module.benefits.map((benefit) => (
-                      <div key={benefit} className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Check className="w-3 h-3 text-primary" />
+                      <div key={benefit} className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 text-primary" />
                         </div>
-                        <span className="text-foreground font-medium">{benefit}</span>
+                        <span className="text-sm sm:text-base font-medium">
+                          {benefit}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  <Link to="/contact">
-                    <Button variant="hero" className="group">
-                      Get Started with {module.name}
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  {/* CTA - Full width on mobile for better touch target */}
+                  <Link to="/contact" className="block w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto group">
+                      Explore {module.name}
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
                   </Link>
                 </div>
 
-                {/* Module Image */}
-                <div className={`${index % 2 === 1 ? "lg:order-1" : ""}`}>
-                  <div className="relative rounded-2xl overflow-hidden shadow-xl border border-border/50 group">
+                {/* Image + Features Container 
+                  Mobile: Order 2 (After text)
+                  Desktop: Zig-Zag handled by lg:order-X
+                */}
+                <div className={`w-full order-2 ${index % 2 === 1 ? "lg:order-1" : ""}`}>
+                  <div className="flex justify-center mb-6">
                     <img
                       src={module.image}
                       alt={module.imageAlt}
-                      className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                      // Ensure image scales down on small screens without breaking ratio
+                      className="w-full h-auto max-h-[200px] sm:max-h-[350px] lg:max-h-[400px] object-contain"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
                   </div>
-                  {/* Features Grid below image */}
-                  <div className="grid sm:grid-cols-2 gap-4 mt-8">
+
+                  {/* Mobile Optimization: 
+                    Switched from horizontal scroll to a 2-col Grid. 
+                    Horizontal scroll on mobile product pages feels "slippery" and hides content 
+                    Grid creates a solid "dashboard" feel
+                  */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     {module.features.map((feature) => (
                       <div
                         key={feature.title}
-                        className="p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all duration-300"
+                        className="p-3 sm:p-4 rounded-lg bg-card border border-border hover:border-primary/30 transition flex flex-col justify-between"
                       >
-                        <feature.icon className="w-6 h-6 text-primary mb-2" />
-                        <h3 className="font-semibold text-foreground text-sm mb-1">{feature.title}</h3>
-                        <p className="text-xs text-muted-foreground">{feature.desc}</p>
+                        <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary mb-2" />
+                        <div>
+                          <h3 className="text-sm font-semibold mb-1">
+                            {feature.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {feature.desc}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
+
               </div>
             </div>
           </section>
         ))}
 
         {/* Integrations */}
-        <section id="integrations" className="py-24 bg-secondary/30">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-12">
-              <Puzzle className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-                Seamless Integrations
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Connect Siriusinfra with your existing tools and workflows. 
-                We integrate with 100+ business applications.
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4">
-              {integrations.map((integration) => (
-                <div
-                  key={integration}
-                  className="px-6 py-3 rounded-lg bg-card border border-border text-foreground font-medium hover:border-primary/50 hover:shadow-card transition-all"
+        <section className="py-16 sm:py-20">
+          <div className="container mx-auto px-4 text-center">
+            <Puzzle className="w-10 h-10 text-primary mx-auto mb-4" />
+            <h2 className="text-3xl sm:text-5xl font-bold mb-4">
+              Seamless Integrations
+            </h2>
+            <p className="text-muted-foreground mb-8">
+              Works with your existing tools — no disruption.
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-3">
+              {integrations.map((name) => (
+                <span
+                  key={name}
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-card border text-sm font-medium whitespace-nowrap"
                 >
-                  {integration}
-                </div>
+                  {name}
+                </span>
               ))}
-              <div className="px-6 py-3 rounded-lg bg-primary/10 border border-primary/30 text-primary font-medium">
+              <span className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-primary/10 text-primary font-medium whitespace-nowrap">
                 + 90 more
-              </div>
+              </span>
             </div>
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="py-24 gradient-hero">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
-              Ready to see Siriusinfra in action?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Get a personalized demo and see how our platform can transform your business.
-            </p>
-            <Link to="/contact">
-              <Button variant="hero" size="xl" className="group">
-                Request Demo
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
+        {/* Final CTA */}
+        <section className="py-16 sm:py-20 gradient-hero text-center px-4">
+          <h2 className="text-3xl sm:text-5xl font-bold mb-6">
+            Ready to see it in action?
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Get a personalized demo and see the platform in action.
+          </p>
+          <Link to="/contact">
+            <Button size="xl" className="w-full sm:w-auto">
+              Request Demo
+            </Button>
+          </Link>
         </section>
       </main>
+
       <Footer />
     </div>
   );

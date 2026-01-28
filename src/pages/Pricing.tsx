@@ -95,11 +95,13 @@ const Pricing = () => {
   const [isAnnual, setIsAnnual] = useState(true);
 
   return (
+    // Reverted to min-h-screen and removed snap/overflow classes so the Header stickiness/blur works correctly with window scroll
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="pt-20">
+      <main>
         {/* Hero */}
-        <section className="py-20 gradient-hero relative overflow-hidden">
+        {/* Kept min-h-screen to maintain the section-wise feel but allowed natural scrolling */}
+        <section className="min-h-screen flex flex-col justify-center pt-28 pb-10 gradient-hero relative overflow-hidden">
           <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl" />
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="max-w-3xl mx-auto text-center">
@@ -145,15 +147,16 @@ const Pricing = () => {
         </section>
 
         {/* Pricing Cards */}
-        <section className="py-24">
+        {/* Kept large padding and flex center to maintain focus on cards */}
+        <section className="min-h-screen flex flex-col justify-center py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {plans.map((plan) => (
                 <div
                   key={plan.name}
-                  className={`relative bg-card rounded-2xl p-8 border ${
+                  className={`relative bg-card rounded-2xl p-8 border flex flex-col ${
                     plan.popular
-                      ? "border-primary shadow-glow scale-105"
+                      ? "border-primary shadow-glow scale-105 z-10"
                       : "border-border shadow-card"
                   } hover:shadow-card-hover transition-all duration-300`}
                 >
@@ -166,19 +169,25 @@ const Pricing = () => {
                   <h3 className="text-2xl font-bold text-foreground mb-2">
                     {plan.name}
                   </h3>
-                  <p className="text-muted-foreground text-sm mb-6">
+                  {/* Added min-h to description to prevent minor misalignments if text length varies significantly */}
+                  <p className="text-muted-foreground text-sm mb-6 min-h-[40px]">
                     {plan.description}
                   </p>
 
-                  <div className="mb-8">
+                  {/* Added fixed minimum height and flex-col/justify-end here. 
+                      This forces the price container to be the same height on all cards,
+                      aligning the buttons immediately below. */}
+                  <div className="mb-8 min-h-[8rem] flex flex-col justify-end">
                     {plan.price.monthly ? (
                       <>
-                        <span className="text-5xl font-bold text-foreground">
-                          ₹{isAnnual ? plan.price.annually : plan.price.monthly}
-                        </span>
-                        <span className="text-muted-foreground">
-                          /user/month
-                        </span>
+                        <div>
+                          <span className="text-5xl font-bold text-foreground">
+                            ₹{isAnnual ? plan.price.annually : plan.price.monthly}
+                          </span>
+                          <span className="text-muted-foreground ml-1">
+                            /user/month
+                          </span>
+                        </div>
                         {isAnnual && (
                           <p className="text-sm text-primary mt-1">
                             Billed annually
@@ -186,7 +195,7 @@ const Pricing = () => {
                         )}
                       </>
                     ) : (
-                      <span className="text-3xl font-bold text-foreground">
+                      <span className="text-3xl font-bold text-foreground pb-2">
                         Custom Pricing
                       </span>
                     )}
@@ -203,7 +212,7 @@ const Pricing = () => {
                     </Button>
                   </Link>
 
-                  <ul className="space-y-3">
+                  <ul className="space-y-3 flex-grow">
                     {plan.features.map((feature) => (
                       <li
                         key={feature.name}
@@ -233,7 +242,7 @@ const Pricing = () => {
         </section>
 
         {/* FAQ */}
-        <section className="py-24 bg-secondary/30">
+        <section className="min-h-[80vh] flex flex-col justify-center py-20 bg-secondary/30">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto">
               <div className="text-center mb-12">
@@ -262,20 +271,20 @@ const Pricing = () => {
 
         {/* CTA */}
         <section className="py-24 gradient-hero">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
-              Ready to get started?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Start your 14-day free trial today. No credit card required.
-            </p>
-            <Link to="/contact">
-              <Button variant="hero" size="xl" className="group">
-                Start Free Trial
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
+                Ready to get started?
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                Start your 14-day free trial today. No credit card required.
+              </p>
+              <Link to="/contact">
+                <Button variant="hero" size="xl" className="group">
+                  Start Free Trial
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </div>
         </section>
       </main>
       <Footer />
