@@ -1,28 +1,43 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+  ReactNode,
+} from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { AppRole } from "@/types/roles"; // Ensure this import exists
+import { AppRole } from "@/types/roles";
 
-// 1. Update the Return Type in the Interface
+// TYPES
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
   loading: boolean;
+
   signUp: (
     email: string,
     password: string,
     firstName: string,
     lastName: string
   ) => Promise<{ error: Error | null }>;
+
   signIn: (
     email: string,
     password: string
-  ) => Promise<{ data: { role: AppRole } | null; error: Error | null }>; // <--- UPDATED THIS LINE
+  ) => Promise<{
+    data: { role: AppRole } | null;
+    error: Error | null;
+  }>;
+
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// PROVIDER
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -30,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ... (keep fetchUserRole and useEffect exactly as they were) ...
+  // FETCH USER ROLE
   const fetchUserRole = async (userId: string) => {
     const { data, error } = await supabase
       .from("user_roles")
@@ -45,37 +60,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // AUTH STATE LISTENER + SESSION SAFETY
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
 
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setRole(null);
+          if (session?.user) {
+            await fetchUserRole(session.user.id);
+          } else {
+            setRole(null);
+          }
+        } catch (error: any) {
+          // THIS is the laptop killer bug fix
+          if (error?.code === "session_not_found") {
+            console.warn("Session not found. Resetting auth state.");
+
+            await supabase.auth.signOut();
+
+            localStorage.clear();
+            sessionStorage.clear();
+
+            if ("indexedDB" in window) {
+              const dbs = await indexedDB.databases();
+              dbs.forEach((db) => {
+                if (db.name) indexedDB.deleteDatabase(db.name);
+              });
+            }
+
+            window.location.href = "/auth";
+          }
+        } finally {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-
-      if (data.session?.user) {
-        fetchUserRole(data.session.user.id);
-      }
-
-      setLoading(false);
-    });
+    );
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // ... (keep signUp as it was) ...
+  // SIGN UP
   const signUp = async (
     email: string,
     password: string,
@@ -83,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lastName: string
   ) => {
     const redirectUrl = `${window.location.origin}/`;
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -94,50 +123,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
+
     return { error: error as Error | null };
   };
 
-  // 2. Update the signIn function implementation
+  // SIGN IN (WITH APPROVAL CHECK)
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
+    if (error || !data.user) {
       return { data: null, error: error as Error };
     }
 
-    // Approved = role row exists
     const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", data.user.id)
       .maybeSingle();
 
-    // Pending / not approved
     if (roleError || !roleData) {
       await supabase.auth.signOut();
-      return { data: null, error: new Error("Your account has not been approved by an admin yet. Please contact support") };
+      return {
+        data: null,
+        error: new Error(
+          "Your account has not been approved by an admin yet."
+        ),
+      };
     }
 
-    // 3. RETURN THE ROLE HERE
-    return { data: { role: roleData.role as AppRole }, error: null };
+    return {
+      data: { role: roleData.role as AppRole },
+      error: null,
+    };
   };
 
+  // SIGN OUT
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
     setRole(null);
   };
 
+  // PROVIDER
   return (
     <AuthContext.Provider
-      value={{ user, session, role, loading, signUp, signIn, signOut }}
+      value={{
+        user,
+        session,
+        role,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+
+// HOOK
 
 export function useAuth() {
   const context = useContext(AuthContext);

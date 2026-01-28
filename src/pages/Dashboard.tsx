@@ -83,43 +83,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Custom Dashboard Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">S</span>
-              </div>
-              <span className="text-xl font-bold text-foreground">
-                SIS<span className="text-gradient">WIT</span>
-              </span>
-            </Link>
-
-            <div className="flex items-center gap-4">
-              {role && <RoleBadge role={role} />}
-
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-foreground">
-                  {firstName} {profile?.last_name || user.user_metadata?.last_name || ""}
-                </p>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSignOut}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      </header>
+      {/* Replaced custom header with the shared Header component */}
+      <Header />
 
       <main className="pt-16">
         {/* Welcome Section */}
