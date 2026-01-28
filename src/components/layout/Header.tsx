@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { AppRole } from "@/types/roles";
 import {
@@ -27,11 +28,11 @@ const navigation = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   // 1. SCROLL EFFECT FOR HEADER BACKGROUND
   useEffect(() => {
@@ -40,18 +41,12 @@ export function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 2. THEME DETECTION
-  useEffect(() => {
-    const isDarkMode = document.documentElement.classList.contains("dark");
-    setIsDark(isDarkMode);
-  }, []);
-
-  // 3. AUTO-CLOSE MENU ON ROUTE CHANGE
+  // 2. AUTO-CLOSE MENU ON ROUTE CHANGE
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // 4. *** KEY FIX: LOCK BODY SCROLL WHEN MENU IS OPEN ***
+  // 3. *** KEY FIX: LOCK BODY SCROLL WHEN MENU IS OPEN ***
   useEffect(() => {
     if (mobileMenuOpen) {
       // Prevent scrolling the background page
@@ -65,12 +60,6 @@ export function Header() {
       document.body.style.overflow = "unset";
     };
   }, [mobileMenuOpen]);
-
-  const toggleTheme = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    document.documentElement.classList.toggle("dark", newDark);
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -166,7 +155,7 @@ export function Header() {
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-lg">
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
 
             {user ? (
@@ -225,17 +214,16 @@ export function Header() {
           {/* Mobile Theme Toggle */}
           <div className="flex lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
-               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
           </div>
         </div>
       </nav>
 
-      {/* ======================================================== */}
-      {/* MOBILE DRAWER             */}
-      {/* ======================================================== */}
       
-      {/* 1. Backdrop Overlay */}
+      {/* MOBILE DRAWER             */}
+      
+      {/* 1.Backdrop Overlay */}
       <div 
         className={`fixed inset-0 z-50 bg-background/80 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
           mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
