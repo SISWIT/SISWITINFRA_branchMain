@@ -5,7 +5,6 @@ The project now has a complete dark theme system with the following features:
 - **Default Theme**: Dark mode is the default
 - **Persistent Storage**: Theme preference is saved to localStorage and persists across page refreshes
 - **No Flash**: A script in `index.html` prevents flashing of the light theme on page load
-- **Easy Toggle**: A `ThemeToggle` component is available for users to switch themes
 
 ## Files Modified/Created
 
@@ -20,11 +19,6 @@ The project now has a complete dark theme system with the following features:
 **Key Functions:**
 - `ThemeProvider`: Wraps the app and initializes theme
 - `useTheme()`: Hook to access theme context in any component
-
-#### `/src/components/ThemeToggle.tsx`
-- A ready-to-use button component for theme switching
-- Shows sun icon in dark mode, moon icon in light mode
-- Can be added to header or navigation
 
 ### 2. **Modified Files**
 
@@ -45,22 +39,6 @@ The dark theme CSS is already defined in `/src/index.css`:
 - Tailwind is configured with `darkMode: ["class"]` in `tailwind.config.ts`
 
 ## How to Use
-
-### Display Theme Toggle Button
-Add the ThemeToggle component to your header or navigation:
-
-```tsx
-import { ThemeToggle } from "@/components/ThemeToggle";
-
-export function Header() {
-  return (
-    <header>
-      {/* ... other header content ... */}
-      <ThemeToggle />
-    </header>
-  );
-}
-```
 
 ### Access Theme in Any Component
 Use the `useTheme` hook:
