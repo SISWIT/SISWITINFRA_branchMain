@@ -71,10 +71,19 @@ export function HeroSection() {
                 </div>
 
                 {/* Main Heading - Clamped font sizes */}
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground tracking-tight leading-tight mb-4 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-                One Unified Platform for{" "}
-                <span className="text-gradient block mt-1">CPQ, CLM & CRM</span>
-                </h1>
+                <h1
+  className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-4 animate-fade-up"
+  style={{ animationDelay: "0.1s" }}
+>
+  <span className="text-gradient block">
+    One Unified Platform for
+  </span>
+
+  <span className="text-foreground block mt-1">
+    CPQ, ERP, CLM & CRM
+  </span>
+</h1>
+
 
                 {/* Subheading - Controlled width and size */}
                 <p className="text-base sm:text-lg text-muted-foreground max-w-lg mx-auto lg:mx-0 mb-6 sm:mb-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
@@ -147,11 +156,11 @@ export function HeroSection() {
       </div>
 
       {/* Scroll indicator - Absolute bottom, small footprint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-bounce hidden sm:block">
+      {/* <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-bounce hidden sm:block">
         <div className="w-5 h-8 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-1.5">
           <div className="w-1 h-2 rounded-full bg-primary" />
         </div>
-      </div>
+      </div> */}
     </section>
   );
 }
