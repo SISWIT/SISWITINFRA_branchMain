@@ -22,6 +22,14 @@ const features = [
   },
   {
     icon: Users,
+    title: "ERP",
+    subtitle: "Enterprise Resource Planning",
+    description: "Integrate and manage all core business processes in one unified system.",
+    highlights: ["Inventory Management", "Financial Planning", "Resource Allocation", "Operational Efficiency"],
+    color: "from-chart-3 to-chart-3/60",
+  },
+  {
+    icon: Users,
     title: "CRM",
     subtitle: "Customer Relationships",
     description: "Build relationships with unified customer data and actionable analytics.",
@@ -99,7 +107,7 @@ export function FeaturesSection() {
           */}
           <div 
             ref={cardsRef} 
-            className="w-full h-auto max-h-[550px] flex md:grid md:grid-cols-3 gap-4 sm:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory px-2 pb-4 md:pb-0 scrollbar-hide"
+            className="w-full h-auto max-h-[550px] flex md:grid md:grid-cols-4 gap-4 sm:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory px-2 pb-4 md:pb-0 scrollbar-hide"
           >
             {features.map((feature, index) => (
               <div

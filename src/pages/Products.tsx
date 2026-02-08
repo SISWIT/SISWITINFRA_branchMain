@@ -2,11 +2,11 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { 
-  Calculator, FileText, Users, ArrowRight, Check, 
-  Workflow, PenTool, Shield, BarChart3, Puzzle, 
+import {
+  Calculator, FileText, Users, ArrowRight, Check,
+  Workflow, PenTool, Shield, BarChart3, Puzzle,
   RefreshCw, Target, LineChart, Mail, FileStack,
-  Zap, History, Share2
+  Zap, History, Share2,Boxes,Factory,Truck
 } from "lucide-react";
 
 // Module visuals → intentional branding instead of random screenshots
@@ -69,6 +69,27 @@ const modules = [
     benefits: ["45% better conversion", "Higher retention", "360° visibility"],
   },
   {
+  id: "erp",
+  icon: Users,
+  name: "ERP",
+  title: "Enterprise Resource Planning",
+  description: "Centralize and automate core business processes across your organization.",
+  image: crmDiagram, // replace with actual ERP image when available
+  imageAlt: "ERP System Diagram",
+  features: [
+    { icon: Boxes, title: "Inventory", desc: "Real-time stock control" },
+    { icon: FileText, title: "Finance", desc: "Accounting & reporting" },
+    { icon: Factory, title: "Operations", desc: "Production & workflows" },
+    { icon: Truck, title: "Supply Chain", desc: "Procurement to delivery" },
+  ],
+  benefits: [
+    "Reduced operational costs",
+    "Improved process efficiency",
+    "Single source of truth"
+  ],
+}
+,
+  {
     id: "document-automation",
     icon: FileStack,
     name: "Doc Gen",
@@ -102,7 +123,7 @@ const Products = () => {
         {/* Hero Section */}
         {/* Mobile: tighter padding. Desktop: full viewport feel */}
         <section className="flex items-center justify-center relative overflow-hidden pt-20 pb-16 sm:min-h-screen sm:pt-24 sm:pb-0">
-          
+
           {/* Decorative blob */}
           {/* Hidden on mobile to reduce clutter and wasted space */}
           <div className="hidden sm:block absolute top-1/2 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl -z-10" />
@@ -123,7 +144,7 @@ const Products = () => {
 
               {/* Comfortable reading width on phones */}
               <p className="text-base sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto px-2 sm:px-0">
-                SISWIT brings together CPQ, CLM, CRM, and Document Automation into a unified platform 
+                SISWIT brings together CPQ, CLM, CRM, and Document Automation into a unified platform
                 that transforms how you sell.
               </p>
 
@@ -144,9 +165,8 @@ const Products = () => {
             key={module.id}
             id={module.id}
             // Mobile: py-12 (breathing room but not huge gaps) Desktop: Full screen focus.
-            className={`py-12 lg:min-h-screen flex flex-col justify-center ${
-              index % 2 === 0 ? "bg-secondary/30" : "bg-background"
-            }`}
+            className={`py-12 lg:min-h-screen flex flex-col justify-center ${index % 2 === 0 ? "bg-secondary/30" : "bg-background"
+              }`}
           >
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               {/* Mobile: Flex Column. Desktop: Grid */}
