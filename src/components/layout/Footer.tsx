@@ -6,6 +6,9 @@ const footerLinks = {
     { name: "CPQ", href: "/products#cpq" },
     { name: "CLM", href: "/products#clm" },
     { name: "CRM", href: "/products#crm" },
+    // Added ERP and Auto Document links
+    { name: "ERP", href: "/products#erp" },
+    { name: "Auto Document", href: "/products#autodoc" },
     { name: "Integrations", href: "/products#integrations" },
   ],
   solutions: [
@@ -51,11 +54,12 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-muted-foreground text-sm mb-6 max-w-xs">
-              One unified cloud platform for CPQ, CLM & CRM. Empowering enterprises with intelligent automation.
+              {/* Updated description to include ERP */}
+              One unified cloud platform for CPQ, CLM, CRM & ERP. Empowering enterprises with intelligent automation.
             </p>
             <div className="flex gap-3">
               {socialLinks.map((social) => (
-              <a
+                <a
                   key={social.name}
                   href={social.href}
                   className="w-10 h-10 rounded-lg bg-background border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent hover:border-accent-foreground/30 transition-all"

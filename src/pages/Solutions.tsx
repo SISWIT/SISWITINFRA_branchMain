@@ -54,7 +54,8 @@ const businessSizes = [
       "Launch fast with essential features and grow at your own pace.",
     features: [
       "Up to 50 users",
-      "CPQ, CLM, CRM core tools",
+      // Updated line to include Auto Document and ERP
+      "CPQ, CLM, CRM, Auto Doc & ERP", 
       "Essential integrations",
       "Self-service onboarding",
       "Email support",

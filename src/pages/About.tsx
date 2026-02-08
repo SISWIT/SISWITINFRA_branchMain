@@ -46,6 +46,8 @@ const milestones = [
   { year: "2022", title: "Series B Funding", description: "Raised $50M to accelerate global expansion." },
   { year: "2023", title: "AI Features", description: "Introduced AI-powered automation and insights." },
   { year: "2024", title: "Global Expansion", description: "Opened offices in Europe and Asia-Pacific." },
+  // Added ERP Milestone
+  { year: "2025", title: "ERP & Auto Doc", description: "Launched comprehensive Enterprise Resource Planning and Auto Document tools." },
 ];
 
 const About = () => {
@@ -67,7 +69,8 @@ const About = () => {
                   <span className="text-gradient">Business Operations</span>
                 </h1>
                 <p className="text-lg text-muted-foreground">
-                  We're on a mission to help businesses streamline their operations, 
+                  {/* Updated text to mention ERP */}
+                  We're on a mission to help businesses streamline their operations with unified CPQ, CLM, CRM, and ERP solutions, 
                   close deals faster, and build stronger customer relationships.
                 </p>
               </div>

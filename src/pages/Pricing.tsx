@@ -8,7 +8,8 @@ import { useState } from "react";
 const plans = [
   {
     name: "Starter",
-    description: "Perfect for small teams getting started with CPQ, CLM, and CRM.",
+    // Added ERP to description
+    description: "Perfect for small teams getting started with CPQ, CLM, CRM, and ERP.",
     price: { monthly: 49, annually: 39 },
     popular: false,
     features: [
@@ -16,6 +17,8 @@ const plans = [
       { name: "CPQ Basic", included: true },
       { name: "CLM Basic", included: true },
       { name: "CRM Basic", included: true },
+      // Added ERP Basic feature
+      { name: "ERP Basic", included: true },
       { name: "5,000 records", included: true },
       { name: "Email support", included: true },
       { name: "Basic integrations", included: true },
@@ -36,6 +39,8 @@ const plans = [
       { name: "CPQ Advanced", included: true },
       { name: "CLM Advanced", included: true },
       { name: "CRM Advanced", included: true },
+      // Added ERP Advanced feature
+      { name: "ERP Advanced", included: true },
       { name: "50,000 records", included: true },
       { name: "Priority support", included: true },
       { name: "All integrations", included: true },
@@ -56,6 +61,8 @@ const plans = [
       { name: "CPQ Enterprise", included: true },
       { name: "CLM Enterprise", included: true },
       { name: "CRM Enterprise", included: true },
+      // Added ERP Enterprise feature
+      { name: "ERP Enterprise", included: true },
       { name: "Unlimited records", included: true },
       { name: "24/7 support", included: true },
       { name: "Custom integrations", included: true },
@@ -113,7 +120,8 @@ const Pricing = () => {
                 <span className="text-gradient">Pricing</span>
               </h1>
               <p className="text-lg text-muted-foreground mb-8">
-                Choose the plan that fits your business. All plans include our core CPQ, CLM, and CRM features.
+                {/* Updated text to include ERP */}
+                Choose the plan that fits your business. All plans include our core CPQ, CLM, CRM, and ERP features.
               </p>
 
               {/* Toggle */}

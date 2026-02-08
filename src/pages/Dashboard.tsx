@@ -4,12 +4,12 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { RoleBadge } from "@/components/ui/RoleBadge";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Calculator, FileText, Users, Settings, BarChart3,
   Bell, Search, Plus, ArrowRight, TrendingUp, Clock,
-  CheckCircle2, AlertCircle, Loader2, LogOut, FileStack
+  CheckCircle2, AlertCircle, Loader2, LogOut, FileStack,
+  Boxes // Added icon for ERP
 } from "lucide-react";
 
 interface Profile {
@@ -22,12 +22,16 @@ const quickActions = [
   { icon: Calculator, title: "Create Quote", description: "Start a new CPQ quote", color: "from-primary to-primary/60" },
   { icon: FileText, title: "New Contract", description: "Draft a new contract", color: "from-accent to-accent/60" },
   { icon: FileStack, title: "Create Document", description: "Generate a new document", color: "from-chart-4 to-chart-4/60" },
+  // Added ERP Quick Action
+  { icon: Boxes, title: "Update Inventory", description: "Manage stock levels", color: "from-orange-500 to-orange-500/60" },
   { icon: Users, title: "Add Contact", description: "Add a new customer", color: "from-chart-3 to-chart-3/60" },
 ];
 
 const recentActivity = [
   { type: "quote", title: "Quote #Q-2024-0142 created", time: "2 hours ago", status: "pending" },
   { type: "contract", title: "Contract with Acme Corp signed", time: "5 hours ago", status: "completed" },
+  // Added ERP Activity
+  { type: "erp", title: "Inventory Batch #9923 received", time: "8 hours ago", status: "completed" },
   { type: "contact", title: "New lead: John Smith", time: "1 day ago", status: "new" },
   { type: "quote", title: "Quote #Q-2024-0141 approved", time: "2 days ago", status: "completed" },
 ];
@@ -36,11 +40,13 @@ const stats = [
   { label: "Open Quotes", value: "24", change: "+12%", icon: Calculator },
   { label: "Active Contracts", value: "156", change: "+8%", icon: FileText },
   { label: "Documents Generated", value: "892", change: "+32%", icon: FileStack },
+  // Added ERP Stat
+  { label: "Inventory Value", value: "$420K", change: "+5%", icon: Boxes },
   { label: "Revenue MTD", value: "$124K", change: "+18%", icon: TrendingUp },
 ];
 
 const Dashboard = () => {
-  const { user, role, loading, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -116,7 +122,8 @@ const Dashboard = () => {
         {/* Stats Grid */}
         <section className="py-8">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Updated grid to accommodate 5 items on large screens */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {stats.map((stat) => (
                 <div
                   key={stat.label}
@@ -218,7 +225,8 @@ const Dashboard = () => {
         <section className="py-8 pb-16">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-xl font-bold text-foreground mb-6">Your Modules</h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Updated grid to accommodate 5 modules */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               <Link to="/dashboard/cpq" className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all flex flex-col h-full">
                 <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Calculator className="w-7 h-7 text-primary-foreground" />
@@ -254,6 +262,20 @@ const Dashboard = () => {
                   Manage leads, track opportunities, and build customer relationships.
                 </p>
                 <span className="mt-auto text-chart-3 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                  Open Module <ArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+
+              {/* Added ERP Module Card */}
+              <Link to="/dashboard/erp" className="group p-6 rounded-xl bg-card border border-border hover:border-orange-500/30 hover:shadow-card-hover transition-all flex flex-col h-full">
+                <div className="w-14 h-14 rounded-xl bg-orange-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Boxes className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-2">ERP</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Track inventory, manage resources, and oversee financials.
+                </p>
+                <span className="mt-auto text-orange-500 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Module <ArrowRight className="w-4 h-4" />
                 </span>
               </Link>
