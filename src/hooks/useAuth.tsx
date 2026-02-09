@@ -1,43 +1,48 @@
 import {
-  useState,
-  useEffect,
   createContext,
   useContext,
+  useEffect,
+  useRef,
+  useState,
   ReactNode,
 } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AppRole } from "@/types/roles";
 
-// TYPES
-
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
   loading: boolean;
-
   signUp: (
     email: string,
     password: string,
     firstName: string,
     lastName: string
   ) => Promise<{ error: Error | null }>;
-
   signIn: (
     email: string,
     password: string
-  ) => Promise<{
-    data: { role: AppRole } | null;
-    error: Error | null;
-  }>;
-
+  ) => Promise<{ data: { role: AppRole } | null; error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// PROVIDER
+/* ---------- ROLE MAPPER ---------- */
+const mapRole = (role: string | null): AppRole | null => {
+  switch (role) {
+    case AppRole.ADMIN:
+      return AppRole.ADMIN;
+    case AppRole.EMPLOYEE:
+      return AppRole.EMPLOYEE;
+    case AppRole.USER:
+      return AppRole.USER;
+    default:
+      return null;
+  }
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -45,122 +50,118 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // FETCH USER ROLE
-  const fetchUserRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const authInitialized = useRef(false);
 
-    if (!error && data?.role) {
-      setRole(data.role as AppRole);
-    } else {
-      setRole(null);
-    }
-  };
-
-  // AUTH STATE LISTENER + SESSION SAFETY
+  /* -------------------- INIT AUTH (ONCE) -------------------- */
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
+    const init = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      // 🔑 IMPORTANT: auth is done here
+      authInitialized.current = true;
+      setLoading(false);
+
+      // 🔄 role loads AFTER auth (non-blocking)
+      if (session?.user) {
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            setRole(mapRole(data?.role ?? null));
+          });
+      }
+    };
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        try {
-          setSession(session);
-          setUser(session?.user ?? null);
+        setSession(session);
+        setUser(session?.user ?? null);
 
-          if (session?.user) {
-            await fetchUserRole(session.user.id);
-          } else {
-            setRole(null);
-          }
-        } catch (error: any) {
-          // THIS is the laptop killer bug fix
-          if (error?.code === "session_not_found") {
-            console.warn("Session not found. Resetting auth state.");
+        setRole(null); // reset role on auth change
 
-            await supabase.auth.signOut();
+        if (session?.user) {
+          supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .maybeSingle()
+            .then(({ data }) => {
+              setRole(mapRole(data?.role ?? null));
+            });
+        }
 
-            localStorage.clear();
-            sessionStorage.clear();
-
-            if ("indexedDB" in window) {
-              const dbs = await indexedDB.databases();
-              dbs.forEach((db) => {
-                if (db.name) indexedDB.deleteDatabase(db.name);
-              });
-            }
-
-            window.location.href = "/auth";
-          }
-        } finally {
+        if (!authInitialized.current) {
+          authInitialized.current = true;
           setLoading(false);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  // SIGN UP
+  /* -------------------- ACTIONS -------------------- */
+
   const signUp = async (
     email: string,
     password: string,
     firstName: string,
     lastName: string
   ) => {
-    const redirectUrl = `${window.location.origin}/`;
-
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        },
+        data: { first_name: firstName, last_name: lastName },
       },
     });
 
     return { error: error as Error | null };
   };
 
-  // SIGN IN (WITH APPROVAL CHECK)
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } =
+      await supabase.auth.signInWithPassword({ email, password });
 
     if (error || !data.user) {
       return { data: null, error: error as Error };
     }
 
-    const { data: roleData, error: roleError } = await supabase
+    const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", data.user.id)
       .maybeSingle();
 
-    if (roleError || !roleData) {
+    const mappedRole = mapRole(roleData?.role ?? null);
+
+    if (!mappedRole) {
       await supabase.auth.signOut();
       return {
         data: null,
-        error: new Error(
-          "Your account has not been approved by an admin yet."
-        ),
+        error: new Error("Account pending admin approval."),
       };
     }
 
+    setRole(mappedRole);
+
     return {
-      data: { role: roleData.role as AppRole },
+      data: { role: mappedRole },
       error: null,
     };
   };
 
-  // SIGN OUT
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -168,32 +169,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
   };
 
-  // PROVIDER
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        session,
-        role,
-        loading,
-        signUp,
-        signIn,
-        signOut,
-      }}
+      value={{ user, session, role, loading, signUp, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
 
-// HOOK
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
-
-export { AppRole };
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
+};
