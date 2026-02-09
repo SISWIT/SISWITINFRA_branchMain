@@ -43,6 +43,13 @@ import ProductsPage from "./pages/cpq/ProductsPage";
 import QuoteDetailPage from "./pages/cpq/QuoteDetailPage";
 import QuotesListPage from "./pages/cpq/QuotesListPage";
 import QuoteBuilderPage from "./pages/cpq/QuoteBuilderPage";
+
+import ERPDashboard from "./pages/erp/ERPDashboard";
+import InventoryPage from "./pages/erp/InventoryPage";
+import ProcurementPage from "./pages/erp/ProcurementPage";
+import ProductionPage from "./pages/erp/ProductionPage";
+import FinancePage from "./pages/erp/FinancePage";
+
 import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
@@ -200,6 +207,32 @@ const App = () => (
             <Route path="/dashboard/documents/pending" element={
               <EmployeeRoute>
                 <PendingSignaturesPage />
+              </EmployeeRoute>
+            } />
+
+            <Route path="/dashboard/erp" element={
+              <EmployeeRoute>
+                <ERPDashboard />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/erp/inventory" element={
+              <EmployeeRoute>
+                <InventoryPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/erp/procurement" element={
+              <EmployeeRoute>
+                <ProcurementPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/erp/production" element={
+              <EmployeeRoute>
+                <ProductionPage />
+              </EmployeeRoute>
+            } />
+            <Route path="/dashboard/erp/finance" element={
+              <EmployeeRoute>
+                <FinancePage />
               </EmployeeRoute>
             } />
 

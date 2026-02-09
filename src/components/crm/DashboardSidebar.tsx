@@ -16,6 +16,9 @@ import {
   FilePlus,
   History,
   Send,
+  Truck,
+  BarChart3,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +33,7 @@ const menuItems = [
   {
     title: "CRM",
     items: [
+      { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/crm" },
       { title: "Leads", icon: Users, path: "/dashboard/crm/leads" },
       { title: "Accounts", icon: Building2, path: "/dashboard/crm/accounts" },
       { title: "Contacts", icon: UserCircle, path: "/dashboard/crm/contacts" },
@@ -41,6 +45,7 @@ const menuItems = [
   {
     title: "CPQ",
     items: [
+      { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/cpq" },
       { title: "Products", icon: Package, path: "/dashboard/cpq/products" },
       { title: "Quotes", icon: FileText, path: "/dashboard/cpq/quotes" },
     ],
@@ -48,6 +53,7 @@ const menuItems = [
   {
     title: "CLM",
     items: [
+      { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/clm" },
       { title: "Contracts", icon: FileSignature, path: "/dashboard/clm/contracts" },
       { title: "Templates", icon: FileText, path: "/dashboard/clm/templates" },
     ],
@@ -60,6 +66,16 @@ const menuItems = [
       { title: "Templates", icon: FileText, path: "/dashboard/documents/templates" },
       { title: "History", icon: History, path: "/dashboard/documents/history" },
       { title: "Pending Signatures", icon: Send, path: "/dashboard/documents/pending" },
+    ],
+  },
+  {
+    title: "ERP",
+    items: [
+      { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/erp" },
+      { title: "Inventory", icon: Package, path: "/dashboard/erp/inventory" },
+      { title: "Procurement", icon: Truck, path: "/dashboard/erp/procurement" },
+      { title: "Production", icon: BarChart3, path: "/dashboard/erp/production" },
+      { title: "Finance", icon: DollarSign, path: "/dashboard/erp/finance" },
     ],
   },
 ];

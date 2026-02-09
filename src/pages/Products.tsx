@@ -149,12 +149,12 @@ const Products = () => {
               </p>
 
               {/* Gentle scroll hint */}
-              <div className="animate-bounce mt-8 hidden sm:block">
+              {/* <div className="animate-bounce mt-8 hidden sm:block">
                 <span className="text-xs text-muted-foreground">Scroll to explore</span>
                 <div className="w-5 h-8 border-2 border-muted-foreground/30 rounded-full mx-auto mt-2 flex justify-center p-1">
                   <div className="w-1 h-2 bg-primary rounded-full" />
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </section>

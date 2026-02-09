@@ -71,12 +71,12 @@ export function HeroSection() {
                 </div>
 
                 {/* Main Heading - Clamped font sizes */}
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-4 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-                  <span className="text-gradient block">
+                <h1 className="font-bold tracking-tight leading-tight mb-4 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+                  <span className="text-gradient block text-1xl sm:text-2xl lg:text-4xl xl:text-3xl ">
                     One Unified Platform for
                   </span>
 
-                  <span className="text-foreground block mt-1">
+                  <span className="text-foreground block mt-1 text-3xl sm:text-3xl lg:text-4xl xl:text-5xl">
                     CPQ, ERP, CLM & CRM
                   </span>
                 </h1>
