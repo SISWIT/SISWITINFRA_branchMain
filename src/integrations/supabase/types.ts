@@ -1263,3 +1263,8 @@ TableName extends DefaultSchemaTableNameOrOptions extends {
           },
         } as const
         
+
+// Add this helper to your types file if you want strict typing for the join
+export type InventoryWithProduct = Database["public"]["Tables"]["inventory_items"]["Row"] & {
+  products: Database["public"]["Tables"]["products"]["Row"] | null;
+};
