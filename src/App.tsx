@@ -104,12 +104,12 @@ const App = () => (
                 <QuotesListPage />
               </EmployeeRoute>
             } />
-            <Route path="dashboard/cpq/quotes/:id/edit" element={
+            <Route path="/dashboard/cpq/quotes/:id/edit" element={
               <EmployeeRoute>
                 <QuoteBuilderPage />
               </EmployeeRoute>}
             />
-            <Route path="dashboard/cpq/quotes/:id" element={
+            <Route path="/dashboard/cpq/quotes/:id" element={
               <EmployeeRoute>
                 <QuoteDetailPage />
               </EmployeeRoute>}
@@ -137,7 +137,7 @@ const App = () => (
                 <ContractsPage />
               </EmployeeRoute>
             } />
-            <Route path="/dashboard/clm/Templates" element={
+            <Route path="/dashboard/clm/templates" element={
               <EmployeeRoute>
                 <TemplatesPage />
               </EmployeeRoute>
