@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -25,13 +26,17 @@ export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
-  const { data: contract, isLoading } = useQuery({
-    queryKey: ["contract-detail", id],
+  const { data: contract, isLoading , user?.id],
+    enabled: !!id && !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("contracts")
         .select("*, accounts(name, email, phone), contacts(first_name, last_name, email), quotes(quote_number, total)")
+        .eq("id", id)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`accounts(name, email, phone), contacts(first_name, last_name, email), quotes(quote_number, total)")
         .eq("id", id)
         .single();
       if (error) throw error;

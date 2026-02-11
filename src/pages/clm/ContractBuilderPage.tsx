@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ export default function ContractBuilderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const quoteId = searchParams.get("quote_id");
 
   const [contractData, setContractData] = useState({
@@ -32,20 +34,21 @@ export default function ContractBuilderPage() {
     content: "",
   });
 
-  // Fetch quote details if converting from quote
+  // Fetch quote details if converting from quote - UPDATED: Filter by current user
   const { data: quote } = useQuery({
-    queryKey: ["quote-for-contract", quoteId],
+    queryKey: ["quote-for-contract", quoteId, user?.id],
+    enabled: !!quoteId && !!user,
     queryFn: async () => {
-      if (!quoteId) return null;
+      if (!quoteId || !user?.id) return null;
       const { data, error } = await supabase
         .from("quotes")
         .select("*, accounts(id, name), contacts(id, first_name, last_name), opportunities(name)")
         .eq("id", quoteId)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .single();
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteId,
   });
 
   // Pre-fill from quote
@@ -60,32 +63,37 @@ export default function ContractBuilderPage() {
       }));
     }
   }, [quote]);
-
-  // Fetch templates
+ - UPDATED: Filter by current user
   const { data: templates } = useQuery({
-    queryKey: ["contract-templates"],
+    queryKey: ["contract-templates", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase.from("contract_templates").select("*").or(`created_by.eq.${user.id},is_public.eq.true`
       const { data, error } = await supabase.from("contract_templates").select("*").eq("is_active", true).order("name");
       if (error) throw error;
       return data;
     },
-  });
-
-  // Fetch accounts
+  }); - UPDATED: Filter by current user
   const { data: accounts } = useQuery({
-    queryKey: ["accounts-list"],
+    queryKey: ["accounts-list", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase.from("accounts").select("id, name").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`
     queryFn: async () => {
       const { data, error } = await supabase.from("accounts").select("id, name").order("name");
       if (error) throw error;
-      return data;
-    },
-  });
-
-  // Fetch contacts
+      return data; - UPDATED: Filter by current user
   const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", contractData.account_id],
+    queryKey: ["contacts-list", contractData.account_id, user?.id],
+    enabled: !!contractData.account_id && !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("contacts").select("id, first_name, last_name").eq("account_id", contractData.account_id).order("first_name");
+      if (!user?.id) return [];
+      const { data, error } = await supabase.from("contacts").select("id, first_name, last_name").eq("account_id", contractData.account_id).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`).order("first_name");
+      if (error) throw error;
+      return data;
+    }pabase.from("contacts").select("id, first_name, last_name").eq("account_id", contractData.account_id).order("first_name");
       if (error) throw error;
       return data;
     },

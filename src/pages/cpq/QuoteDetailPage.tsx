@@ -3,13 +3,13 @@ import { ArrowLeft, Download, Send, CheckCircle, XCircle, Edit, ArrowRight, Prin
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuote, useQuoteItems, useUpdateQuoteStatus, useDeleteQuote } from "@/hooks/useCPQ";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Quote } from "@/types/cpq";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground" },
@@ -24,36 +24,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export default function QuoteDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const { data: quote, isLoading } = useQuery({
-    queryKey: ["quote-detail", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*, accounts(name, email, phone), contacts(first_name, last_name, email), opportunities(name), quote_items(*)")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: string) => {
-      const updates: any = { status };
-      if (status === "approved") {
-        updates.approved_at = new Date().toISOString();
-      }
-      const { error } = await supabase.from("quotes").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quote-detail", id] });
-      toast.success("Quote status updated");
-    },
-    onError: (error) => toast.error("Failed to update: " + error.message),
-  });
+  const { data: quote, isLoading } = useQuote(id || "");
+  const { data: quoteItems } = useQuoteItems(id || "");
+  const updateStatusMutation = useUpdateQuoteStatus();
+  const deleteMutation = useDeleteQuote();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
@@ -107,24 +82,24 @@ export default function QuoteDetailPage() {
                 <Button variant="outline" onClick={() => navigate(`/dashboard/cpq/quotes/${id}/edit`)}>
                   <Edit className="h-4 w-4 mr-2" />Edit
                 </Button>
-                <Button onClick={() => updateStatusMutation.mutate("pending_approval")}>
+                <Button onClick={() => updateStatusMutation.mutate({ id: id || "", status: "pending_approval" })}>
                   <Send className="h-4 w-4 mr-2" />Submit for Approval
                 </Button>
               </>
             )}
             {quote.status === "pending_approval" && (
               <>
-                <Button variant="outline" onClick={() => updateStatusMutation.mutate("rejected")}>
+                <Button variant="outline" onClick={() => updateStatusMutation.mutate({ id: id || "", status: "rejected" })}>
                   <XCircle className="h-4 w-4 mr-2" />Reject
                 </Button>
-                <Button onClick={() => updateStatusMutation.mutate("approved")}>
+                <Button onClick={() => updateStatusMutation.mutate({ id: id || "", status: "approved" })}>
                   <CheckCircle className="h-4 w-4 mr-2" />Approve
                 </Button>
               </>
             )}
             {quote.status === "approved" && (
               <>
-                <Button variant="outline" onClick={() => updateStatusMutation.mutate("sent")}>
+                <Button variant="outline" onClick={() => updateStatusMutation.mutate({ id: id || "", status: "sent" })}>
                   <Send className="h-4 w-4 mr-2" />Send to Customer
                 </Button>
                 <Button asChild>
@@ -201,7 +176,7 @@ export default function QuoteDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {quote.quote_items?.map((item: any) => (
+                    {quoteItems?.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           <div>

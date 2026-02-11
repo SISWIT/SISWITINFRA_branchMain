@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import type { Lead, Account, Contact, Opportunity, Activity, Product, Quote, QuoteItem, Contract, ContractTemplate } from "@/types/crm";
+import type { Lead, Account, Contact, Opportunity, Activity, Product, Quote, QuoteItem } from "@/types/crm";
 import { toast } from "sonner"; // Assuming you use sonner or use-toast
 
 // Leads - UPDATED: Filter by current user
@@ -571,13 +571,17 @@ export function useQuotes() {
 }
 
 export function useQuote(id: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["quote", id],
+    queryKey: ["quote", id, user?.id],
+    enabled: !!id && !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("quotes")
         .select("*, opportunity:opportunities(*), account:accounts(*)")
         .eq("id", id)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .single();
       if (error) throw error;
       
@@ -590,7 +594,6 @@ export function useQuote(id: string) {
       
       return { ...data, items } as Quote;
     },
-    enabled: !!id,
   });
 }
 
@@ -692,196 +695,9 @@ export function useDeleteQuoteItem() {
   });
 }
 
-// Contracts - UPDATED: Filter by current user
-export function useContracts() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["contracts", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("contracts")
-        .select("*, account:accounts(*), quote:quotes(*)")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Contract[];
-    },
-  });
-}
 
-export function useContractTemplates() {
-  return useQuery({
-    queryKey: ["contract_templates"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as ContractTemplate[];
-    },
-  });
-}
-
-export function useCreateContract() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
-  return useMutation({
-    mutationFn: async (contract: Omit<Partial<Contract>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .insert({
-          name: contract.name || '',
-          template_id: contract.template_id,
-          opportunity_id: contract.opportunity_id,
-          quote_id: contract.quote_id,
-          account_id: contract.account_id,
-          contact_id: contract.contact_id,
-          content: contract.content,
-          start_date: contract.start_date,
-          end_date: contract.end_date,
-          value: contract.value,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success("Contract created successfully");
-    },
-    onError: (error) => {
-      toast.error("Error creating contract: " + error.message);
-    },
-  });
-}
-
-export function useUpdateContract() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Contract> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success("Contract updated successfully");
-    },
-    onError: (error) => {
-      toast.error("Error updating contract: " + error.message);
-    },
-  });
-}
-
-export function useDeleteContract() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contracts").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success("Contract deleted successfully");
-    },
-    onError: (error) => {
-      toast.error("Error deleting contract: " + error.message);
-    },
-  });
-}
-
-// Templates
-export function useCreateContractTemplate() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
-  return useMutation({
-    mutationFn: async (template: Omit<Partial<ContractTemplate>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .insert({
-          name: template.name || '',
-          content: template.content || '',
-          is_active: template.is_active ?? true,
-          created_by: user?.id,
-          type: template.type || 'general', 
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast.success("Template created successfully");
-    },
-    onError: (error) => {
-      toast.error("Error creating template: " + error.message);
-    },
-  });
-}
-
-export function useUpdateContractTemplate() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<ContractTemplate> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .update({
-           name: updates.name,
-           content: updates.content,
-           is_active: updates.is_active,
-           type: updates.type,
-        })
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast.success("Template updated successfully");
-    },
-    onError: (error) => {
-      toast.error("Error updating template: " + error.message);
-    },
-  });
-}
-
-export function useDeleteContractTemplate() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contract_templates").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast.success("Template deleted successfully");
-    },
-    onError: (error) => {
-      toast.error("Error deleting template: " + error.message);
-    },
-  });
-}
+// Contracts - MOVED TO useCLM.ts
+// Contract Templates - MOVED TO useCLM.ts
 
 // Dashboard Stats - UPDATED: Filter by current user
 export function useDashboardStats() {

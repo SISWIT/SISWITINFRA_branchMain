@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
@@ -24,12 +25,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function CLMDashboard() {
+  const { user } = useAuth();
   const { data: stats } = useQuery({
-    queryKey: ["clm-stats"],
+    queryKey: ["clm-stats", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const [contractsRes, templatesRes] = await Promise.all([
-        supabase.from("contracts").select("*"),
-        supabase.from("contract_templates").select("*", { count: "exact" }),
+        supabase.from("contracts").select("*").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
+        supabase.from("contract_templates").select("*", { count: "exact" }).or(`created_by.eq.${user.id},is_public.eq.true`),
       ]);
 
       const contracts = contractsRes.data || [];

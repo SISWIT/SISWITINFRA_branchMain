@@ -4,7 +4,7 @@ import {
   useCreateContractTemplate,
   useUpdateContractTemplate,
   useDeleteContractTemplate 
-} from "@/hooks/useCRM";
+} from "@/hooks/useCLM";
 import { DataTable } from "@/components/crm/DataTable";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
-import { ContractTemplate } from "@/types/crm";
+import { ContractTemplate } from "@/types/clm";
 
 export default function TemplatesPage() {
   const { data: templates = [], isLoading } = useContractTemplates();

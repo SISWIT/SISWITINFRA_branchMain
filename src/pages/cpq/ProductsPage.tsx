@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/useCPQ";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import {
   Dialog,
@@ -24,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import type { Product } from "@/types/cpq";
 
 const categories = [
   "CPQ",
@@ -40,65 +40,12 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const queryClient = useQueryClient();
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (product: any) => {
-      const { error } = await supabase.from("products").insert(product);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Product created successfully");
-      setIsDialogOpen(false);
-    },
-    onError: (error) =>
-      toast.error("Failed to create product: " + error.message),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, ...product }: any) => {
-      const { error } = await supabase
-        .from("products")
-        .update(product)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Product updated successfully");
-      setIsDialogOpen(false);
-      setEditingProduct(null);
-    },
-    onError: (error) =>
-      toast.error("Failed to update product: " + error.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Product deleted successfully");
-    },
-    onError: (error) =>
-      toast.error("Failed to delete product: " + error.message),
-  });
+  const { data: products, isLoading } = useProducts();
+  const createMutation = useCreateProduct();
+  const updateMutation = useUpdateProduct();
+  const deleteMutation = useDeleteProduct();
 
   const filteredProducts = products?.filter((product) => {
     const matchesSearch =
@@ -122,9 +69,18 @@ export default function ProductsPage() {
     };
 
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, ...product });
+      updateMutation.mutate({ id: editingProduct.id, ...product }, {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+          setEditingProduct(null);
+        },
+      });
     } else {
-      createMutation.mutate(product);
+      createMutation.mutate(product, {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+        },
+      });
     }
   };
 

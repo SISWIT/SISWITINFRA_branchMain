@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -29,13 +30,17 @@ export default function ContractsListPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: contracts, isLoading } = useQuery({
-    queryKey: ["contracts-list"],
+    queryKey: ["contracts-list", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("contracts")
         .select("*, accounts(name), contacts(first_name, last_name), quotes(quote_number)")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;

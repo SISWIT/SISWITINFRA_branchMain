@@ -6,15 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useProducts, useCreateQuote } from "@/hooks/useCPQ";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import type { QuoteItem } from "@/types/cpq";
 
-interface QuoteItem {
+interface LocalQuoteItem {
   id?: string;
   product_id: string;
   product_name: string;
@@ -28,7 +31,7 @@ interface QuoteItem {
 export default function QuoteBuilderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const opportunityId = searchParams.get("opportunity_id");
   const accountId = searchParams.get("account_id");
 
@@ -47,57 +50,59 @@ export default function QuoteBuilderPage() {
     tax_percent: 18,
   });
 
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [items, setItems] = useState<LocalQuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
 
-  // 1. Fetch products
-  const { data: products } = useQuery({
-    queryKey: ["products-active"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").eq("is_active", true).order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Use the hook for products
+  const { data: products } = useProducts();
 
-  // 2. Fetch accounts (including address fields now)
+  // Create quote mutation using the hook
+  const createQuoteMutation = useCreateQuote();
+
+  // 2. Fetch accounts (including address fields now) - UPDATED: Filter by current user
   const { data: accounts } = useQuery({
-    queryKey: ["accounts-list"],
+    queryKey: ["accounts-list", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("accounts")
         .select("id, name, address, city, state, postal_code, country")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("name");
       if (error) throw error;
       return data;
     },
   });
 
-  // 3. Fetch contacts based on selected account
+  // 3. Fetch contacts based on selected account - UPDATED: Filter by current user
   const { data: contacts, isLoading: isLoadingContacts } = useQuery({
-    queryKey: ["contacts-list", quoteData.account_id], 
+    queryKey: ["contacts-list", quoteData.account_id, user?.id], 
     queryFn: async () => {
-      if (!quoteData.account_id) return [];
+      if (!quoteData.account_id || !user?.id) return [];
       const { data, error } = await supabase
         .from("contacts")
         .select("id, first_name, last_name")
         .eq("account_id", quoteData.account_id)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("first_name");
         
       if (error) throw error;
       return data;
     },
-    enabled: !!quoteData.account_id && quoteData.account_id !== "",
+    enabled: !!quoteData.account_id && quoteData.account_id !== "" && !!user,
   });
 
-  // 4. Fetch opportunities based on selected account
+  // 4. Fetch opportunities based on selected account - UPDATED: Filter by current user
   const { data: opportunities, isLoading: isLoadingOpportunities } = useQuery({
-    queryKey: ["opportunities-list", quoteData.account_id],
+    queryKey: ["opportunities-list", quoteData.account_id, user?.id],
     queryFn: async () => {
-      if (!quoteData.account_id) return [];
+      if (!quoteData.account_id || !user?.id) return [];
       const { data, error } = await supabase
         .from("opportunities")
         .select("id, name, amount")
+        .eq("account_id", quoteData.account_id)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .eq("account_id", quoteData.account_id)
         .order("name");
         
@@ -162,59 +167,28 @@ export default function QuoteBuilderPage() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Create quote mutation
-  const createQuoteMutation = useMutation({
-    mutationFn: async (status: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | "accepted" | "expired") => {
-      const { data: quote, error: quoteError } = await supabase
-        .from("quotes")
-        .insert([{
-          account_id: quoteData.account_id || null,
-          contact_id: quoteData.contact_id || null,
-          opportunity_id: quoteData.opportunity_id || null,
-          valid_until: quoteData.valid_until || null,
-          terms: quoteData.terms,
-          notes: quoteData.notes,
-          discount_percent: quoteData.discount_percent,
-          discount_amount: discountAmount,
-          tax_percent: quoteData.tax_percent,
-          tax_amount: taxAmount,
-          subtotal,
-          total: grandTotal,
-          status,
-          // quote_number is usually generated by database triggers if not provided
-        }])
-        .select()
-        .single();
-
-      if (quoteError) throw quoteError;
-
-      // Insert quote items
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase.from("quote_items").insert(
-          items.map((item, index) => ({
-            quote_id: quote.id,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            description: item.description,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            discount_percent: item.discount_percent,
-            total: item.total,
-            sort_order: index,
-          }))
-        );
-        if (itemsError) throw itemsError;
-      }
-
-      return quote;
-    },
-    onSuccess: (quote) => {
-      queryClient.invalidateQueries({ queryKey: ["quotes-list"] });
-      toast.success("Quote created successfully");
-      navigate(`/dashboard/cpq/quotes/${quote.id}`);
-    },
-    onError: (error) => toast.error("Failed to create quote: " + error.message),
-  });
+  const handleCreateQuote = (status: "draft" | "pending_approval") => {
+    createQuoteMutation.mutate({
+      account_id: quoteData.account_id || undefined,
+      contact_id: quoteData.contact_id || undefined,
+      opportunity_id: quoteData.opportunity_id || undefined,
+      status,
+      valid_until: quoteData.valid_until || undefined,
+      terms: quoteData.terms,
+      notes: quoteData.notes,
+      subtotal,
+      discount_percent: quoteData.discount_percent,
+      discount_amount: discountAmount,
+      tax_percent: quoteData.tax_percent,
+      tax_amount: taxAmount,
+      total: grandTotal,
+      items,
+    }, {
+      onSuccess: (quote) => {
+        navigate(`/dashboard/cpq/quotes/${quote.id}`);
+      },
+    });
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
@@ -235,10 +209,10 @@ export default function QuoteBuilderPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => createQuoteMutation.mutate("draft")} disabled={createQuoteMutation.isPending}>
+            <Button variant="outline" onClick={() => handleCreateQuote("draft")} disabled={createQuoteMutation.isPending}>
               <Save className="h-4 w-4 mr-2" />Save Draft
             </Button>
-            <Button onClick={() => createQuoteMutation.mutate("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
+            <Button onClick={() => handleCreateQuote("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
               <Send className="h-4 w-4 mr-2" />Submit for Approval
             </Button>
           </div>
@@ -480,10 +454,10 @@ export default function QuoteBuilderPage() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Button className="w-full" onClick={() => createQuoteMutation.mutate("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
+                  <Button className="w-full" onClick={() => handleCreateQuote("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
                     <Send className="h-4 w-4 mr-2" />Submit for Approval
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={() => createQuoteMutation.mutate("draft")} disabled={createQuoteMutation.isPending}>
+                  <Button variant="outline" className="w-full" onClick={() => handleCreateQuote("draft")} disabled={createQuoteMutation.isPending}>
                     <Save className="h-4 w-4 mr-2" />Save as Draft
                   </Button>
                 </div>

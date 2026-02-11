@@ -1,8 +1,7 @@
 import { Calculator, Package, FileText, DollarSign, TrendingUp, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuotes, useProducts } from "@/hooks/useCPQ";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
@@ -11,34 +10,28 @@ import { StatsCard } from "@/components/crm/StatsCard";
 const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
 
 export default function CPQDashboard() {
-  const { data: stats } = useQuery({
-    queryKey: ["cpq-stats"],
-    queryFn: async () => {
-      const [productsRes, quotesRes] = await Promise.all([
-        supabase.from("products").select("*", { count: "exact" }),
-        supabase.from("quotes").select("*, quote_items(*)"),
-      ]);
+  const { data: quotes } = useQuotes();
+  const { data: products } = useProducts();
 
-      const quotes = quotesRes.data || [];
-      const totalProducts = productsRes.count || 0;
-      const totalQuotes = quotes.length;
-      const draftQuotes = quotes.filter((q) => q.status === "draft").length;
-      const approvedQuotes = quotes.filter((q) => q.status === "approved" || q.status === "accepted").length;
-      const pendingQuotes = quotes.filter((q) => q.status === "pending_approval" || q.status === "sent").length;
-      const totalValue = quotes.reduce((sum, q) => sum + (q.total || 0), 0);
-      const approvalRate = totalQuotes > 0 ? ((approvedQuotes / totalQuotes) * 100).toFixed(1) : "0";
-
-      const quotesByStatus = {
-        draft: draftQuotes,
-        pending: pendingQuotes,
-        approved: approvedQuotes,
-        rejected: quotes.filter((q) => q.status === "rejected").length,
-        expired: quotes.filter((q) => q.status === "expired").length,
-      };
-
-      return { totalProducts, totalQuotes, draftQuotes, approvedQuotes, pendingQuotes, totalValue, approvalRate, quotesByStatus };
+  // Calculate stats
+  const stats = {
+    totalProducts: products?.length || 0,
+    totalQuotes: quotes?.length || 0,
+    draftQuotes: quotes?.filter((q) => q.status === "draft").length || 0,
+    approvedQuotes: quotes?.filter((q) => q.status === "approved" || q.status === "accepted").length || 0,
+    pendingQuotes: quotes?.filter((q) => q.status === "pending_approval" || q.status === "sent").length || 0,
+    totalValue: quotes?.reduce((sum, q) => sum + (q.total || 0), 0) || 0,
+    approvalRate: quotes && quotes.length > 0 
+      ? (((quotes.filter((q) => q.status === "approved" || q.status === "accepted").length) / quotes.length) * 100).toFixed(1)
+      : "0",
+    quotesByStatus: {
+      draft: quotes?.filter((q) => q.status === "draft").length || 0,
+      pending: quotes?.filter((q) => q.status === "pending_approval" || q.status === "sent").length || 0,
+      approved: quotes?.filter((q) => q.status === "approved" || q.status === "accepted").length || 0,
+      rejected: quotes?.filter((q) => q.status === "rejected").length || 0,
+      expired: quotes?.filter((q) => q.status === "expired").length || 0,
     },
-  });
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);

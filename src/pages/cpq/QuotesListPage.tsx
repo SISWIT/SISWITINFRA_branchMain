@@ -4,14 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuotes, useUpdateQuoteStatus, useDeleteQuote } from "@/hooks/useCPQ";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { Quote } from "@/types/cpq";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -26,44 +26,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 export default function QuotesListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { data: quotes, isLoading } = useQuery({
-    queryKey: ["quotes-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*, accounts(name), contacts(first_name, last_name), opportunities(name)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | "accepted" | "expired" }) => {
-      const { error } = await supabase.from("quotes").update({ status }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes-list"] });
-      toast.success("Quote status updated");
-    },
-    onError: (error) => toast.error("Failed to update: " + error.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("quotes").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["quotes-list"] });
-      toast.success("Quote deleted");
-    },
-    onError: (error) => toast.error("Failed to delete: " + error.message),
-  });
+  const { data: quotes, isLoading } = useQuotes();
+  const updateStatusMutation = useUpdateQuoteStatus();
+  const deleteMutation = useDeleteQuote();
 
   const filteredQuotes = quotes?.filter((quote) => {
     const matchesSearch =
@@ -75,6 +42,16 @@ export default function QuotesListPage() {
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this quote?")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    updateStatusMutation.mutate({ id, status: newStatus });
   };
 
   return (
@@ -165,26 +142,26 @@ export default function QuotesListPage() {
                                 <Edit className="h-4 w-4 mr-2" />Edit
                               </DropdownMenuItem>
                               {quote.status === "draft" && (
-                                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: quote.id, status: "pending_approval" })}>
+                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "pending_approval")}>
                                   <Send className="h-4 w-4 mr-2" />Submit for Approval
                                 </DropdownMenuItem>
                               )}
                               {quote.status === "pending_approval" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: quote.id, status: "approved" })}>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "approved")}>
                                     <CheckCircle className="h-4 w-4 mr-2" />Approve
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: quote.id, status: "rejected" })}>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "rejected")}>
                                     <XCircle className="h-4 w-4 mr-2" />Reject
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {quote.status === "approved" && (
-                                <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/new?quote_id=${quote.id}`)}>
-                                  <ArrowRight className="h-4 w-4 mr-2" />Convert to Contract
+                              {(quote.status === "approved" || quote.status === "draft") && (
+                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "sent")}>
+                                  <Send className="h-4 w-4 mr-2" />Mark as Sent
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(quote.id)}>
+                              <DropdownMenuItem onClick={() => handleDelete(quote.id)} className="text-destructive">
                                 <Trash2 className="h-4 w-4 mr-2" />Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -202,3 +179,4 @@ export default function QuotesListPage() {
     </DashboardLayout>
   );
 }
+

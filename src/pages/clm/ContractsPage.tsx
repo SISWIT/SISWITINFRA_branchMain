@@ -4,8 +4,9 @@ import {
   useCreateContract, 
   useUpdateContract, 
   useDeleteContract,
-  useAccounts 
-} from "@/hooks/useCRM";
+  useContractTemplates
+} from "@/hooks/useCLM";
+import { useAccounts } from "@/hooks/useCRM";
 import { DataTable } from "@/components/crm/DataTable";
 import { Button } from "@/components/ui/button";
 import {
