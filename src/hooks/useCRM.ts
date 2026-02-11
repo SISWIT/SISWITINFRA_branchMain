@@ -4,14 +4,18 @@ import { useAuth } from "./useAuth";
 import type { Lead, Account, Contact, Opportunity, Activity, Product, Quote, QuoteItem, Contract, ContractTemplate } from "@/types/crm";
 import { toast } from "sonner"; // Assuming you use sonner or use-toast
 
-// Leads
+// Leads - UPDATED: Filter by current user
 export function useLeads() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["leads"],
+    queryKey: ["leads", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("leads")
         .select("*")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Lead[];
@@ -97,14 +101,18 @@ export function useDeleteLead() {
   });
 }
 
-// Accounts
+// Accounts - UPDATED: Filter by current user
 export function useAccounts() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["accounts"],
+    queryKey: ["accounts", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("accounts")
         .select("*")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Account[];
@@ -192,15 +200,18 @@ export function useDeleteAccount() {
   });
 }
 
-// Contacts
-// UPDATED: Now accepts an optional accountId to filter contacts
+// Contacts - UPDATED: Filter by current user and optional accountId
 export function useContacts(accountId?: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["contacts", accountId], // Include accountId in key to trigger refetch on change
+    queryKey: ["contacts", user?.id, accountId],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       let query = supabase
         .from("contacts")
         .select("*, account:accounts(*)")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       
       if (accountId) {
@@ -291,15 +302,18 @@ export function useDeleteContact() {
   });
 }
 
-// Opportunities
-// UPDATED: Now accepts an optional accountId to filter opportunities
+// Opportunities - UPDATED: Filter by current user and optional accountId
 export function useOpportunities(accountId?: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["opportunities", accountId], // Include accountId in key
+    queryKey: ["opportunities", user?.id, accountId],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       let query = supabase
         .from("opportunities")
         .select("*, account:accounts(*), contact:contacts(*)")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
       if (accountId) {
@@ -389,12 +403,17 @@ export function useDeleteOpportunity() {
   });
 }
 
-// Activities
+// Activities - UPDATED: Filter by current user
 export function useActivities(filters?: { opportunityId?: string; leadId?: string; accountId?: string }) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["activities", filters],
+    queryKey: ["activities", user?.id, filters],
+    enabled: !!user,
     queryFn: async () => {
-      let query = supabase.from("activities").select("*").order("created_at", { ascending: false });
+      if (!user?.id) throw new Error("User not authenticated");
+      let query = supabase.from("activities").select("*")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
+        .order("created_at", { ascending: false });
       
       if (filters?.opportunityId) query = query.eq("opportunity_id", filters.opportunityId);
       if (filters?.leadId) query = query.eq("lead_id", filters.leadId);
@@ -502,7 +521,8 @@ export function useProducts() {
 
 export function useCreateProduct() {
   const queryClient = useQueryClient();
-  
+  const { user } = useAuth();
+
   return useMutation({
     mutationFn: async (product: Omit<Partial<Product>, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
@@ -513,6 +533,7 @@ export function useCreateProduct() {
           description: product.description,
           category: product.category,
           unit_price: product.unit_price,
+          created_by: user?.id,
         })
         .select()
         .single();
@@ -530,13 +551,18 @@ export function useCreateProduct() {
 }
 
 // Quotes
+// Quotes - UPDATED: Filter by current user
 export function useQuotes() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["quotes"],
+    queryKey: ["quotes", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("quotes")
         .select("*, opportunity:opportunities(*), account:accounts(*)")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Quote[];
@@ -666,14 +692,18 @@ export function useDeleteQuoteItem() {
   });
 }
 
-// Contracts
+// Contracts - UPDATED: Filter by current user
 export function useContracts() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["contracts"],
+    queryKey: ["contracts", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("contracts")
         .select("*, account:accounts(*), quote:quotes(*)")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Contract[];
@@ -853,23 +883,26 @@ export function useDeleteContractTemplate() {
   });
 }
 
-// Dashboard Stats
+// Dashboard Stats - UPDATED: Filter by current user
 export function useDashboardStats() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["dashboard_stats"],
+    queryKey: ["dashboard_stats", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const [leads, opportunities, accounts, quotes, contracts] = await Promise.all([
-        supabase.from("leads").select("id, status", { count: "exact" }),
-        supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_won, is_closed"),
-        supabase.from("accounts").select("id", { count: "exact" }),
-        supabase.from("quotes").select("id, status, total", { count: "exact" }),
-        supabase.from("contracts").select("id, status, value", { count: "exact" }),
+        supabase.from("leads").select("id, status", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
+        supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_won, is_closed").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
+        supabase.from("accounts").select("id", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
+        supabase.from("quotes").select("id, status, total", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
+        supabase.from("contracts").select("id, status, value", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
       ]);
-      
+
       const opps = opportunities.data || [];
       const openOpps = opps.filter(o => !o.is_closed);
       const wonOpps = opps.filter(o => o.is_won);
-      
+
       return {
         totalLeads: leads.count || 0,
         totalAccounts: accounts.count || 0,
@@ -879,8 +912,8 @@ export function useDashboardStats() {
         expectedRevenue: openOpps.reduce((sum, o) => sum + (o.expected_revenue || 0), 0),
         wonDeals: wonOpps.length,
         wonValue: wonOpps.reduce((sum, o) => sum + (o.amount || 0), 0),
-        winRate: opps.filter(o => o.is_closed).length > 0 
-          ? (wonOpps.length / opps.filter(o => o.is_closed).length) * 100 
+        winRate: opps.filter(o => o.is_closed).length > 0
+          ? (wonOpps.length / opps.filter(o => o.is_closed).length) * 100
           : 0,
         totalQuotes: quotes.count || 0,
         totalContracts: contracts.count || 0,

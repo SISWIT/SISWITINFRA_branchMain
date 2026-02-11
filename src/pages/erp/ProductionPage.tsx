@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -60,11 +61,14 @@ export default function ProductionPage() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // 1. FETCH DATA (Joins with Products table to get the Product Name)
+  // 1. FETCH DATA - UPDATED: Filter by current user
   const { data: orders, isLoading } = useQuery({
-    queryKey: ["production-orders"],
+    queryKey: ["production-orders", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("production_orders")
         .select(`
@@ -74,16 +78,17 @@ export default function ProductionPage() {
             sku
           )
         `)
+        .eq("created_by", user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 
-  // 2. CREATE / UPDATE MUTATION
+  // 2. CREATE / UPDATE MUTATION - UPDATED: Include user ID
   const upsertOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const payload = { ...orderData };
+      const payload = { ...orderData, created_by: user?.id };
       delete payload.products; // Remove the joined data before sending to DB
 
       if (payload.id) {

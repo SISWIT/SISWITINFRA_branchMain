@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -31,14 +32,18 @@ export default function FinancePage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // 1. FETCH FINANCIAL DATA
+  // 1. FETCH FINANCIAL DATA - UPDATED: Filter by current user
   const { data: records, isLoading } = useQuery({
-    queryKey: ["financial-records"],
+    queryKey: ["financial-records", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("financial_records")
         .select("*")
+        .eq("created_by", user.id)
         .order('transaction_date', { ascending: false });
       if (error) throw error;
       return data;
@@ -64,10 +69,11 @@ export default function FinancePage() {
     };
   }, [records]);
 
-  // 3. ADD TRANSACTION MUTATION
+  // 3. ADD TRANSACTION MUTATION - UPDATED: Include user ID
   const addTransactionMutation = useMutation({
     mutationFn: async (newRecord: any) => {
-      const { data, error } = await supabase.from("financial_records").insert([newRecord]).select();
+      const recordWithUser = { ...newRecord, created_by: user?.id };
+      const { data, error } = await supabase.from("financial_records").insert([recordWithUser]).select();
       if (error) throw error;
       return data;
     },

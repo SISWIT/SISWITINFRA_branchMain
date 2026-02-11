@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus, AlertTriangle, Package, Search, Loader2, Warehouse } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export default function InventoryPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // SECTION: Real-time Sync
   // Listens for any changes to the inventory_items table and refreshes data
@@ -38,10 +40,12 @@ export default function InventoryPage() {
     };
   }, [queryClient]);
 
-  // SECTION: Fast Data Fetching
+  // SECTION: Fast Data Fetching - UPDATED: Filter by current user
   const { data: inventory, isLoading } = useQuery({
-    queryKey: ["inventory-list"],
+    queryKey: ["inventory-list", user?.id],
+    enabled: !!user,
     queryFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
       const { data, error } = await supabase
         .from("inventory_items")
         .select(`
@@ -52,6 +56,7 @@ export default function InventoryPage() {
             category
           )
         `)
+        .eq("created_by", user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -64,7 +69,7 @@ export default function InventoryPage() {
     mutationFn: async (newItem: any) => {
       const { data, error } = await supabase
         .from("inventory_items")
-        .insert([newItem])
+        .insert([{ ...newItem, created_by: user?.id }])
         .select();
       if (error) throw error;
       return data;

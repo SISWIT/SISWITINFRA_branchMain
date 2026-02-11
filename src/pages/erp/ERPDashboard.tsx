@@ -3,17 +3,40 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts"; // Removed unused BarChart imports
+import { useAuth } from "@/hooks/useAuth";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { StatsCard } from "@/components/crm/StatsCard";
 import { Badge } from "@/components/ui/badge";
-import { Database } from "@/integrations/supabase/types"; 
 
-type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"];
-type ProductionOrder = Database["public"]["Tables"]["production_orders"]["Row"];
-type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
-type FinancialRecord = Database["public"]["Tables"]["financial_records"]["Row"];
+// Simplified types to avoid deep type instantiation errors
+interface SimpleInventoryItem {
+  id: string;
+  quantity_on_hand: number;
+  reorder_level: number | null;
+  products: { unit_price: number } | null;
+}
+
+interface SimpleProductionOrder {
+  id: string;
+  status: string;
+}
+
+interface SimplePurchaseOrder {
+  id: string;
+  status: string;
+  total_amount: number | null;
+  order_number?: string;
+  po_number?: string;
+  accounts: { name: string } | null;
+}
+
+interface SimpleFinancialRecord {
+  id: string;
+  transaction_type: string;
+  amount: number;
+}
 
 const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
 
@@ -29,36 +52,42 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ERPDashboard() {
+  const { user } = useAuth();
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["erp-stats"],
+    queryKey: ["erp-stats", user?.id],
+    enabled: !!user,
     queryFn: async () => {
-      // 1. Fetch Inventory with Product details
+      if (!user?.id) throw new Error("User not authenticated");
+      // 1. Fetch Inventory with Product details - UPDATED: Filter by user
       const { data: inventoryData } = await supabase
         .from("inventory_items")
-        .select(`*, products(unit_price)`);
+        .select(`*, products(unit_price)`)
+        .eq("created_by", user.id);
 
-      // 2. Fetch Purchase Orders with Vendor names
+      // 2. Fetch Purchase Orders with Vendor names - UPDATED: Filter by user
       const { data: purchaseOrdersData } = await supabase
         .from("purchase_orders")
         .select(`*, accounts(name)`)
+        .eq("created_by", user.id)
         .order('created_at', { ascending: false });
 
-      // 3. Fetch Production Orders
+      // 3. Fetch Production Orders - UPDATED: Filter by user
       const { data: productionOrdersData } = await supabase
         .from("production_orders")
-        .select("*");
+        .select("*")
+        .eq("created_by", user.id);
 
-      // 4. Fetch Financial Records
+      // 4. Fetch Financial Records - UPDATED: Filter by user
       const { data: financialRecordsData } = await supabase
         .from("financial_records")
-        .select("*");
+        .select("*")
+        .eq("created_by", user.id);
 
       // Type Casting
-      const inventory = (inventoryData || []) as (InventoryItem & { products: { unit_price: number } | null })[];
-      const production = (productionOrdersData || []) as ProductionOrder[];
-      // We explicitly cast accounts to allow access to 'name'
-      const procurement = (purchaseOrdersData || []) as (PurchaseOrder & { accounts: { name: string } | null })[];
-      const finance = (financialRecordsData || []) as FinancialRecord[];
+      const inventory = (inventoryData || []) as SimpleInventoryItem[];
+      const production = (productionOrdersData || []) as SimpleProductionOrder[];
+      const procurement = (purchaseOrdersData || []) as SimplePurchaseOrder[];
+      const finance = (financialRecordsData || []) as SimpleFinancialRecord[];
 
       // --- Calculations ---
       const totalInventory = inventory.length;
