@@ -1,32 +1,19 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/crm/StatsCard";
+import { useAutoDocuments } from "@/hooks/useDocuments";
 import { 
   FileStack, FilePlus, FileText, Send, CheckCircle2, 
   Clock, AlertCircle, ArrowRight, History, Zap
 } from "lucide-react";
-
-const stats = [
-  { title: "Documents Generated", value: "892", change: "+32%", icon: FileStack },
-  { title: "Pending Signatures", value: "24", change: "-8%", icon: Send },
-  { title: "Approved Documents", value: "156", change: "+15%", icon: CheckCircle2 },
-  { title: "Automation Rate", value: "94%", change: "+5%", icon: Zap },
-];
 
 const quickActions = [
   { icon: FilePlus, title: "Create Document", description: "Generate a new document from template", path: "/dashboard/documents/create", color: "from-primary to-primary/60" },
   { icon: FileText, title: "Manage Templates", description: "Edit and create document templates", path: "/dashboard/documents/templates", color: "from-accent to-accent/60" },
   { icon: History, title: "View History", description: "Document generation history and logs", path: "/dashboard/documents/history", color: "from-chart-3 to-chart-3/60" },
   { icon: Send, title: "Pending Approvals", description: "Documents awaiting signature", path: "/dashboard/documents/pending", color: "from-chart-4 to-chart-4/60" },
-];
-
-const recentDocuments = [
-  { id: "DOC-2024-0892", name: "Sales Agreement - Acme Corp", type: "Contract", status: "signed", time: "2 hours ago" },
-  { id: "DOC-2024-0891", name: "Quote Proposal - TechStart Inc", type: "Quote", status: "pending", time: "5 hours ago" },
-  { id: "DOC-2024-0890", name: "NDA - Global Solutions", type: "NDA", status: "approved", time: "1 day ago" },
-  { id: "DOC-2024-0889", name: "Invoice #INV-4521", type: "Invoice", status: "sent", time: "1 day ago" },
-  { id: "DOC-2024-0888", name: "Service Agreement - DataFlow", type: "Contract", status: "draft", time: "2 days ago" },
 ];
 
 const statusStyles: Record<string, { bg: string; text: string }> = {
@@ -38,6 +25,23 @@ const statusStyles: Record<string, { bg: string; text: string }> = {
 };
 
 const DocumentsDashboard = () => {
+  const { data: documents = [], isLoading } = useAutoDocuments();
+  
+  const stats = [
+    { title: "Documents Generated", value: documents.length.toString(), change: "+0%", icon: FileStack },
+    { title: "Pending Signatures", value: documents.filter((d: any) => d.status === "pending").length.toString(), change: "0%", icon: Send },
+    { title: "Approved Documents", value: documents.filter((d: any) => d.status === "signed" || d.status === "approved").length.toString(), change: "+0%", icon: CheckCircle2 },
+    { title: "Automation Rate", value: "0%", change: "+0%", icon: Zap },
+  ];
+
+  const recentDocuments = documents.slice(0, 5).map((doc: any) => ({
+    id: doc.id,
+    name: doc.name || "Untitled Document",
+    type: doc.type || "Document",
+    status: doc.status || "draft",
+    time: "Recently created"
+  }));
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -102,27 +106,38 @@ const DocumentsDashboard = () => {
             </Link>
           </div>
           <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-            <div className="divide-y divide-border">
-              {recentDocuments.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="p-4 hover:bg-secondary/50 transition-colors flex items-center gap-4"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <FileStack className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{doc.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {doc.id} • {doc.type} • {doc.time}
+            {isLoading ? (
+              <div className="p-8 text-center text-muted-foreground">
+                Loading documents...
+              </div>
+            ) : recentDocuments.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <FileStack className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <div>No documents yet. Create one to get started!</div>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {recentDocuments.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-4 hover:bg-secondary/50 transition-colors flex items-center gap-4"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <FileStack className="w-5 h-5 text-primary" />
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground truncate">{doc.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {doc.id} • {doc.type} • {doc.time}
+                      </div>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${statusStyles[doc.status]?.bg} ${statusStyles[doc.status]?.text}`}>
+                      {doc.status}
+                    </span>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${statusStyles[doc.status]?.bg} ${statusStyles[doc.status]?.text}`}>
-                    {doc.status}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

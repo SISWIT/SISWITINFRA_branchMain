@@ -41,30 +41,19 @@ export default function ContractScanPage() {
       setScanProgress(i);
     }
 
-    // Mock AI scan results
-    const mockResult: ScanResult = {
-      parties: ["Siriusinfra Technologies Pvt Ltd", "Acme Corporation Inc."],
-      startDate: "2025-01-01",
-      endDate: "2025-12-31",
-      value: "₹89,99,000",
-      paymentTerms: "Net 30 days, quarterly billing",
-      renewalClause: "Auto-renews annually unless cancelled 30 days prior to expiration",
-      riskFlags: [
-        { level: "high", message: "Missing signature field on page 12" },
-        { level: "medium", message: "Liability cap not specified in Section 7" },
-        { level: "low", message: "Non-standard indemnification language detected" },
-      ],
-      keyClausesClauses: [
-        { title: "Term & Termination", summary: "12-month initial term with 30-day termination notice requirement", risk: "low" },
-        { title: "Payment Terms", summary: "Quarterly payments due within 30 days of invoice", risk: "low" },
-        { title: "Liability", summary: "Liability cap not explicitly defined - potential unlimited exposure", risk: "high" },
-        { title: "Data Protection", summary: "GDPR-compliant data processing terms included", risk: "low" },
-        { title: "Intellectual Property", summary: "All IP remains with service provider; customer gets limited license", risk: "medium" },
-        { title: "Confidentiality", summary: "Standard NDA terms with 3-year post-termination period", risk: "low" },
-      ],
+    // AI scan results - replace with actual API call in production
+    const scanResultData: ScanResult = {
+      parties: [],
+      startDate: "",
+      endDate: "",
+      value: "",
+      paymentTerms: "",
+      renewalClause: "",
+      riskFlags: [],
+      keyClausesClauses: [],
     };
 
-    setScanResult(mockResult);
+    setScanResult(scanResultData);
     setIsScanning(false);
     toast.success("Contract scan completed");
   };

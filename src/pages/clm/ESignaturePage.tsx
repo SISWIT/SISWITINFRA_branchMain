@@ -70,11 +70,8 @@ export default function ESignaturePage() {
     navigate("/dashboard/clm/contracts");
   };
 
-  // Mock audit trail
-  const auditTrail = [
-    { timestamp: "2025-06-20 10:30:00", action: "Document created", user: "John Doe", ip: "192.168.1.1" },
-    { timestamp: "2025-06-20 10:35:00", action: "Sent for signature", user: "John Doe", ip: "192.168.1.1" },
-  ];
+  // Audit trail - will be fetched from database in production
+  const auditTrail: Array<{ timestamp: string; action: string; user: string; ip: string }> = [];
 
   return (
     <DashboardLayout>

@@ -9,7 +9,7 @@ import {
   Calculator, FileText, Users, Settings, BarChart3,
   Bell, Search, Plus, ArrowRight, TrendingUp, Clock,
   CheckCircle2, AlertCircle, Loader2, LogOut, FileStack,
-  Boxes // Added icon for ERP
+  Boxes
 } from "lucide-react";
 
 interface Profile {
@@ -22,33 +22,25 @@ const quickActions = [
   { icon: Calculator, title: "Create Quote", description: "Start a new CPQ quote", color: "from-primary to-primary/60" },
   { icon: FileText, title: "New Contract", description: "Draft a new contract", color: "from-accent to-accent/60" },
   { icon: FileStack, title: "Create Document", description: "Generate a new document", color: "from-chart-4 to-chart-4/60" },
-  // Added ERP Quick Action
   { icon: Boxes, title: "Update Inventory", description: "Manage stock levels", color: "from-orange-500 to-orange-500/60" },
   { icon: Users, title: "Add Contact", description: "Add a new customer", color: "from-chart-3 to-chart-3/60" },
-];
-
-const recentActivity = [
-  { type: "quote", title: "Quote #Q-2024-0142 created", time: "2 hours ago", status: "pending" },
-  { type: "contract", title: "Contract with Acme Corp signed", time: "5 hours ago", status: "completed" },
-  // Added ERP Activity
-  { type: "erp", title: "Inventory Batch #9923 received", time: "8 hours ago", status: "completed" },
-  { type: "contact", title: "New lead: John Smith", time: "1 day ago", status: "new" },
-  { type: "quote", title: "Quote #Q-2024-0141 approved", time: "2 days ago", status: "completed" },
-];
-
-const stats = [
-  { label: "Open Quotes", value: "24", change: "+12%", icon: Calculator },
-  { label: "Active Contracts", value: "156", change: "+8%", icon: FileText },
-  { label: "Documents Generated", value: "892", change: "+32%", icon: FileStack },
-  // Added ERP Stat
-  { label: "Inventory Value", value: "$420K", change: "+5%", icon: Boxes },
-  { label: "Revenue MTD", value: "$124K", change: "+18%", icon: TrendingUp },
 ];
 
 const Dashboard = () => {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
+
+  // Initialize with empty/zero stats - these will show real data when fetched
+  const [stats] = useState([
+    { label: "Open Quotes", value: "0", change: "+0%", icon: Calculator },
+    { label: "Active Contracts", value: "0", change: "+0%", icon: FileText },
+    { label: "Documents Generated", value: "0", change: "+0%", icon: FileStack },
+    { label: "Inventory Value", value: "$0", change: "+0%", icon: Boxes },
+    { label: "Revenue MTD", value: "$0", change: "+0%", icon: TrendingUp },
+  ]);
+
+  const [recentActivity] = useState([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -180,41 +172,48 @@ const Dashboard = () => {
                   </Button>
                 </div>
                 <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-                  <div className="divide-y divide-border">
-                    {recentActivity.map((activity, index) => (
-                      <div
-                        key={index}
-                        className="p-4 hover:bg-secondary/50 transition-colors flex items-center gap-4"
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activity.status === "completed"
-                            ? "bg-primary/10"
-                            : activity.status === "pending"
-                              ? "bg-accent/10"
-                              : "bg-chart-3/10"
-                          }`}>
-                          {activity.status === "completed" ? (
-                            <CheckCircle2 className="w-5 h-5 text-primary" />
-                          ) : activity.status === "pending" ? (
-                            <Clock className="w-5 h-5 text-accent" />
-                          ) : (
-                            <AlertCircle className="w-5 h-5 text-chart-3" />
-                          )}
+                  {recentActivity.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground">
+                      <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <div>No recent activity. Start by creating a quote or contract!</div>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {recentActivity.map((activity, index) => (
+                        <div
+                          key={index}
+                          className="p-4 hover:bg-secondary/50 transition-colors flex items-center gap-4"
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activity.status === "completed"
+                              ? "bg-primary/10"
+                              : activity.status === "pending"
+                                ? "bg-accent/10"
+                                : "bg-chart-3/10"
+                            }`}>
+                            {activity.status === "completed" ? (
+                              <CheckCircle2 className="w-5 h-5 text-primary" />
+                            ) : activity.status === "pending" ? (
+                              <Clock className="w-5 h-5 text-accent" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 text-chart-3" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">{activity.title}</div>
+                            <div className="text-sm text-muted-foreground">{activity.time}</div>
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${activity.status === "completed"
+                              ? "bg-primary/10 text-primary"
+                              : activity.status === "pending"
+                                ? "bg-accent/10 text-accent"
+                                : "bg-chart-3/10 text-chart-3"
+                            }`}>
+                            {activity.status}
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-foreground">{activity.title}</div>
-                          <div className="text-sm text-muted-foreground">{activity.time}</div>
-                        </div>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${activity.status === "completed"
-                            ? "bg-primary/10 text-primary"
-                            : activity.status === "pending"
-                              ? "bg-accent/10 text-accent"
-                              : "bg-chart-3/10 text-chart-3"
-                          }`}>
-                          {activity.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

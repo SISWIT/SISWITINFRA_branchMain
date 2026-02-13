@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAutoDocuments } from "@/hooks/useDocuments";
 import { 
   FileStack, Search, Download, Eye, Filter, Calendar,
   CheckCircle2, Clock, Send, AlertCircle, FileText
@@ -14,17 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const documents = [
-  { id: "DOC-2024-0892", name: "Sales Agreement - Acme Corp", type: "Contract", status: "signed", createdAt: "Dec 28, 2024", createdBy: "John Smith" },
-  { id: "DOC-2024-0891", name: "Quote Proposal - TechStart Inc", type: "Quote", status: "pending", createdAt: "Dec 28, 2024", createdBy: "Sarah Johnson" },
-  { id: "DOC-2024-0890", name: "NDA - Global Solutions", type: "NDA", status: "approved", createdAt: "Dec 27, 2024", createdBy: "Mike Wilson" },
-  { id: "DOC-2024-0889", name: "Invoice #INV-4521", type: "Invoice", status: "sent", createdAt: "Dec 27, 2024", createdBy: "Emily Davis" },
-  { id: "DOC-2024-0888", name: "Service Agreement - DataFlow", type: "Contract", status: "draft", createdAt: "Dec 26, 2024", createdBy: "John Smith" },
-  { id: "DOC-2024-0887", name: "Employment Offer - J. Williams", type: "HR", status: "signed", createdAt: "Dec 25, 2024", createdBy: "HR Admin" },
-  { id: "DOC-2024-0886", name: "Partnership Agreement", type: "Contract", status: "expired", createdAt: "Dec 24, 2024", createdBy: "Legal Team" },
-  { id: "DOC-2024-0885", name: "Quote - Enterprise Plan", type: "Quote", status: "approved", createdAt: "Dec 23, 2024", createdBy: "Sarah Johnson" },
-];
-
 const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: string; label: string }> = {
   signed: { icon: CheckCircle2, bg: "bg-primary/10", text: "text-primary", label: "Signed" },
   pending: { icon: Clock, bg: "bg-accent/10", text: "text-accent", label: "Pending" },
@@ -35,13 +25,14 @@ const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: 
 };
 
 const DocumentHistoryPage = () => {
+  const { data: documents = [], isLoading } = useAutoDocuments();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.id.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredDocuments = documents.filter((doc: any) => {
+    const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (doc.id || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
     const matchesType = typeFilter === "all" || doc.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
@@ -104,70 +95,73 @@ const DocumentHistoryPage = () => {
 
         {/* Documents Table */}
         <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left p-4 font-medium text-muted-foreground">Document</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Type</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Created</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Created By</th>
-                  <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredDocuments.map((doc) => {
-                  const status = statusConfig[doc.status];
-                  const StatusIcon = status.icon;
-                  return (
-                    <tr key={doc.id} className="hover:bg-secondary/50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <FileStack className="w-5 h-5 text-primary" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-foreground">{doc.name}</div>
-                            <div className="text-sm text-muted-foreground">{doc.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="inline-block text-xs font-medium px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                          {doc.type}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${status.bg} ${status.text}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="p-4 text-muted-foreground">{doc.createdAt}</td>
-                      <td className="p-4 text-muted-foreground">{doc.createdBy}</td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="icon">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredDocuments.length === 0 && (
+          {isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <FileStack className="w-12 h-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Loading documents...</h3>
+            </div>
+          ) : filteredDocuments.length === 0 ? (
             <div className="text-center py-12">
               <FileStack className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No documents found</h3>
               <p className="text-muted-foreground">Try adjusting your search or filter criteria</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left p-4 font-medium text-muted-foreground">Document</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Type</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Created</th>
+                    <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredDocuments.map((doc: any) => {
+                    const status = statusConfig[doc.status] || statusConfig.draft;
+                    const StatusIcon = status.icon;
+                    return (
+                      <tr key={doc.id} className="hover:bg-secondary/50 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <FileStack className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-foreground">{doc.name || "Untitled"}</div>
+                              <div className="text-sm text-muted-foreground">{doc.id}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-block text-xs font-medium px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
+                            {doc.type || "Document"}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${status.bg} ${status.text}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="p-4 text-muted-foreground">Recently created</td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="icon">
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon">
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

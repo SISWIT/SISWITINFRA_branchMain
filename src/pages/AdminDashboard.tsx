@@ -93,10 +93,10 @@ export default function AdminDashboard() {
         .eq('role', 'employee');
 
       setStats({
-        totalUsers: (employeeCount || 0) + validRequests.length + 12, // +12 is mock existing users
+        totalUsers: (employeeCount || 0) + validRequests.length,
         pendingRequests: validRequests.length,
         activeEmployees: employeeCount || 0,
-        rejectedRequests: 5 // Mock number for the chart
+        rejectedRequests: 0
       });
 
     } catch (error: any) {
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Mock Data for Charts
+  // Chart data for displaying user statistics
   const chartData = [
     { name: "Active", value: stats.activeEmployees },
     { name: "Pending", value: stats.pendingRequests },
