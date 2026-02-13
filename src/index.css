@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
   :root {
     /* ═══════════════════════════════════════════════════════════════════════
        METEOR SILVER DESIGN SYSTEM - LIGHT MODE
@@ -199,6 +203,7 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
     transition: background-color 0.3s ease, color 0.3s ease;
+    scrollbar-gutter: stable;
   }
   
   /* Smooth theme transition for all elements */

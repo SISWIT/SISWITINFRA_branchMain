@@ -3,6 +3,14 @@ import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -19,11 +27,11 @@ interface Profile {
 }
 
 const quickActions = [
-  { icon: Calculator, title: "Create Quote", description: "Start a new CPQ quote", color: "from-primary to-primary/60" },
-  { icon: FileText, title: "New Contract", description: "Draft a new contract", color: "from-accent to-accent/60" },
-  { icon: FileStack, title: "Create Document", description: "Generate a new document", color: "from-chart-4 to-chart-4/60" },
-  { icon: Boxes, title: "Update Inventory", description: "Manage stock levels", color: "from-orange-500 to-orange-500/60" },
-  { icon: Users, title: "Add Contact", description: "Add a new customer", color: "from-chart-3 to-chart-3/60" },
+  { icon: Calculator, title: "Create Quote", description: "Start a new CPQ quote", color: "from-primary to-primary/60", route: "/dashboard/cpq/quotes/new" },
+  { icon: FileText, title: "New Contract", description: "Draft a new contract", color: "from-accent to-accent/60", route: "/dashboard/clm/contracts" },
+  { icon: FileStack, title: "Create Document", description: "Generate a new document", color: "from-chart-4 to-chart-4/60", route: "/dashboard/documents/create" },
+  { icon: Boxes, title: "Update Inventory", description: "Manage stock levels", color: "from-orange-500 to-orange-500/60", route: "/dashboard/erp/inventory" },
+  { icon: Users, title: "Add Contact", description: "Add a new customer", color: "from-chart-3 to-chart-3/60", route: "/dashboard/crm/contacts" },
 ];
 
 const Dashboard = () => {
@@ -102,10 +110,31 @@ const Dashboard = () => {
                   <Bell className="w-4 h-4 mr-2" />
                   Notifications
                 </Button>
-                <Button variant="hero" size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Quick Action
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="hero" size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Quick Action
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {quickActions.map((action) => (
+                      <DropdownMenuItem
+                        key={action.title}
+                        onClick={() => navigate(action.route)}
+                        className="cursor-pointer"
+                      >
+                        <action.icon className="w-4 h-4 mr-2" />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{action.title}</span>
+                          <span className="text-xs text-muted-foreground">{action.description}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -148,6 +177,7 @@ const Dashboard = () => {
                   {quickActions.map((action) => (
                     <button
                       key={action.title}
+                      onClick={() => navigate(action.route)}
                       className="w-full p-4 rounded-xl bg-card border border-border hover:border-primary/30 hover:shadow-card-hover transition-all flex items-center gap-4 text-left group"
                     >
                       <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
