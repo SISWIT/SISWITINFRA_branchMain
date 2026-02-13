@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuote, useQuoteItems, useUpdateQuoteStatus, useDeleteQuote } from "@/hooks/useCPQ";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -36,32 +35,27 @@ export default function QuoteDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="animate-pulse space-y-6">
+      <div className="animate-pulse space-y-6">
           <div className="h-8 bg-muted rounded w-1/3" />
           <div className="h-64 bg-muted rounded" />
         </div>
-      </DashboardLayout>
     );
   }
 
   if (!quote) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
+      <div className="text-center py-12">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold">Quote not found</h2>
           <Button variant="link" onClick={() => navigate("/dashboard/cpq/quotes")}>Go back to quotes</Button>
         </div>
-      </DashboardLayout>
     );
   }
 
   const statusConfig = STATUS_CONFIG[quote.status] || STATUS_CONFIG.draft;
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -278,6 +272,5 @@ export default function QuoteDetailPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

@@ -1,5 +1,4 @@
 import { useAutoDocuments } from "@/hooks/useDocuments";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { 
   Send, Clock, User, Building2, FileStack, 
@@ -11,8 +10,9 @@ const PendingSignaturesPage = () => {
   
   // Filter for documents with pending signatures
   const pendingDocuments = allDocuments.filter((doc: any) => doc.status === "pending");
-    <DashboardLayout>
-      <div className="space-y-6">
+
+  return (
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -142,7 +142,7 @@ const PendingSignaturesPage = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+  );
 };
 
 export default PendingSignaturesPage;

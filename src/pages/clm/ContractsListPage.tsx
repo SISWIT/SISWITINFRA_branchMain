@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -89,8 +88,7 @@ export default function ContractsListPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Contracts</h1>
@@ -215,6 +213,5 @@ export default function ContractsListPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   );
 }

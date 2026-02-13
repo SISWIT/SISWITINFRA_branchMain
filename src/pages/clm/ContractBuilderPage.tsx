@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -63,41 +62,51 @@ export default function ContractBuilderPage() {
       }));
     }
   }, [quote]);
- - UPDATED: Filter by current user
   const { data: templates } = useQuery({
     queryKey: ["contract-templates", user?.id],
-    enabled: !!user,
+    enabled: !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase.from("contract_templates").select("*").or(`created_by.eq.${user.id},is_public.eq.true`
-      const { data, error } = await supabase.from("contract_templates").select("*").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("contract_templates")
+        .select("*")
+        .or(`created_by.eq.${user.id},is_public.eq.true`)
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
-  }); - UPDATED: Filter by current user
+  });
+
   const { data: accounts } = useQuery({
     queryKey: ["accounts-list", user?.id],
-    enabled: !!user,
+    enabled: !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase.from("accounts").select("id, name").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("id, name").order("name");
-      if (error) throw error;
-      return data; - UPDATED: Filter by current user
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", contractData.account_id, user?.id],
-    enabled: !!contractData.account_id && !!user,
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase.from("contacts").select("id, first_name, last_name").eq("account_id", contractData.account_id).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`).order("first_name");
-      if (error) throw error;
-      return data;
-    }pabase.from("contacts").select("id, first_name, last_name").eq("account_id", contractData.account_id).order("first_name");
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id, name")
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
+        .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: !!contractData.account_id,
+  });
+
+  const { data: contacts } = useQuery({
+    queryKey: ["contacts-list", contractData.account_id, user?.id],
+    enabled: !!contractData.account_id && !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id, first_name, last_name")
+        .eq("account_id", contractData.account_id)
+        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
+        .order("first_name");
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Apply template content
@@ -134,12 +143,12 @@ export default function ContractBuilderPage() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (contract) => {
+    onSuccess: (contract: any) => {
       queryClient.invalidateQueries({ queryKey: ["contracts-list"] });
       toast.success("Contract created successfully");
       navigate(`/dashboard/clm/contracts/${contract.id}`);
     },
-    onError: (error) => toast.error("Failed to create contract: " + error.message),
+    onError: (error: any) => toast.error("Failed to create contract: " + (error?.message || String(error))),
   });
 
   const formatCurrency = (value: number) => {
@@ -147,8 +156,7 @@ export default function ContractBuilderPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -332,6 +340,5 @@ export default function ContractBuilderPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

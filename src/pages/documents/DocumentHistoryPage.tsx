@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAutoDocuments } from "@/hooks/useDocuments";
@@ -39,8 +38,7 @@ const DocumentHistoryPage = () => {
   });
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -166,7 +164,6 @@ const DocumentHistoryPage = () => {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

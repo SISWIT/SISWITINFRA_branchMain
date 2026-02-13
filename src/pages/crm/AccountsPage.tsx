@@ -8,7 +8,6 @@ import {
 } from "@/hooks/useCRM";
 
 import { DataTable } from "@/components/crm/DataTable";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -252,8 +251,7 @@ export default function AccountsPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Accounts</h1>
           <p className="text-muted-foreground">
@@ -397,7 +395,6 @@ export default function AccountsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }
 

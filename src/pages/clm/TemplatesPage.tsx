@@ -32,7 +32,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { ContractTemplate } from "@/types/clm";
 
@@ -151,8 +150,7 @@ export default function TemplatesPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Contract Templates</h1>
           <p className="text-muted-foreground">Create reusable templates for your legal agreements</p>
@@ -216,6 +214,5 @@ export default function TemplatesPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }

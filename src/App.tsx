@@ -6,9 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
-// 1. IMPORT ADMIN ROUTE HERE
-import { EmployeeRoute, AdminRoute } from "@/components/auth/ProtectedRoute";
 
+// Auth & Layout Routes
+import { EmployeeRoute, AdminRoute } from "@/components/auth/ProtectedRoute";
+import { DashboardLayout } from "@/components/crm/DashboardLayout"; // <-- IMPORTANT: Adjust this path if your layout is in a components/layouts folder
+
+// Public Pages
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Solutions from "./pages/Solutions";
@@ -16,20 +19,26 @@ import Pricing from "./pages/Pricing";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
+// Dashboard Base & Admin
+import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+
+// Documents
 import DocumentsDashboard from "./pages/documents/DocumentsDashboard";
 import DocumentTemplatesPage from "./pages/documents/DocumentTemplatesPage";
 import DocumentHistoryPage from "./pages/documents/DocumentHistoryPage";
 import DocumentCreatePage from "./pages/documents/DocumentCreatePage";
 import PendingSignaturesPage from "./pages/documents/PendingSignaturesPage";
 
+// CLM
 import CLMDashboard from "./pages/clm/CLMDashboard";
 import ContractsPage from "./pages/clm/ContractsPage"; 
 import TemplatesPage from "./pages/clm/TemplatesPage"; 
 
+// CRM
 import CRMLayout from "./pages/crm/CRMLayout";
 import LeadsPage from "./pages/crm/LeadsPage";
 import OpportunitiesPage from "./pages/crm/OpportunitiesPage";
@@ -38,19 +47,19 @@ import AccountsPage from "./pages/crm/AccountsPage";
 import ContactsPage from "./pages/crm/ContactsPage";
 import ActivitiesPage from "./pages/crm/ActivitiesPage";
 
+// CPQ
 import CPQDashboard from "./pages/cpq/CPQDashboard";
 import ProductsPage from "./pages/cpq/ProductsPage";
 import QuoteDetailPage from "./pages/cpq/QuoteDetailPage";
 import QuotesListPage from "./pages/cpq/QuotesListPage";
 import QuoteBuilderPage from "./pages/cpq/QuoteBuilderPage";
 
+// ERP
 import ERPDashboard from "./pages/erp/ERPDashboard";
 import InventoryPage from "./pages/erp/InventoryPage";
 import ProcurementPage from "./pages/erp/ProcurementPage";
 import ProductionPage from "./pages/erp/ProductionPage";
 import FinancePage from "./pages/erp/FinancePage";
-
-import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -64,185 +73,93 @@ const App = () => (
           <ScrollToTop />
           <AuthProvider>
             <Routes>
-            {/* Public routes - accessible by everyone */}
-            <Route path="/" element={<Index />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/solutions" element={<Solutions />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+              {/* --- PUBLIC ROUTES --- */}
+              <Route path="/" element={<Index />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/solutions" element={<Solutions />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* --- ADMIN ROUTES --- */}
-            {/* This matches the navigate("/admin") from your login form */}
-            <Route path="/admin" element={
-              <AdminRoute>
-                {/* Replace <Dashboard /> with your specific <AdminDashboard /> component when ready */}
-                <AdminDashboard /> 
-              </AdminRoute>
-            } />
+              {/* --- ADMIN ROUTE --- */}
+              <Route 
+                path="/admin" 
+                element={
+                  <AdminRoute>
+                    <AdminDashboard /> 
+                  </AdminRoute>
+                } 
+              />
 
-            {/* --- EMPLOYEE ROUTES --- */}
-            <Route path="/dashboard" element={
-              <EmployeeRoute>
-                <Dashboard />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/cpq" element={
-              <EmployeeRoute>
-                <CPQDashboard />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/cpq/products" element={
-              <EmployeeRoute>
-                <ProductsPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/cpq/quotes" element={
-              <EmployeeRoute>
-                <QuotesListPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/cpq/quotes/:id/edit" element={
-              <EmployeeRoute>
-                <QuoteBuilderPage />
-              </EmployeeRoute>}
-            />
-            <Route path="/dashboard/cpq/quotes/:id" element={
-              <EmployeeRoute>
-                <QuoteDetailPage />
-              </EmployeeRoute>}
-            />
+              {/* --- STANDALONE DASHBOARD (NO SIDEBAR) --- */}
+              {/* Matches exactly /dashboard */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <EmployeeRoute>
+                    <Dashboard />
+                  </EmployeeRoute>
+                } 
+              />
 
-            <Route path="/dashboard/cpq/quotes/new" element={
-              <EmployeeRoute>
-                <QuoteBuilderPage />
-              </EmployeeRoute>
-            } />
+              {/* --- MODULE DASHBOARDS (WITH SIDEBAR) --- */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <EmployeeRoute>
+                    <DashboardLayout />
+                  </EmployeeRoute>
+                }
+              >
+                {/* Notice we removed the 'index' Route for Dashboard from here */}
+                <Route path="analytics" element={<Dashboard />} />
 
+                {/* CPQ Routes */}
+                <Route path="cpq" element={<CPQDashboard />} />
+                <Route path="cpq/products" element={<ProductsPage />} />
+                <Route path="cpq/quotes" element={<QuotesListPage />} />
+                <Route path="cpq/quotes/new" element={<QuoteBuilderPage />} />
+                <Route path="cpq/quotes/:id" element={<QuoteDetailPage />} />
+                <Route path="cpq/quotes/:id/edit" element={<QuoteBuilderPage />} />
 
-            <Route path="/dashboard/clm" element={
-              <EmployeeRoute>
-                <CLMDashboard />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm" element={
-              <EmployeeRoute>
-                <CRMLayout />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/clm/contracts" element={
-              <EmployeeRoute>
-                <ContractsPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/clm/templates" element={
-              <EmployeeRoute>
-                <TemplatesPage />
-              </EmployeeRoute>
-            } />
+                {/* CLM Routes */}
+                <Route path="clm" element={<CLMDashboard />} />
+                <Route path="clm/contracts" element={<ContractsPage />} />
+                <Route path="clm/templates" element={<TemplatesPage />} />
 
+                {/* CRM Routes */}
+                <Route path="crm" element={<CRMLayout />} />
+                <Route path="crm/leads" element={<LeadsPage />} />
+                <Route path="crm/pipeline" element={<PipelinePage />} />
+                <Route path="crm/accounts" element={<AccountsPage />} />
+                <Route path="crm/contacts" element={<ContactsPage />} />
+                <Route path="crm/opportunities" element={<OpportunitiesPage />} />
+                <Route path="crm/activities" element={<ActivitiesPage />} />
 
-            <Route path="/dashboard/crm/leads" element={
-              <EmployeeRoute>
-                <LeadsPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm/pipeline" element={
-              <EmployeeRoute>
-                <PipelinePage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm/accounts" element={
-              <EmployeeRoute>
-                <AccountsPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm/contacts" element={
-              <EmployeeRoute>
-                <ContactsPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm/opportunities" element={
-              <EmployeeRoute>
-                <OpportunitiesPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/crm/activities" element={
-              <EmployeeRoute>
-                <ActivitiesPage />
-              </EmployeeRoute>
-            } />
+                {/* Documents Routes */}
+                <Route path="documents" element={<DocumentsDashboard />} />
+                <Route path="documents/create" element={<DocumentCreatePage />} />
+                <Route path="documents/templates" element={<DocumentTemplatesPage />} />
+                <Route path="documents/history" element={<DocumentHistoryPage />} />
+                <Route path="documents/pending" element={<PendingSignaturesPage />} />
 
+                {/* ERP Routes */}
+                <Route path="erp" element={<ERPDashboard />} />
+                <Route path="erp/inventory" element={<InventoryPage />} />
+                <Route path="erp/procurement" element={<ProcurementPage />} />
+                <Route path="erp/production" element={<ProductionPage />} />
+                <Route path="erp/finance" element={<FinancePage />} />
+              </Route>
 
-            <Route path="/dashboard/analytics" element={
-              <EmployeeRoute>
-                <Dashboard />
-              </EmployeeRoute>
-            } />
-            
-            {/* REMOVED the old /dashboard/admin route since we now have the dedicated /admin route above */}
-
-            <Route path="/dashboard/documents" element={
-              <EmployeeRoute>
-                <DocumentsDashboard />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/documents/create" element={
-              <EmployeeRoute>
-                <DocumentCreatePage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/documents/templates" element={
-              <EmployeeRoute>
-                <DocumentTemplatesPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/documents/history" element={
-              <EmployeeRoute>
-                <DocumentHistoryPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/documents/pending" element={
-              <EmployeeRoute>
-                <PendingSignaturesPage />
-              </EmployeeRoute>
-            } />
-
-            <Route path="/dashboard/erp" element={
-              <EmployeeRoute>
-                <ERPDashboard />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/erp/inventory" element={
-              <EmployeeRoute>
-                <InventoryPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/erp/procurement" element={
-              <EmployeeRoute>
-                <ProcurementPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/erp/production" element={
-              <EmployeeRoute>
-                <ProductionPage />
-              </EmployeeRoute>
-            } />
-            <Route path="/dashboard/erp/finance" element={
-              <EmployeeRoute>
-                <FinancePage />
-              </EmployeeRoute>
-            } />
-
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   </ThemeProvider>
 );
 

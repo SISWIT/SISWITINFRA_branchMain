@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Upload, FileText, AlertTriangle, CheckCircle, Clock, ArrowLeft, Sparkles, Shield, Calendar, DollarSign, Users, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
@@ -81,8 +80,7 @@ export default function ContractScanPage() {
     : "low";
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -279,6 +277,5 @@ export default function ContractScanPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

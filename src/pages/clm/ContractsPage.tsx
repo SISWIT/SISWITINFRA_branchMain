@@ -40,7 +40,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
@@ -246,8 +245,7 @@ export default function ContractsPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Contracts</h1>
           <p className="text-muted-foreground">Manage legal agreements</p>
@@ -370,6 +368,5 @@ export default function ContractsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }

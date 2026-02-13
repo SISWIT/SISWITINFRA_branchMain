@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
+import { Link } from "react-router-dom"; // <-- Added this missing import
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/crm/StatsCard";
 import { useAutoDocuments } from "@/hooks/useDocuments";
@@ -43,8 +42,7 @@ const DocumentsDashboard = () => {
   }));
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -170,7 +168,6 @@ const DocumentsDashboard = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

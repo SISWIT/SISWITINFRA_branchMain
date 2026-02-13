@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,8 +50,7 @@ const DocumentCreatePage = () => {
   const selectedTemplateData = templates.find((t) => t.id === selectedTemplate);
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <Link to="/dashboard/documents" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
@@ -285,7 +283,6 @@ const DocumentCreatePage = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 };
 

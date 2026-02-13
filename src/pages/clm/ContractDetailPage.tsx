@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -66,32 +65,27 @@ export default function ContractDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="animate-pulse space-y-6">
+      <div className="animate-pulse space-y-6">
           <div className="h-8 bg-muted rounded w-1/3" />
           <div className="h-64 bg-muted rounded" />
         </div>
-      </DashboardLayout>
     );
   }
 
   if (!contract) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
+      <div className="text-center py-12">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold">Contract not found</h2>
           <Button variant="link" onClick={() => navigate("/dashboard/clm/contracts")}>Go back to contracts</Button>
         </div>
-      </DashboardLayout>
     );
   }
 
   const statusConfig = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -301,6 +295,5 @@ export default function ContractDetailPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

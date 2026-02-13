@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Plus, Search, Edit, Trash2, IndianRupee } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/useCPQ";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import {
   Dialog,
   DialogContent,
@@ -41,11 +40,40 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  // Controlled form state for dialog (ensures values are submitted reliably)
+  const [formName, setFormName] = useState("");
+  const [formSku, setFormSku] = useState("");
+  const [formCategory, setFormCategory] = useState<string>("CPQ");
+  const [formUnitPrice, setFormUnitPrice] = useState<string>("");
+  const [formDescription, setFormDescription] = useState<string>("");
 
   const { data: products, isLoading } = useProducts();
   const createMutation = useCreateProduct();
   const updateMutation = useUpdateProduct();
   const deleteMutation = useDeleteProduct();
+
+  // Sync controlled form state when dialog opens or editingProduct changes
+  useEffect(() => {
+    if (isDialogOpen) {
+      if (editingProduct) {
+        setFormName(editingProduct.name || "");
+        setFormSku(editingProduct.sku || "");
+        setFormCategory(editingProduct.category || "CPQ");
+        setFormUnitPrice(
+          editingProduct.unit_price != null
+            ? String(editingProduct.unit_price)
+            : ""
+        );
+        setFormDescription(editingProduct.description || "");
+      } else {
+        setFormName("");
+        setFormSku("");
+        setFormCategory("CPQ");
+        setFormUnitPrice("");
+        setFormDescription("");
+      }
+    }
+  }, [isDialogOpen, editingProduct]);
 
   const filteredProducts = products?.filter((product) => {
     const matchesSearch =
@@ -58,13 +86,12 @@ export default function ProductsPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
     const product = {
-      name: formData.get("name") as string,
-      sku: formData.get("sku") as string,
-      description: formData.get("description") as string,
-      unit_price: parseFloat(formData.get("unit_price") as string),
-      category: formData.get("category") as string,
+      name: formName,
+      sku: formSku,
+      description: formDescription,
+      unit_price: parseFloat(formUnitPrice || "0"),
+      category: formCategory,
       is_active: true,
     };
 
@@ -92,8 +119,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl md:text-3xl font-semibold">
@@ -112,7 +138,12 @@ export default function ProductsPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button>
+              <Button
+                onClick={() => {
+                  // ensure form is reset when opening add dialog
+                  setEditingProduct(null);
+                }}
+              >
                 <Plus className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Add Product</span>
               </Button>
@@ -124,12 +155,14 @@ export default function ProductsPage() {
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <input type="hidden" name="category" value={formCategory} />
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name</Label>
                   <Input
                     id="name"
                     name="name"
-                    defaultValue={editingProduct?.name}
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
                     required
                   />
                 </div>
@@ -138,14 +171,15 @@ export default function ProductsPage() {
                   <Input
                     id="sku"
                     name="sku"
-                    defaultValue={editingProduct?.sku}
+                    value={formSku}
+                    onChange={(e) => setFormSku(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
                   <Select
-                    name="category"
-                    defaultValue={editingProduct?.category || "CPQ"}
+                    value={formCategory}
+                    onValueChange={(val: string) => setFormCategory(val)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
@@ -166,7 +200,8 @@ export default function ProductsPage() {
                     name="unit_price"
                     type="number"
                     step="0.01"
-                    defaultValue={editingProduct?.unit_price}
+                    value={formUnitPrice}
+                    onChange={(e) => setFormUnitPrice(e.target.value)}
                     required
                   />
                 </div>
@@ -175,7 +210,8 @@ export default function ProductsPage() {
                   <Textarea
                     id="description"
                     name="description"
-                    defaultValue={editingProduct?.description}
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
                     rows={3}
                   />
                 </div>
@@ -191,7 +227,7 @@ export default function ProductsPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             {/* changed top-1/2 to top-5 for  */}
-            <Search className="absolute left-3 top-5 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search products..."
               value={searchQuery}
@@ -277,7 +313,7 @@ export default function ProductsPage() {
                       <IndianRupee className="h-4 w-4 text-primary" />
                       {/* price smaller on mobile */}
                       <span className="text-lg md:text-xl font-semibold">
-                        {product.unit_price.toLocaleString("en-IN")}
+                        {formatCurrency(product.unit_price)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {/* price text smaller on mobile */}
@@ -313,7 +349,11 @@ export default function ProductsPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 text-destructive"
-                      onClick={() => deleteMutation.mutate(product.id)}
+                      onClick={() => {
+                        if (confirm(`Delete ${product.name}? This action cannot be undone.`)) {
+                          deleteMutation.mutate(product.id);
+                        }
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -334,6 +374,5 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

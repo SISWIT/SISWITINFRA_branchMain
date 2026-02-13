@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { StatsCard } from "@/components/crm/StatsCard";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -69,8 +68,7 @@ export default function CLMDashboard() {
     : [];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     
           {/* Title Section */}
@@ -229,6 +227,5 @@ export default function CLMDashboard() {
           </Card>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

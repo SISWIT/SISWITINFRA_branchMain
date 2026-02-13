@@ -10,7 +10,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProducts, useCreateQuote } from "@/hooks/useCPQ";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -195,8 +194,7 @@ export default function QuoteBuilderPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -466,6 +464,5 @@ export default function QuoteBuilderPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

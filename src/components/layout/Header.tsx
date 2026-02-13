@@ -103,31 +103,36 @@ export function Header() {
       }`}
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {/* justify-between ensures the left group and right group stay at opposite ends */}
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Mobile Menu Button */}
-          <div className="flex lg:hidden mr-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileMenuOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
+          
+          {/* LEFT GROUP: Mobile Menu + Logo */}
+          <div className="flex items-center">
+            {/* Mobile Menu Button */}
+            <div className="flex lg:hidden mr-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu className="h-6 w-6" />
+              </Button>
+            </div>
+
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-lg">
+                  S
+                </span>
+              </div>
+              <span className="text-xl font-bold">
+                SIS<span className="text-gradient">WIT</span>
+              </span>
+            </Link>
           </div>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">
-                S
-              </span>
-            </div>
-            <span className="text-xl font-bold">
-              SIS<span className="text-gradient">WIT</span>
-            </span>
-          </Link>
-
-          {/* Desktop Nav */}
+          {/* CENTER/DESKTOP NAV: Stays hidden on mobile */}
           <div className="hidden lg:flex items-center gap-1">
             {navigation.map((item) => (
               <Link
@@ -144,7 +149,7 @@ export function Header() {
             ))}
           </div>
 
-          {/* Right Section */}
+          {/* RIGHT SECTION: Desktop Auth/Theme */}
           <div className="hidden lg:flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
               {isDark ? <Sun /> : <Moon />}
@@ -201,10 +206,14 @@ export function Header() {
             )}
           </div>
 
-          {/* Mobile Theme Toggle */}
+          {/* MOBILE THEME TOGGLE: Pushed to far right by justify-between */}
           <div className="flex lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              {isDark ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
             </Button>
           </div>
         </div>
@@ -220,7 +229,7 @@ export function Header() {
         onClick={() => setMobileMenuOpen(false)}
       />
 
-      {/* -------------------- MOBILE DRAWER (ORIGINAL) -------------------- */}
+      {/* -------------------- MOBILE DRAWER -------------------- */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] h-[100dvh] bg-background border-r border-border shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"

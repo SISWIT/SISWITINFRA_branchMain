@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQuotes, useUpdateQuoteStatus, useDeleteQuote } from "@/hooks/useCPQ";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -55,8 +54,7 @@ export default function QuotesListPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Quotes</h1>
@@ -176,7 +174,6 @@ export default function QuotesListPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   );
 }
 

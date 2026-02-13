@@ -13,7 +13,6 @@ import type { Lead, LeadStatus, LeadSource } from "@/types/crm";
 import { format } from "date-fns";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 
 export default function LeadsPage() {
   const { data: leads = [], isLoading } = useLeads();
@@ -53,8 +52,7 @@ export default function LeadsPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div><h1 className="text-3xl font-bold">Leads</h1><p className="text-muted-foreground">Manage your sales leads</p></div>
         <DataTable data={leads} columns={columns} loading={isLoading} onAdd={openCreateDialog} addLabel="Add Lead" searchPlaceholder="Search leads..." />
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -78,6 +76,5 @@ export default function LeadsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }

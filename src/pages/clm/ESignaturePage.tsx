@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DashboardLayout } from "@/components/crm/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -74,8 +73,7 @@ export default function ESignaturePage() {
   const auditTrail: Array<{ timestamp: string; action: string; user: string; ip: string }> = [];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -293,6 +291,5 @@ export default function ESignaturePage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }
