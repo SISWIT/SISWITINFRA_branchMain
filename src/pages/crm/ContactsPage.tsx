@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreHorizontal, Pencil, Trash2, User, Mail, Phone, Briefcase } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, User, Mail, Phone } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
