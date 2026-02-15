@@ -9,9 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useProducts, useCreateQuote } from "@/hooks/useCPQ";
+import { useProducts, useCreateQuote, useQuote, useUpdateQuote, useQuoteItems } from "@/hooks/useCPQ";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import type { QuoteItem } from "@/types/cpq";
@@ -29,10 +28,12 @@ interface LocalQuoteItem {
 
 export default function QuoteBuilderPage() {
   const navigate = useNavigate();
+  const { id: quoteId } = useParams();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const opportunityId = searchParams.get("opportunity_id");
   const accountId = searchParams.get("account_id");
+  const isEditMode = !!quoteId;
 
   // Default valid_until to 30 days from now
   const defaultValidDate = new Date();
@@ -52,11 +53,48 @@ export default function QuoteBuilderPage() {
   const [items, setItems] = useState<LocalQuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
 
+  // Fetch existing quote if editing
+  const { data: existingQuote, isLoading: isLoadingQuote } = useQuote(isEditMode ? quoteId! : "");
+  const { data: existingItems, isLoading: isLoadingItems } = useQuoteItems(isEditMode ? quoteId! : "");
+
+  // Load existing quote data when in edit mode
+  useEffect(() => {
+    if (isEditMode && existingQuote && !isLoadingQuote) {
+      setQuoteData({
+        account_id: existingQuote.account_id || "",
+        contact_id: existingQuote.contact_id || "",
+        opportunity_id: existingQuote.opportunity_id || "",
+        valid_until: existingQuote.valid_until || defaultValidDate.toISOString().split('T')[0],
+        terms: existingQuote.terms || "Net 30 days",
+        notes: existingQuote.notes || "",
+        discount_percent: existingQuote.discount_percent || 0,
+        tax_percent: existingQuote.tax_percent || 18,
+      });
+    }
+  }, [isEditMode, existingQuote, isLoadingQuote]);
+
+  // Load existing quote items when in edit mode
+  useEffect(() => {
+    if (isEditMode && existingItems && !isLoadingItems) {
+      setItems(existingItems.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_percent: item.discount_percent,
+        total: item.total,
+      })));
+    }
+  }, [isEditMode, existingItems, isLoadingItems]);
+
   // Use the hook for products
   const { data: products } = useProducts();
 
-  // Create quote mutation using the hook
+  // Create or update quote mutation
   const createQuoteMutation = useCreateQuote();
+  const updateQuoteMutation = useUpdateQuote();
 
   // 2. Fetch accounts (including address fields now) - UPDATED: Filter by current user
   const { data: accounts } = useQuery({
@@ -163,8 +201,8 @@ export default function QuoteBuilderPage() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleCreateQuote = (status: "draft" | "pending_approval") => {
-    createQuoteMutation.mutate({
+  const handleSaveQuote = (status: "draft" | "pending_approval") => {
+    const quotePayload = {
       account_id: quoteData.account_id || undefined,
       contact_id: quoteData.contact_id || undefined,
       opportunity_id: quoteData.opportunity_id || undefined,
@@ -178,12 +216,29 @@ export default function QuoteBuilderPage() {
       tax_percent: quoteData.tax_percent,
       tax_amount: taxAmount,
       total: grandTotal,
-      items,
-    }, {
-      onSuccess: (quote) => {
-        navigate(`/dashboard/cpq/quotes/${quote.id}`);
-      },
-    });
+    };
+
+    if (isEditMode && quoteId) {
+      // Update existing quote
+      updateQuoteMutation.mutate(
+        { id: quoteId, ...quotePayload },
+        {
+          onSuccess: () => {
+            navigate(`/dashboard/cpq/quotes/${quoteId}`);
+          },
+        }
+      );
+    } else {
+      // Create new quote with items
+      createQuoteMutation.mutate(
+        { ...quotePayload, items },
+        {
+          onSuccess: (quote) => {
+            navigate(`/dashboard/cpq/quotes/${quote.id}`);
+          },
+        }
+      );
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -199,20 +254,25 @@ export default function QuoteBuilderPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Create Quote</h1>
-              <p className="text-muted-foreground">Build a new quote with products and pricing</p>
+              <h1 className="text-3xl font-bold">{isEditMode ? "Edit Quote" : "Create Quote"}</h1>
+              <p className="text-muted-foreground">{isEditMode ? "Update quote details and products" : "Build a new quote with products and pricing"}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleCreateQuote("draft")} disabled={createQuoteMutation.isPending}>
-              <Save className="h-4 w-4 mr-2" />Save Draft
+            <Button variant="outline" onClick={() => handleSaveQuote("draft")} disabled={createQuoteMutation.isPending || updateQuoteMutation.isPending}>
+              <Save className="h-4 w-4 mr-2" />{isEditMode ? "Save Changes" : "Save Draft"}
             </Button>
-            <Button onClick={() => handleCreateQuote("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
-              <Send className="h-4 w-4 mr-2" />Submit for Approval
+            <Button onClick={() => handleSaveQuote("pending_approval")} disabled={(createQuoteMutation.isPending || updateQuoteMutation.isPending) || (!isEditMode && items.length === 0)}>
+              <Send className="h-4 w-4 mr-2" />{isEditMode ? "Update & Submit" : "Submit for Approval"}
             </Button>
           </div>
         </div>
 
+        {isLoadingQuote || isLoadingItems ? (
+          <div className="animate-pulse space-y-6">
+            <div className="h-64 bg-muted rounded" />
+          </div>
+        ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Quote Details & Products */}
           <div className="lg:col-span-2 space-y-6">
@@ -449,17 +509,18 @@ export default function QuoteBuilderPage() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Button className="w-full" onClick={() => handleCreateQuote("pending_approval")} disabled={createQuoteMutation.isPending || items.length === 0}>
-                    <Send className="h-4 w-4 mr-2" />Submit for Approval
+                  <Button className="w-full" onClick={() => handleSaveQuote("pending_approval")} disabled={(createQuoteMutation.isPending || updateQuoteMutation.isPending) || (!isEditMode && items.length === 0)}>
+                    <Send className="h-4 w-4 mr-2" />{isEditMode ? "Update & Submit" : "Submit for Approval"}
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={() => handleCreateQuote("draft")} disabled={createQuoteMutation.isPending}>
-                    <Save className="h-4 w-4 mr-2" />Save as Draft
+                  <Button variant="outline" className="w-full" onClick={() => handleSaveQuote("draft")} disabled={createQuoteMutation.isPending || updateQuoteMutation.isPending}>
+                    <Save className="h-4 w-4 mr-2" />{isEditMode ? "Save Changes" : "Save as Draft"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
+        )}
       </div>
   );
 }
