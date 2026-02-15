@@ -72,7 +72,13 @@ export function CustomerSignupForm({ onBack, onSuccess }: CustomerSignupFormProp
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(" ") || "";
 
-      const { error } = await signUp(formData.email, formData.password, firstName, lastName);
+      const { error } = await signUp(
+        formData.email,
+        formData.password,
+        firstName,
+        lastName,
+        "customer"
+      );
 
       if (error) {
         if (error.message.includes("already registered")) {

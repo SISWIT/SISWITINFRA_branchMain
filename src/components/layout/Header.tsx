@@ -155,7 +155,7 @@ export function Header() {
               {isDark ? <Sun /> : <Moon />}
             </Button>
 
-            {user && (
+            {user && (isEmployee || isAdmin) && (
               <Link to={dashboardHref}>
                 <Button variant="outline" size="sm" className="gap-2">
                   <LayoutDashboard className="h-4 w-4" />

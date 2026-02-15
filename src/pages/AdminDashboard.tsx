@@ -108,10 +108,13 @@ export default function AdminDashboard() {
   // --- Handlers ---
   const handleApprove = async (request: SignupRequest) => {
     try {
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: request.user_id,
-        role: AppRole.EMPLOYEE,
-      });
+      const { error: roleError } = await supabase.from("user_roles").upsert(
+        {
+          user_id: request.user_id,
+          role: AppRole.EMPLOYEE,
+        },
+        { onConflict: "user_id" }
+      );
       if (roleError) throw roleError;
 
       const { error: deleteError } = await supabase

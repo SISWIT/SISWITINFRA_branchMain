@@ -91,9 +91,11 @@ export function SignInForm() {
         // --- REDIRECT LOGIC ---
         // Check the role returned from useAuth and redirect accordingly
         if (data?.role === AppRole.ADMIN) {
-            navigate("/admin");
+          navigate("/admin");
+        } else if (data?.role === AppRole.EMPLOYEE) {
+          navigate("/dashboard");
         } else {
-            navigate("/dashboard");
+          navigate("/");
         }
       }
     } catch {

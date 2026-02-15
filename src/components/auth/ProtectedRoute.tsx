@@ -29,15 +29,19 @@ export function ProtectedRoute({ children, allowedRoles, redirectTo = "/auth" }:
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  // 2. If logged in but role doesn't match the allowed roles
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    // Optional: If an Admin tries to access a normal route, you might want to redirect them 
-    // to the admin dashboard instead of the generic unauthorized page.
-    if (role === AppRole.ADMIN) {
-       return <Navigate to="/admin" replace />;
+  // 2. If role is required, block users with missing or mismatched roles
+  if (allowedRoles) {
+    if (!role) {
+      return <Navigate to="/unauthorized" replace />;
     }
-    
-    return <Navigate to="/unauthorized" replace />;
+
+    if (!allowedRoles.includes(role)) {
+      if (role === AppRole.ADMIN) {
+        return <Navigate to="/admin" replace />;
+      }
+
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   return <>{children}</>;

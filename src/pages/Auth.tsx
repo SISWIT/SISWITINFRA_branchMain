@@ -6,6 +6,7 @@ import { EmployeeSignupForm } from "@/components/auth/EmployeeSignupForm";
 import { CustomerSignupForm } from "@/components/auth/CustomerSignupForm";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { CheckCircle2 } from "lucide-react";
+import { AppRole } from "@/types/roles";
 
 type AuthStep = "role-selection" | "employee-signup" | "customer-signup" | "signin" | "success";
 
@@ -20,7 +21,9 @@ const Auth = () => {
   // Redirect based on role if already logged in
   useEffect(() => {
     if (user && role) {
-      if (role === "employee") {
+      if (role === AppRole.ADMIN) {
+        navigate("/admin");
+      } else if (role === AppRole.EMPLOYEE) {
         navigate("/dashboard");
       } else {
         navigate("/");
