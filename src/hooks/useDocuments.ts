@@ -1,24 +1,124 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import type { AutoDocument, DocumentTemplate, DocumentVersion, DocumentPermission } from "@/types/documents";
+import type {
+  AutoDocument,
+  DocumentESignature,
+  DocumentPermission,
+  DocumentTemplate,
+  DocumentVersion,
+} from "@/types/documents";
 import { toast } from "sonner";
+
+type DocumentESignatureWithDocument = DocumentESignature & {
+  document?: Pick<AutoDocument, "id" | "name" | "type" | "status" | "created_at" | "updated_at"> | null;
+};
+
+function isMissingTableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  return (error as { code?: string }).code === "42P01";
+}
+
+function useDocumentsRealtime(userId?: string, scope = "global") {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`documents-realtime-${userId}-${scope}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "auto_documents" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
+        queryClient.invalidateQueries({ queryKey: ["auto_document"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_templates" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["document_templates"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_esignatures" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
+        queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, scope, userId]);
+}
+
+async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("document_esignatures")
+    .select("status")
+    .eq("document_id", documentId);
+
+  if (error || !data) {
+    if (error && !isMissingTableError(error)) {
+      throw error;
+    }
+    return;
+  }
+
+  const statuses = data.map((row) => row.status);
+  if (statuses.length === 0) {
+    return;
+  }
+
+  let nextStatus: AutoDocument["status"] = "sent";
+
+  if (statuses.includes("pending")) {
+    nextStatus = "sent";
+  } else if (statuses.includes("rejected")) {
+    nextStatus = "rejected";
+  } else if (statuses.includes("expired")) {
+    nextStatus = "expired";
+  } else if (statuses.every((status) => status === "signed")) {
+    nextStatus = "signed";
+  }
+
+  const { error: updateError } = await supabase
+    .from("auto_documents")
+    .update({ status: nextStatus })
+    .eq("id", documentId);
+
+  if (updateError && !isMissingTableError(updateError)) {
+    throw updateError;
+  }
+}
 
 // ===== DOCUMENT TEMPLATES =====
 export function useDocumentTemplates() {
   const { user } = useAuth();
+  useDocumentsRealtime(user?.id, "templates");
+
   return useQuery({
     queryKey: ["document_templates", user?.id],
     enabled: !!user,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const { data, error } = await supabase
         .from("document_templates")
         .select("*")
         .or(`created_by.eq.${user.id},is_public.eq.true`)
-        .order("name");
-      if (error) throw error;
-      return data as DocumentTemplate[];
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          return [];
+        }
+        throw error;
+      }
+
+      return (data || []) as DocumentTemplate[];
     },
   });
 }
@@ -36,14 +136,18 @@ export function useCreateDocumentTemplate() {
           type: template.type || "other",
           description: template.description,
           content: template.content || "",
-          variables: template.variables,
+          variables: template.variables || {},
           is_active: template.is_active ?? true,
           is_public: template.is_public ?? false,
           created_by: user?.id,
         })
         .select()
         .single();
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -67,7 +171,11 @@ export function useUpdateDocumentTemplate() {
         .eq("id", id)
         .select()
         .single();
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -86,7 +194,10 @@ export function useDeleteDocumentTemplate() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("document_templates").delete().eq("id", id);
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document_templates"] });
@@ -101,36 +212,54 @@ export function useDeleteDocumentTemplate() {
 // ===== AUTO DOCUMENTS =====
 export function useAutoDocuments() {
   const { user } = useAuth();
+  useDocumentsRealtime(user?.id, "documents");
+
   return useQuery({
     queryKey: ["auto_documents", user?.id],
     enabled: !!user,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const { data, error } = await supabase
         .from("auto_documents")
         .select("*")
         .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as AutoDocument[];
+
+      if (error) {
+        throw error;
+      }
+
+      return (data || []) as AutoDocument[];
     },
   });
 }
 
 export function useAutoDocument(id: string) {
   const { user } = useAuth();
+
   return useQuery({
     queryKey: ["auto_document", id, user?.id],
     enabled: !!id && !!user,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const { data, error } = await supabase
         .from("auto_documents")
         .select("*")
         .eq("id", id)
         .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .single();
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data as AutoDocument;
     },
   });
@@ -156,14 +285,18 @@ export function useCreateAutoDocument() {
           file_name: doc.file_name,
           format: doc.format,
           file_size: doc.file_size,
-          generated_from: doc.generated_from,
+          generated_from: doc.generated_from || "template",
           owner_id: user?.id,
           created_by: user?.id,
         })
         .select()
         .single();
-      if (error) throw error;
-      return data;
+
+      if (error) {
+        throw error;
+      }
+
+      return data as AutoDocument;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
@@ -186,8 +319,12 @@ export function useUpdateAutoDocument() {
         .eq("id", id)
         .select()
         .single();
-      if (error) throw error;
-      return data;
+
+      if (error) {
+        throw error;
+      }
+
+      return data as AutoDocument;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
@@ -206,7 +343,10 @@ export function useDeleteAutoDocument() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("auto_documents").delete().eq("id", id);
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
@@ -218,21 +358,202 @@ export function useDeleteAutoDocument() {
   });
 }
 
+// ===== DOCUMENT E-SIGNATURES =====
+export function useDocumentESignatures(documentId?: string) {
+  const { user } = useAuth();
+  useDocumentsRealtime(user?.id, `esignatures-${documentId || "all"}`);
+
+  return useQuery({
+    queryKey: ["document_esignatures", documentId || "all", user?.id],
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      let query = supabase
+        .from("document_esignatures")
+        .select("*, document:auto_documents(id,name,type,status,created_at,updated_at)")
+        .order("created_at", { ascending: false });
+
+      if (documentId) {
+        query = query.eq("document_id", documentId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          return [];
+        }
+        throw error;
+      }
+
+      return (data || []) as DocumentESignatureWithDocument[];
+    },
+  });
+}
+
+export function useCreateDocumentESignature() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (signature: Omit<Partial<DocumentESignature>, "id" | "created_at" | "updated_at">) => {
+      const { data, error } = await supabase
+        .from("document_esignatures")
+        .insert({
+          document_id: signature.document_id || "",
+          recipient_name: signature.recipient_name || "",
+          recipient_email: signature.recipient_email || "",
+          status: signature.status || "pending",
+          expires_at: signature.expires_at || null,
+          sent_at: new Date().toISOString(),
+          reminder_count: 0,
+          created_by: user?.id,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (signature.document_id) {
+        const { error: updateDocError } = await supabase
+          .from("auto_documents")
+          .update({ status: "sent" })
+          .eq("id", signature.document_id);
+
+        if (updateDocError) {
+          throw updateDocError;
+        }
+      }
+
+      return data as DocumentESignature;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
+      queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
+      queryClient.invalidateQueries({ queryKey: ["auto_document", variables.document_id] });
+      toast.success("E-signature request sent successfully");
+    },
+    onError: (error) => {
+      toast.error("Error sending e-signature request: " + error.message);
+    },
+  });
+}
+
+export function useUpdateDocumentESignature() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, document_id, ...updates }: Partial<DocumentESignature> & { id: string }) => {
+      const payload = { ...updates } as Partial<DocumentESignature>;
+      if (updates.status === "signed") {
+        payload.signed_at = updates.signed_at || new Date().toISOString();
+      }
+
+      const { data, error } = await supabase
+        .from("document_esignatures")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (document_id) {
+        await syncAutoDocumentStatusFromSignatures(document_id);
+      }
+
+      return data as DocumentESignature;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
+      queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
+      if (variables.document_id) {
+        queryClient.invalidateQueries({ queryKey: ["auto_document", variables.document_id] });
+      }
+      toast.success("Signature status updated");
+    },
+    onError: (error) => {
+      toast.error("Error updating signature: " + error.message);
+    },
+  });
+}
+
+export function useSendDocumentReminder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (signatureId: string) => {
+      const { data: current, error: currentError } = await supabase
+        .from("document_esignatures")
+        .select("id, reminder_count")
+        .eq("id", signatureId)
+        .single();
+
+      if (currentError) {
+        throw currentError;
+      }
+
+      const nextReminderCount = (current?.reminder_count || 0) + 1;
+      const { data, error } = await supabase
+        .from("document_esignatures")
+        .update({
+          reminder_count: nextReminderCount,
+          last_reminder_at: new Date().toISOString(),
+        })
+        .eq("id", signatureId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data as DocumentESignature;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
+      toast.success("Reminder sent");
+    },
+    onError: (error) => {
+      toast.error("Error sending reminder: " + error.message);
+    },
+  });
+}
+
 // ===== DOCUMENT VERSIONS =====
 export function useDocumentVersions(documentId: string) {
   const { user } = useAuth();
+
   return useQuery({
     queryKey: ["document_versions", documentId, user?.id],
     enabled: !!documentId && !!user,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const { data, error } = await supabase
         .from("document_versions")
         .select("*")
         .eq("document_id", documentId)
         .order("version_number", { ascending: false });
-      if (error) throw error;
-      return data as DocumentVersion[];
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          return [];
+        }
+        throw error;
+      }
+
+      return (data || []) as DocumentVersion[];
     },
   });
 }
@@ -258,7 +579,11 @@ export function useCreateDocumentVersion() {
         })
         .select()
         .single();
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {
@@ -274,18 +599,29 @@ export function useCreateDocumentVersion() {
 // ===== DOCUMENT PERMISSIONS =====
 export function useDocumentPermissions(documentId: string) {
   const { user } = useAuth();
+
   return useQuery({
     queryKey: ["document_permissions", documentId, user?.id],
     enabled: !!documentId && !!user,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
       const { data, error } = await supabase
         .from("document_permissions")
         .select("*")
         .eq("document_id", documentId)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as DocumentPermission[];
+
+      if (error) {
+        if (isMissingTableError(error)) {
+          return [];
+        }
+        throw error;
+      }
+
+      return (data || []) as DocumentPermission[];
     },
   });
 }
@@ -306,7 +642,11 @@ export function useShareDocument() {
         })
         .select()
         .single();
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {
@@ -325,7 +665,10 @@ export function useRemoveDocumentPermission() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("document_permissions").delete().eq("id", id);
-      if (error) throw error;
+
+      if (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document_permissions"] });

@@ -1,17 +1,9 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  FileText, ArrowRight, ArrowLeft, Check, FileStack,
-  Building2, User, Calendar, Loader2
-} from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
-import { useCreateAutoDocument } from "@/hooks/useDocuments";
-import type { DocumentType } from "@/types/documents";
 import {
   Select,
   SelectContent,
@@ -19,14 +11,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const templates = [
-  { id: "1", name: "Sales Agreement", category: "agreement", description: "Standard sales contract for products and services" },
-  { id: "2", name: "Quote Proposal", category: "proposal", description: "Professional quote template with pricing breakdown" },
-  { id: "3", name: "Non-Disclosure Agreement", category: "agreement", description: "Mutual NDA for business partnerships" },
-  { id: "4", name: "Service Level Agreement", category: "agreement", description: "SLA template for service providers" },
-  { id: "5", name: "Invoice Template", category: "invoice", description: "Standard invoice with line items" },
-];
+import { useAuth } from "@/hooks/useAuth";
+import { useAccounts, useContacts } from "@/hooks/useCRM";
+import { useCreateAutoDocument, useDocumentTemplates } from "@/hooks/useDocuments";
+import type { DocumentType } from "@/types/documents";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  Calendar,
+  Check,
+  FileStack,
+  FileText,
+  Loader2,
+  User,
+} from "lucide-react";
 
 const steps = [
   { id: 1, title: "Select Template", icon: FileText },
@@ -36,14 +36,20 @@ const steps = [
 
 const DocumentCreatePage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { data: templates = [], isLoading: isTemplatesLoading } = useDocumentTemplates();
+  const { data: accounts = [] } = useAccounts();
   const createDocumentMutation = useCreateAutoDocument();
+
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
     documentName: "",
+    accountId: "",
     accountName: "",
+    contactId: "",
     contactName: "",
     contactEmail: "",
     effectiveDate: "",
@@ -51,324 +57,355 @@ const DocumentCreatePage = () => {
     notes: "",
   });
 
-  const handleInputChange = (field: string, value: string) => {
+  const { data: contacts = [] } = useContacts(formData.accountId || undefined);
+
+  useEffect(() => {
+    const preselectedTemplateId = searchParams.get("templateId");
+    if (preselectedTemplateId) {
+      setSelectedTemplateId(preselectedTemplateId);
+    }
+  }, [searchParams]);
+
+  const selectedTemplate = useMemo(
+    () => templates.find((template) => template.id === selectedTemplateId),
+    [selectedTemplateId, templates],
+  );
+
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleGenerateDocument = async () => {
-    // Check authentication
-    if (!user) {
-      toast.error("You must be logged in to create documents");
-      return;
-    }
+  const handleAccountChange = (accountId: string) => {
+    const account = accounts.find((item) => item.id === accountId);
+    setFormData((prev) => ({
+      ...prev,
+      accountId,
+      accountName: account?.name || "",
+      contactId: "",
+      contactName: "",
+      contactEmail: "",
+    }));
+  };
 
-    // Validate required fields
-    if (!formData.documentName) {
-      toast.error("Please enter a document name");
+  const handleContactChange = (contactId: string) => {
+    const contact = contacts.find((item) => item.id === contactId);
+    const contactName = contact ? `${contact.first_name} ${contact.last_name}`.trim() : "";
+    setFormData((prev) => ({
+      ...prev,
+      contactId,
+      contactName,
+      contactEmail: contact?.email || "",
+    }));
+  };
+
+  const handleGenerateDocument = async () => {
+    if (!user) {
+      toast.error("You must be logged in to create documents.");
       return;
     }
     if (!selectedTemplate) {
-      toast.error("Please select a template");
+      toast.error("Please select a template.");
       return;
     }
-    if (!formData.accountName) {
-      toast.error("Please select an account");
+    if (!formData.documentName.trim()) {
+      toast.error("Please enter a document name.");
+      return;
+    }
+    if (!formData.accountId) {
+      toast.error("Please select an account.");
       return;
     }
 
     setIsGenerating(true);
 
     try {
-      const selectedTemplateData = templates.find((t) => t.id === selectedTemplate);
-      
-      // Log for debugging
-      console.log("Creating document with user:", user.id);
-      
-      // Create document with the collected data
-      await createDocumentMutation.mutateAsync({
-        name: formData.documentName,
-        type: (selectedTemplateData?.category as DocumentType) || "other",
+      const createdDocument = await createDocumentMutation.mutateAsync({
+        name: formData.documentName.trim(),
+        type: (selectedTemplate.type as DocumentType) || "other",
         status: "draft",
+        template_id: selectedTemplate.id,
+        related_entity_type: "account",
+        related_entity_id: formData.accountId,
+        generated_from: "template",
         content: JSON.stringify({
-          templateName: selectedTemplateData?.name,
+          templateName: selectedTemplate.name,
+          accountId: formData.accountId,
           accountName: formData.accountName,
+          contactId: formData.contactId || null,
           contactName: formData.contactName,
           contactEmail: formData.contactEmail,
-          effectiveDate: formData.effectiveDate,
-          expiryDate: formData.expiryDate,
-          notes: formData.notes,
+          effectiveDate: formData.effectiveDate || null,
+          expiryDate: formData.expiryDate || null,
+          notes: formData.notes || null,
         }),
       });
 
-      // Navigate to documents list after successful creation
-      setTimeout(() => {
-        navigate("/dashboard/documents");
-      }, 1000);
-    } catch (error: any) {
-      console.error("Error generating document:", error);
-      
-      // Provide specific error messages
-      if (error?.message?.includes("row-level security")) {
-        toast.error("Permission denied: Unable to create document. Please ensure you're properly authenticated.");
-      } else if (error?.message?.includes("auto_documents")) {
-        toast.error("Document service not available. Please contact support.");
-      } else {
-        toast.error("Failed to generate document. Please try again.");
-      }
+      navigate(`/dashboard/documents/${createdDocument.id}/esign`);
+    } catch {
+      // Error is surfaced through mutation toast.
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const selectedTemplateData = templates.find((t) => t.id === selectedTemplate);
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div>
-          <Link to="/dashboard/documents" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Documents
-          </Link>
-          <h1 className="text-2xl font-bold text-foreground">Create New Document</h1>
-          <p className="text-muted-foreground">Generate a document from a template with auto-filled data</p>
-        </div>
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div>
+        <Link to="/dashboard/documents" className="mb-4 inline-flex items-center text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Documents
+        </Link>
+        <h1 className="text-2xl font-bold text-foreground">Create New Document</h1>
+        <p className="text-muted-foreground">Generate a document from templates and send it for e-signature.</p>
+      </div>
 
-        {/* Progress Steps */}
-        <div className="flex items-center justify-between">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <div className={`flex items-center gap-3 ${currentStep >= step.id ? "text-primary" : "text-muted-foreground"}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  currentStep > step.id 
-                    ? "bg-primary text-primary-foreground" 
-                    : currentStep === step.id 
-                    ? "bg-primary/20 text-primary border-2 border-primary" 
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {currentStep > step.id ? <Check className="w-5 h-5" /> : <step.icon className="w-5 h-5" />}
-                </div>
-                <span className="font-medium hidden sm:block">{step.title}</span>
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => (
+          <div key={step.id} className="flex items-center">
+            <div className={`flex items-center gap-3 ${currentStep >= step.id ? "text-primary" : "text-muted-foreground"}`}>
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                  currentStep > step.id
+                    ? "bg-primary text-primary-foreground"
+                    : currentStep === step.id
+                      ? "border-2 border-primary bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {currentStep > step.id ? <Check className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
               </div>
-              {index < steps.length - 1 && (
-                <div className={`w-12 sm:w-24 h-0.5 mx-4 ${currentStep > step.id ? "bg-primary" : "bg-border"}`} />
-              )}
+              <span className="hidden font-medium sm:block">{step.title}</span>
             </div>
-          ))}
-        </div>
+            {index < steps.length - 1 ? (
+              <div className={`mx-4 h-0.5 w-12 sm:w-24 ${currentStep > step.id ? "bg-primary" : "bg-border"}`} />
+            ) : null}
+          </div>
+        ))}
+      </div>
 
-        {/* Step Content */}
-        <div className="bg-card rounded-xl border border-border shadow-card p-6">
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-foreground">Select a Template</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+        {currentStep === 1 ? (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Select a Template</h2>
+            {isTemplatesLoading ? (
+              <div className="py-10 text-center text-muted-foreground">Loading templates...</div>
+            ) : templates.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="text-muted-foreground">No templates found. Create one first to generate a document.</p>
+                <Link to="/dashboard/documents/templates">
+                  <Button variant="outline" className="mt-4">
+                    Go to Templates
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
                 {templates.map((template) => (
                   <button
                     key={template.id}
-                    onClick={() => setSelectedTemplate(template.id)}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      selectedTemplate === template.id
+                    onClick={() => setSelectedTemplateId(template.id)}
+                    className={`rounded-xl border p-4 text-left transition-all ${
+                      selectedTemplateId === template.id
                         ? "border-primary bg-primary/5 shadow-card"
                         : "border-border hover:border-primary/30"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-primary" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <FileText className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <div className="font-semibold text-foreground">{template.name}</div>
-                        <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground mt-1">
-                          {template.category}
+                        <span className="mt-1 inline-block rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                          {template.type}
                         </span>
-                        <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
+                        <p className="mt-2 text-sm text-muted-foreground">{template.description || "No description provided."}</p>
                       </div>
-                      {selectedTemplate === template.id && (
-                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-4 h-4 text-primary-foreground" />
+                      {selectedTemplateId === template.id ? (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
+                          <Check className="h-4 w-4 text-primary-foreground" />
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-foreground">Enter Document Details</h2>
-              <div className="grid sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="documentName">Document Name</Label>
-                  <Input
-                    id="documentName"
-                    placeholder="Enter document name"
-                    value={formData.documentName}
-                    onChange={(e) => handleInputChange("documentName", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="account">Account / Company</Label>
-                  <Select onValueChange={(value) => handleInputChange("accountName", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="acme">Acme Corporation</SelectItem>
-                      <SelectItem value="techstart">TechStart Inc</SelectItem>
-                      <SelectItem value="global">Global Solutions</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contactName">Contact Name</Label>
-                  <Input
-                    id="contactName"
-                    placeholder="Enter contact name"
-                    value={formData.contactName}
-                    onChange={(e) => handleInputChange("contactName", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="contactEmail">Contact Email</Label>
-                  <Input
-                    id="contactEmail"
-                    type="email"
-                    placeholder="Enter contact email"
-                    value={formData.contactEmail}
-                    onChange={(e) => handleInputChange("contactEmail", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="effectiveDate">Effective Date</Label>
-                  <Input
-                    id="effectiveDate"
-                    type="date"
-                    value={formData.effectiveDate}
-                    onChange={(e) => handleInputChange("effectiveDate", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expiryDate">Expiry Date</Label>
-                  <Input
-                    id="expiryDate"
-                    type="date"
-                    value={formData.expiryDate}
-                    onChange={(e) => handleInputChange("expiryDate", e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-2 space-y-2">
-                  <Label htmlFor="notes">Additional Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Enter any additional notes or instructions"
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange("notes", e.target.value)}
-                    rows={4}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-foreground">Review & Generate</h2>
-              
-              <div className="rounded-xl border border-border p-6 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <FileStack className="w-7 h-7 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground text-lg">{formData.documentName || "Untitled Document"}</h3>
-                    <p className="text-muted-foreground">Template: {selectedTemplateData?.name}</p>
-                  </div>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-border">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Account</div>
-                      <div className="font-medium text-foreground">{formData.accountName || "Not specified"}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <User className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Contact</div>
-                      <div className="font-medium text-foreground">{formData.contactName || "Not specified"}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Effective Date</div>
-                      <div className="font-medium text-foreground">{formData.effectiveDate || "Not specified"}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">Expiry Date</div>
-                      <div className="font-medium text-foreground">{formData.expiryDate || "Not specified"}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {formData.notes && (
-                  <div className="pt-4 border-t border-border">
-                    <div className="text-sm text-muted-foreground mb-1">Notes</div>
-                    <p className="text-foreground">{formData.notes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-6 border-t border-border">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep((prev) => prev - 1)}
-              disabled={currentStep === 1 || isGenerating}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Previous
-            </Button>
-            {currentStep < 3 ? (
-              <Button
-                onClick={() => setCurrentStep((prev) => prev + 1)}
-                disabled={currentStep === 1 && !selectedTemplate}
-              >
-                Next
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            ) : (
-              <Button 
-                variant="hero" 
-                onClick={handleGenerateDocument}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileStack className="w-4 h-4 mr-2" />
-                    Generate Document
-                  </>
-                )}
-              </Button>
             )}
           </div>
+        ) : null}
+
+        {currentStep === 2 ? (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Enter Document Details</h2>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="documentName">Document Name</Label>
+                <Input
+                  id="documentName"
+                  placeholder="Enter document name"
+                  value={formData.documentName}
+                  onChange={(event) => handleInputChange("documentName", event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Account / Company</Label>
+                <Select value={formData.accountId} onValueChange={handleAccountChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Contact</Label>
+                <Select value={formData.contactId} onValueChange={handleContactChange} disabled={!formData.accountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.accountId ? "Select contact" : "Select account first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.first_name} {contact.last_name} {contact.email ? `(${contact.email})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="effectiveDate">Effective Date</Label>
+                <Input
+                  id="effectiveDate"
+                  type="date"
+                  value={formData.effectiveDate}
+                  onChange={(event) => handleInputChange("effectiveDate", event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expiryDate">Expiry Date</Label>
+                <Input
+                  id="expiryDate"
+                  type="date"
+                  value={formData.expiryDate}
+                  onChange={(event) => handleInputChange("expiryDate", event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  rows={4}
+                  placeholder="Enter any additional notes or instructions"
+                  value={formData.notes}
+                  onChange={(event) => handleInputChange("notes", event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {currentStep === 3 ? (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Review & Generate</h2>
+
+            <div className="space-y-4 rounded-xl border border-border p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
+                  <FileStack className="h-7 w-7 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">{formData.documentName || "Untitled Document"}</h3>
+                  <p className="text-muted-foreground">Template: {selectedTemplate?.name || "Not selected"}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm text-muted-foreground">Account</div>
+                    <div className="font-medium text-foreground">{formData.accountName || "Not specified"}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm text-muted-foreground">Contact</div>
+                    <div className="font-medium text-foreground">{formData.contactName || "Not specified"}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm text-muted-foreground">Effective Date</div>
+                    <div className="font-medium text-foreground">{formData.effectiveDate || "Not specified"}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm text-muted-foreground">Expiry Date</div>
+                    <div className="font-medium text-foreground">{formData.expiryDate || "Not specified"}</div>
+                  </div>
+                </div>
+              </div>
+
+              {formData.notes ? (
+                <div className="border-t border-border pt-4">
+                  <div className="mb-1 text-sm text-muted-foreground">Notes</div>
+                  <p className="text-foreground">{formData.notes}</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-8 flex justify-between border-t border-border pt-6">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentStep((prev) => prev - 1)}
+            disabled={currentStep === 1 || isGenerating}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Previous
+          </Button>
+
+          {currentStep < 3 ? (
+            <Button
+              onClick={() => setCurrentStep((prev) => prev + 1)}
+              disabled={(currentStep === 1 && !selectedTemplateId) || (currentStep === 1 && isTemplatesLoading)}
+            >
+              Next
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button variant="hero" onClick={handleGenerateDocument} disabled={isGenerating}>
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <FileStack className="mr-2 h-4 w-4" />
+                  Generate & Open E-Sign
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
+    </div>
   );
 };
 

@@ -1,169 +1,240 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAutoDocuments } from "@/hooks/useDocuments";
-import { 
-  FileStack, Search, Download, Eye, Filter, Calendar,
-  CheckCircle2, Clock, Send, AlertCircle, FileText
-} from "lucide-react";
+import { useAutoDocuments, useDocumentESignatures } from "@/hooks/useDocuments";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  Eye,
+  FileStack,
+  FileText,
+  Search,
+  Send,
+  XCircle,
+} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: string; label: string }> = {
-  signed: { icon: CheckCircle2, bg: "bg-primary/10", text: "text-primary", label: "Signed" },
-  pending: { icon: Clock, bg: "bg-accent/10", text: "text-accent", label: "Pending" },
-  approved: { icon: CheckCircle2, bg: "bg-chart-3/10", text: "text-chart-3", label: "Approved" },
-  sent: { icon: Send, bg: "bg-chart-4/10", text: "text-chart-4", label: "Sent" },
-  draft: { icon: FileText, bg: "bg-muted", text: "text-muted-foreground", label: "Draft" },
-  expired: { icon: AlertCircle, bg: "bg-destructive/10", text: "text-destructive", label: "Expired" },
+  draft: { icon: FileText, bg: "bg-gray-100", text: "text-gray-800", label: "Draft" },
+  pending_review: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Review" },
+  approved: { icon: CheckCircle2, bg: "bg-emerald-100", text: "text-emerald-800", label: "Approved" },
+  sent: { icon: Send, bg: "bg-sky-100", text: "text-sky-800", label: "Sent for Signature" },
+  signed: { icon: CheckCircle2, bg: "bg-green-100", text: "text-green-800", label: "Signed" },
+  rejected: { icon: XCircle, bg: "bg-red-100", text: "text-red-800", label: "Rejected" },
+  expired: { icon: Clock, bg: "bg-orange-100", text: "text-orange-800", label: "Expired" },
+  published: { icon: CheckCircle2, bg: "bg-blue-100", text: "text-blue-800", label: "Published" },
+  archived: { icon: FileStack, bg: "bg-gray-100", text: "text-gray-800", label: "Archived" },
 };
 
 const DocumentHistoryPage = () => {
+  const navigate = useNavigate();
   const { data: documents = [], isLoading } = useAutoDocuments();
+  const { data: signatures = [] } = useDocumentESignatures();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const filteredDocuments = documents.filter((doc: any) => {
-    const matchesSearch = (doc.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (doc.id || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-    const matchesType = typeFilter === "all" || doc.type === typeFilter;
+  const typeOptions = useMemo(() => {
+    return Array.from(new Set(documents.map((document) => document.type))).sort();
+  }, [documents]);
+
+  const pendingSignatureCountByDocument = useMemo(() => {
+    return signatures.reduce<Record<string, number>>((accumulator, signature) => {
+      if (signature.status !== "pending") {
+        return accumulator;
+      }
+      accumulator[signature.document_id] = (accumulator[signature.document_id] || 0) + 1;
+      return accumulator;
+    }, {});
+  }, [signatures]);
+
+  const filteredDocuments = documents.filter((document) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      (document.name || "").toLowerCase().includes(query) || (document.id || "").toLowerCase().includes(query);
+    const matchesStatus = statusFilter === "all" || document.status === statusFilter;
+    const matchesType = typeFilter === "all" || document.type === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  const handleExportList = () => {
+    const headers = ["id", "name", "type", "status", "created_at"];
+    const lines = filteredDocuments.map((document) =>
+      [document.id, document.name, document.type, document.status, document.created_at]
+        .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    );
+    const csv = [headers.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = globalThis.document.createElement("a");
+    link.href = url;
+    link.download = "document-history.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDocument = (id: string) => {
+    const document = documents.find((item) => item.id === id);
+    if (!document) {
+      return;
+    }
+
+    const payload = document.content || JSON.stringify(document, null, 2);
+    const blob = new Blob([payload], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = globalThis.document.createElement("a");
+    link.href = url;
+    link.download = `${document.name.replace(/\s+/g, "-").toLowerCase()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Document History</h1>
-            <p className="text-muted-foreground">View and manage all generated documents</p>
-          </div>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export List
-          </Button>
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Document History</h1>
+          <p className="text-muted-foreground">Track generated documents and signing progress.</p>
+        </div>
+        <Button variant="outline" onClick={handleExportList}>
+          <Download className="mr-2 h-4 w-4" />
+          Export List
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or ID..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="pl-10"
+          />
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="signed">Signed</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Contract">Contract</SelectItem>
-              <SelectItem value="Quote">Quote</SelectItem>
-              <SelectItem value="NDA">NDA</SelectItem>
-              <SelectItem value="Invoice">Invoice</SelectItem>
-              <SelectItem value="HR">HR</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            {Object.keys(statusConfig).map((status) => (
+              <SelectItem key={status} value={status}>
+                {statusConfig[status].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        {/* Documents Table */}
-        <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-          {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <FileStack className="w-12 h-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">Loading documents...</h3>
-            </div>
-          ) : filteredDocuments.length === 0 ? (
-            <div className="text-center py-12">
-              <FileStack className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No documents found</h3>
-              <p className="text-muted-foreground">Try adjusting your search or filter criteria</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-4 font-medium text-muted-foreground">Document</th>
-                    <th className="text-left p-4 font-medium text-muted-foreground">Type</th>
-                    <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                    <th className="text-left p-4 font-medium text-muted-foreground">Created</th>
-                    <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredDocuments.map((doc: any) => {
-                    const status = statusConfig[doc.status] || statusConfig.draft;
-                    const StatusIcon = status.icon;
-                    return (
-                      <tr key={doc.id} className="hover:bg-secondary/50 transition-colors">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <FileStack className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-foreground">{doc.name || "Untitled"}</div>
-                              <div className="text-sm text-muted-foreground">{doc.id}</div>
-                            </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {typeOptions.map((type) => (
+              <SelectItem key={type} value={type}>
+                <span className="capitalize">{type}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+        {isLoading ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <FileStack className="mx-auto mb-4 h-12 w-12 animate-pulse text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">Loading documents...</h3>
+          </div>
+        ) : filteredDocuments.length === 0 ? (
+          <div className="py-12 text-center">
+            <FileStack className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold text-foreground">No documents found</h3>
+            <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="p-4 text-left font-medium text-muted-foreground">Document</th>
+                  <th className="p-4 text-left font-medium text-muted-foreground">Type</th>
+                  <th className="p-4 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="p-4 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="p-4 text-right font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredDocuments.map((document) => {
+                  const status = statusConfig[document.status] || statusConfig.draft;
+                  const StatusIcon = status.icon;
+                  const pendingCount = pendingSignatureCountByDocument[document.id] || 0;
+
+                  return (
+                    <tr key={document.id} className="transition-colors hover:bg-secondary/50">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                            <FileStack className="h-5 w-5 text-primary" />
                           </div>
-                        </td>
-                        <td className="p-4">
-                          <span className="inline-block text-xs font-medium px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                            {doc.type || "Document"}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${status.bg} ${status.text}`}>
-                            <StatusIcon className="w-3 h-3" />
+                          <div>
+                            <div className="font-medium text-foreground">{document.name || "Untitled"}</div>
+                            <div className="text-sm text-muted-foreground">{document.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="inline-block rounded-full bg-secondary px-2 py-1 text-xs font-medium capitalize text-secondary-foreground">
+                          {document.type}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${status.bg} ${status.text}`}>
+                            <StatusIcon className="h-3 w-3" />
                             {status.label}
                           </span>
-                        </td>
-                        <td className="p-4 text-muted-foreground">Recently created</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                          {pendingCount > 0 ? (
+                            <span className="text-xs text-muted-foreground">{pendingCount} pending signer(s)</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        <div className="flex items-center gap-1 text-sm">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {format(new Date(document.created_at), "MMM d, yyyy")}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/documents/${document.id}/esign`)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDownloadDocument(document.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/documents/${document.id}/esign`)}>
+                            E-Sign
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+    </div>
   );
 };
 

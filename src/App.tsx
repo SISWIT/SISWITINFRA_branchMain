@@ -32,6 +32,7 @@ import DocumentTemplatesPage from "./pages/documents/DocumentTemplatesPage";
 import DocumentHistoryPage from "./pages/documents/DocumentHistoryPage";
 import DocumentCreatePage from "./pages/documents/DocumentCreatePage";
 import PendingSignaturesPage from "./pages/documents/PendingSignaturesPage";
+import DocumentESignPage from "./pages/documents/DocumentESignPage";
 
 // CLM
 import CLMDashboard from "./pages/clm/CLMDashboard";
@@ -144,6 +145,7 @@ const App = () => (
                 <Route path="documents/templates" element={<DocumentTemplatesPage />} />
                 <Route path="documents/history" element={<DocumentHistoryPage />} />
                 <Route path="documents/pending" element={<PendingSignaturesPage />} />
+                <Route path="documents/:id/esign" element={<DocumentESignPage />} />
 
                 {/* ERP Routes */}
                 <Route path="erp" element={<ERPDashboard />} />
