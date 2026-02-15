@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { Package, Plus, Minus, Trash2, Calculator, Save, Send, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ export default function QuoteBuilderPage() {
     },
   });
 
-  // 3. Fetch contacts based on selected account - UPDATED: Filter by current user
+  // 3. Fetch contacts based on selected account
   const { data: contacts, isLoading: isLoadingContacts } = useQuery({
     queryKey: ["contacts-list", quoteData.account_id, user?.id], 
     queryFn: async () => {
@@ -83,7 +83,6 @@ export default function QuoteBuilderPage() {
         .from("contacts")
         .select("id, first_name, last_name")
         .eq("account_id", quoteData.account_id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("first_name");
         
       if (error) throw error;
@@ -92,7 +91,7 @@ export default function QuoteBuilderPage() {
     enabled: !!quoteData.account_id && quoteData.account_id !== "" && !!user,
   });
 
-  // 4. Fetch opportunities based on selected account - UPDATED: Filter by current user
+  // 4. Fetch opportunities based on selected account
   const { data: opportunities, isLoading: isLoadingOpportunities } = useQuery({
     queryKey: ["opportunities-list", quoteData.account_id, user?.id],
     queryFn: async () => {
@@ -100,8 +99,6 @@ export default function QuoteBuilderPage() {
       const { data, error } = await supabase
         .from("opportunities")
         .select("id, name, amount")
-        .eq("account_id", quoteData.account_id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .eq("account_id", quoteData.account_id)
         .order("name");
         
