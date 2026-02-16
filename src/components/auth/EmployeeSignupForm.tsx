@@ -74,8 +74,8 @@ export function EmployeeSignupForm({ onBack, onSuccess }: EmployeeSignupFormProp
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(" ") || "";
 
-      // SECURITY: Role is assigned server-side as 'user' - admin must approve for employee access
-      const { error } = await signUp(formData.email, formData.password, firstName, lastName);
+      // Pass signupType='employee' so the database trigger creates a pending employee record
+      const { error } = await signUp(formData.email, formData.password, firstName, lastName, "employee");
 
       if (error) {
         if (error.message.includes("already registered")) {

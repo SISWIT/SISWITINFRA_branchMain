@@ -45,7 +45,8 @@ export function Header() {
 
   const isAdmin = role === AppRole.ADMIN;
   const isEmployee = role === AppRole.EMPLOYEE;
-  const dashboardHref = isAdmin ? "/admin" : "/dashboard";
+  const isUser = role === AppRole.USER;
+  const dashboardHref = isAdmin ? "/admin" : isEmployee ? "/dashboard" : "/";
 
   const isActive = (href: string) =>
     location.pathname === href || location.pathname.startsWith(href + "/");

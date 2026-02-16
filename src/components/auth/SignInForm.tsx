@@ -55,7 +55,7 @@ export function SignInForm() {
         return;
       }
 
-      // Capture 'data' which now contains the role
+      // Capture 'data' which now contains the role and isApproved status
       const { data, error } = await signIn(formData.email, formData.password);
       
       if (error) {
@@ -72,7 +72,7 @@ export function SignInForm() {
           toast({
             variant: "destructive",
             title: "Account Pending Approval",
-            description: "Your account has not been approved by an admin yet. Please contact support.",
+            description: "Your account has not been approved by an admin yet. Please wait for an administrator to approve your access.",
           });
         } 
         else {
@@ -88,12 +88,17 @@ export function SignInForm() {
           description: "You've successfully logged in.",
         });
 
-        // --- REDIRECT LOGIC ---
-        // Check the role returned from useAuth and redirect accordingly
+        // --- REDIRECT LOGIC BASED ON ROLE ---
+        // ADMIN -> /admin
+        // EMPLOYEE (approved) -> /dashboard  
+        // USER (customer) -> / (home)
         if (data?.role === AppRole.ADMIN) {
-            navigate("/admin");
+          navigate("/admin");
+        } else if (data?.role === AppRole.EMPLOYEE) {
+          navigate("/dashboard");
         } else {
-            navigate("/dashboard");
+          // For USER (customer), redirect to home page
+          navigate("/");
         }
       }
     } catch {
