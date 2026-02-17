@@ -5,12 +5,17 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { User, Session, AuthError, PostgrestSingleResponse, PostgrestError } from "@supabase/supabase-js";
+import {
+  User,
+  Session,
+  AuthError,
+  PostgrestSingleResponse,
+} from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AppRole } from "@/types/roles";
-import { Database } from "@/integrations/supabase/types"; // Import your Database type
+import { Database } from "@/integrations/supabase/types";
 
-/* ---------------- TYPES ---------------- */
+/* TYPES */
 
 interface AuthContextType {
   user: User | null;
@@ -35,199 +40,172 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+/* CONTEXT */
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/* ---------------- HELPERS ---------------- */
+/* HELPERS */
 
 const mapRole = (role: string | null): AppRole | null => {
-  console.log("🗺️ Mapping role:", role);
   if (!role) return null;
-  const validRoles = ["user", "employee", "admin"] as const;
-  if (validRoles.includes(role as AppRole)) {
+  if (role === "user" || role === "employee" || role === "admin") {
     return role as AppRole;
   }
-  console.warn("⚠️ Invalid role mapped to null:", role);
   return null;
 };
 
-// Timeout utility
-const timeout = (ms: number, label: string) => new Promise((_, reject) => {
-  setTimeout(() => {
-    console.warn(`⏰ Timeout after ${ms}ms for: ${label}`);
-    reject(new Error(`Timeout after ${ms}ms for ${label}`));
-  }, ms);
-});
+/* simple timeout helper used for database calls */
+const timeout = (ms: number) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("timeout")), ms)
+  );
 
-// Cache keys
-const ROLE_CACHE_KEY = 'auth_role_cache';
+/* key used to cache role data in local storage */
+const ROLE_CACHE_KEY = "auth_role_cache";
 
-/* ---------------- PROVIDER ---------------- */
+/* PROVIDER */
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  /* state that holds auth and role info */
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  /* ---------------- FETCH ROLE ---------------- */
-  
+
+  /* fetch role and approval status from database or cache */
   const fetchRoleAndApproval = async (userId: string) => {
-    console.log("🔎 Starting fetchRoleAndApproval for user:", userId);
-    
-    // Check cache first
-    const cached = localStorage.getItem(ROLE_CACHE_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed.userId === userId && parsed.role) {
-          const mapped = mapRole(parsed.role);
-          if (mapped) {
-            console.log("💾 Using cached role:", mapped, "Approved:", parsed.approved);
-            setRole(mapped);
-            setIsApproved(parsed.approved);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn("⚠️ Invalid role cache:", e);
-      }
-    }
-    
     try {
+      /* first check if role is already cached locally */
+      const cached = localStorage.getItem(ROLE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.userId === userId) {
+          setRole(parsed.role);
+          setIsApproved(parsed.approved);
+          return;
+        }
+      }
+
+      /* fetch role from supabase */
       const rolePromise = supabase
         .from("user_roles")
         .select("*")
         .eq("user_id", userId)
         .single();
-      
-      const { data, error } = await Promise.race<PostgrestSingleResponse<Database['public']['Tables']['user_roles']['Row']>>([
+
+      const response = (await Promise.race([
         rolePromise,
-        timeout(10000, `fetchRoleAndApproval for ${userId}`)
-      ]);
-      
-      console.log("🧾 ROLE DATA received:", data);
-      console.log("❌ ROLE ERROR:", error);
-      
+        timeout(10000),
+      ])) as PostgrestSingleResponse<
+        Database["public"]["Tables"]["user_roles"]["Row"]
+      >;
+
+      const { data, error } = response;
+
+      /* fallback to default user role if anything fails */
       if (error || !data) {
-        console.warn("⚠️ Using default USER role due to error or no data");
         setRole(AppRole.USER);
         setIsApproved(true);
-        // Cache default
-        localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ userId, role: AppRole.USER, approved: true }));
         return;
       }
-      
+
+      /* map database role into app role */
       const mapped = mapRole(data.role);
       const finalRole = mapped ?? AppRole.USER;
-      const finalApproved = mapped === AppRole.EMPLOYEE ? data.approved : true;
-      
+
+      /* employees require approval, others do not */
+      const finalApproved =
+        mapped === AppRole.EMPLOYEE ? data.approved : true;
+
       setRole(finalRole);
       setIsApproved(finalApproved);
-      
-      // Cache the role
-      localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ userId, role: data.role, approved: data.approved }));
-      
-      console.log("✅ Role set:", finalRole, "Approved:", finalApproved);
+
+      /* store result in local cache */
+      localStorage.setItem(
+        ROLE_CACHE_KEY,
+        JSON.stringify({
+          userId,
+          role: data.role,
+          approved: data.approved,
+        })
+      );
     } catch (err) {
-      console.error("❌ Error in fetchRoleAndApproval:", err);
-      // Set defaults on error/timeout
+      /* fallback to safe defaults on error */
       setRole(AppRole.USER);
       setIsApproved(true);
-      localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ userId, role: AppRole.USER, approved: true }));
-    } finally {
-      console.log("🏁 fetchRoleAndApproval completed for user:", userId);
     }
   };
-  
-  
-  /* ---------------- INIT AUTH ---------------- */
-  
+
+  /* initialize auth state on first load */
   useEffect(() => {
-    console.log("🚀 Starting auth initialization...");
-    
     let mounted = true;
-    
+
     const init = async () => {
-      console.log("⏳ Setting loading to true at init start");
       setLoading(true);
-      
+
       try {
-        const getSessionPromise = supabase.auth.getSession();
-        
-        const { data: { session } } = await Promise.race<{ data: { session: Session | null }; error: AuthError | null }>([
-          getSessionPromise,
-          timeout(10000, 'getSession in init')
-        ]);
-        
-        console.log("📦 Session received in init:", session);
-        
+        /* get existing session from supabase */
+        const { data } = await supabase.auth.getSession();
+
         if (!mounted) return;
-        
+
+        const session = data.session;
+
         setSession(session);
         setUser(session?.user ?? null);
-        
-        if (session?.user && !role) {
-          console.log("🔄 Fetching role after session restore (no role set yet)");
+
+        /* fetch role if user exists */
+        if (session?.user) {
           await fetchRoleAndApproval(session.user.id);
         }
       } catch (err) {
-        console.error("❌ Error in init auth:", err);
-        // Set defaults on failure
+        /* reset everything on failure */
         setSession(null);
         setUser(null);
         setRole(null);
         setIsApproved(null);
       } finally {
-        if (mounted) {
-          console.log("⏳ Setting loading to false at init end");
-          setLoading(false);
-          console.log("✅ Auth initialization completed");
-        }
+        if (mounted) setLoading(false);
       }
     };
-    
+
     init();
-    
+
+    /* listen to auth changes like login or logout */
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("⚡ Auth state change event:", event, "Session:", session);
-        
         if (!mounted) return;
-        
+
         setSession(session);
         setUser(session?.user ?? null);
-        
+
+        /* when user logs out, clear all stored data */
         if (event === "SIGNED_OUT") {
-          console.log("🚪 Signed out - resetting states");
           setRole(null);
           setIsApproved(null);
-          localStorage.removeItem(ROLE_CACHE_KEY); // Clear cache on sign out
-          console.log("⏳ Setting loading to false after sign out");
-          setLoading(false);
+          localStorage.removeItem(ROLE_CACHE_KEY);
           return;
         }
-        
-        if (session?.user && !role) {
-          console.log("⏳ Setting loading to true for role fetch after state change (no role set yet)");
+
+        /* when user logs in, fetch role again */
+        if (session?.user) {
           setLoading(true);
           await fetchRoleAndApproval(session.user.id);
-          console.log("⏳ Setting loading to false after role fetch");
           setLoading(false);
         }
       }
     );
-    
+
     return () => {
-      console.log("🛑 Cleaning up auth effect");
       mounted = false;
       listener.subscription.unsubscribe();
     };
   }, []);
-  
-  
-  /* ---------------- ACTIONS ---------------- */
-  
+
+  /* AUTH ACTIONS */
+
+  /* register a new user */
   const signUp = async (
     email: string,
     password: string,
@@ -235,10 +213,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lastName: string,
     signupType: "employee" | "customer"
   ) => {
-    console.log("📝 Starting signUp for:", email, "Type:", signupType);
-    
     try {
-      const signUpPromise = supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -249,114 +225,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         },
       });
-      
-      const { error } = await Promise.race<{ data: { user: User | null; session: Session | null }; error: AuthError | null }>([
-        signUpPromise,
-        timeout(15000, `signUp for ${email}`)
-      ]);
-      
-      if (error) {
-        console.error("❌ signUp failed:", error.message);
-      } else {
-        console.log("✅ signUp success");
-      }
-      
+
       return { error: error as Error | null };
     } catch (err) {
-      console.error("❌ Timeout or error in signUp:", err);
       return { error: err as Error };
-    } finally {
-      console.log("🏁 signUp completed for:", email);
     }
   };
-  
+
+  /* login existing user */
   const signIn = async (email: string, password: string) => {
-    console.log("🔐 Starting signIn for:", email);
-    
     try {
-      const signInPromise = supabase.auth.signInWithPassword({ email, password });
-      
-      const { data, error } = await Promise.race<{ data: { user: User | null; session: Session | null }; error: AuthError | null }>([
-        signInPromise,
-        timeout(15000, `signIn for ${email}`)
-      ]);
-      
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
       if (error || !data.user) {
-        console.error("❌ signIn auth error:", error);
         return { data: null, error: error as Error };
       }
-      
-      console.log("✅ signIn auth success, user:", data.user.id);
-      console.log("🔄 Fetching role after signIn");
-      
-      const { data: roleData, error: roleError } = await Promise.race<PostgrestSingleResponse<Pick<Database['public']['Tables']['user_roles']['Row'], 'role' | 'approved'>>>([
-        supabase
-          .from("user_roles")
-          .select("role, approved")
-          .eq("user_id", data.user.id)
-          .maybeSingle(),
-        timeout(10000, `role fetch after signIn for ${data.user.id}`)
-      ]);
-      
-      console.log("📦 Role data received after signIn:", roleData);
-      console.log("❌ Role error:", roleError);
-      
+
+      /* fetch role for logged in user */
+      const roleRes = await supabase
+        .from("user_roles")
+        .select("role, approved")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      const roleData = roleRes.data;
+
       const mappedRole = mapRole(roleData?.role ?? null);
       const finalRole = mappedRole ?? AppRole.USER;
-      
+
+      /* prevent employee login if not approved */
       if (finalRole === AppRole.EMPLOYEE && !roleData?.approved) {
-        console.warn("⛔ Employee not approved - signing out");
-        
         await supabase.auth.signOut();
-        localStorage.removeItem(ROLE_CACHE_KEY);
-        
         return {
           data: null,
-          error: new Error(
-            "Your account is pending admin approval. Please wait."
-          ),
+          error: new Error("Your account is pending admin approval."),
         };
       }
-      
+
       setRole(finalRole);
       setIsApproved(roleData?.approved ?? true);
-      
-      // Cache after successful signIn
-      localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ userId: data.user.id, role: roleData?.role ?? AppRole.USER, approved: roleData?.approved ?? true }));
-      
-      console.log("🎉 signIn completed. Role:", finalRole, "Approved:", roleData?.approved ?? true);
-      
+
       return {
         data: { role: finalRole, isApproved: roleData?.approved ?? true },
         error: null,
       };
     } catch (err) {
-      console.error("❌ Timeout or error in signIn:", err);
       return { data: null, error: err as Error };
-    } finally {
-      console.log("🏁 signIn completed for:", email);
     }
   };
-  
+
+  /* logout user and clear all state */
   const signOut = async () => {
-    console.log("🚪 Starting signOut...");
-    try {
-      await supabase.auth.signOut();
-      console.log("✅ signOut success");
-    } catch (err) {
-      console.error("❌ signOut error:", err);
-    } finally {
-      setUser(null);
-      setSession(null);
-      setRole(null);
-      setIsApproved(null);
-      localStorage.removeItem(ROLE_CACHE_KEY); // Clear cache
-      console.log("🏁 signOut completed - states reset");
-    }
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setRole(null);
+    setIsApproved(null);
+    localStorage.removeItem(ROLE_CACHE_KEY);
   };
-  
-  /* ---------------- PROVIDER ---------------- */
-  
+
+  /* provide auth state to entire app */
   return (
     <AuthContext.Provider
       value={{
@@ -375,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* ---------------- HOOK ---------------- */
+/* HOOK TO USE AUTH CONTEXT */
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
