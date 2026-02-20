@@ -15,12 +15,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
@@ -84,25 +79,33 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       // 1. Fetch Stats in parallel
-      const [totalUsersRes, activeEmployeesRes, rejectedRequestsRes, pendingViewRes] =
-        await Promise.all([
-          supabase.from("user_roles").select("*", { count: "exact", head: true }),
-          supabase
-            .from("user_roles")
-            .select("*", { count: "exact", head: true })
-            .eq("role", "employee")
-            .eq("approved", true),
-          supabase
-            .from("signup_requests")
-            .select("*", { count: "exact", head: true })
-            .eq("status", "rejected"),
-          // 2. Fetch the joined data directly from your new VIEW
-          supabase.from("admin_pending_approvals").select("*"),
-        ]);
+      const [
+        totalUsersRes,
+        activeEmployeesRes,
+        rejectedRequestsRes,
+        pendingViewRes,
+      ] = await Promise.all([
+        supabase.from("user_roles").select("*", { count: "exact", head: true }),
+        supabase
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "employee")
+          .eq("approved", true),
+        supabase
+          .from("signup_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "rejected"),
+        // Fix 1: Cast supabase to 'any' to allow querying the View
+        // that isn't in your generated types yet.
+        (supabase as any).from("admin_pending_approvals").select("*"),
+      ]);
 
       if (pendingViewRes.error) throw pendingViewRes.error;
 
-      const pendingData = (pendingViewRes.data as PendingEmployee[]) || [];
+      // Fix 2: Cast the data to 'unknown' then 'PendingEmployee[]'
+      // to satisfy the TypeScript overlap requirement.
+      const pendingData =
+        (pendingViewRes.data as unknown as PendingEmployee[]) || [];
 
       setRequests(pendingData);
       setStats({
@@ -111,7 +114,6 @@ export default function AdminDashboard() {
         activeEmployees: activeEmployeesRes.count ?? 0,
         rejectedRequests: rejectedRequestsRes.count ?? 0,
       });
-
     } catch (error: any) {
       console.error("error in fetchData", error);
       toast({
@@ -154,7 +156,11 @@ export default function AdminDashboard() {
 
       fetchData();
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Failed", description: error.message });
+      toast({
+        variant: "destructive",
+        title: "Failed",
+        description: error.message,
+      });
     }
   };
 
@@ -174,10 +180,17 @@ export default function AdminDashboard() {
           .eq("role", "employee"),
       ]);
 
-      toast({ title: "Request Rejected", description: `${request.email} request rejected.` });
+      toast({
+        title: "Request Rejected",
+        description: `${request.email} request rejected.`,
+      });
       fetchData();
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Failed", description: error.message });
+      toast({
+        variant: "destructive",
+        title: "Failed",
+        description: error.message,
+      });
     }
   };
 
@@ -206,7 +219,9 @@ export default function AdminDashboard() {
                 key={item.name}
                 variant={item.active ? "secondary" : "ghost"}
                 className={`w-full justify-start gap-3 ${
-                  item.active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"
+                  item.active
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground"
                 }`}
                 asChild
               >
@@ -223,24 +238,55 @@ export default function AdminDashboard() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                <p className="text-muted-foreground">Overview of employee access and system health.</p>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  Admin Dashboard
+                </h1>
+                <p className="text-muted-foreground">
+                  Overview of employee access and system health.
+                </p>
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total Users" value={stats.totalUsers} icon={Users} desc="Registered" />
-              <StatCard title="Active Employees" value={stats.activeEmployees} icon={CheckCircle2} desc="Approved" color="text-green-600" />
-              <StatCard title="Pending" value={stats.pendingRequests} icon={Clock} desc="Reviewing" color="text-orange-500" />
-              <StatCard title="Rejected" value={stats.rejectedRequests} icon={XCircle} desc="Denied" color="text-red-500" />
+              <StatCard
+                title="Total Users"
+                value={stats.totalUsers}
+                icon={Users}
+                desc="Registered"
+              />
+              <StatCard
+                title="Active Employees"
+                value={stats.activeEmployees}
+                icon={CheckCircle2}
+                desc="Approved"
+                color="text-green-600"
+              />
+              <StatCard
+                title="Pending"
+                value={stats.pendingRequests}
+                icon={Clock}
+                desc="Reviewing"
+                color="text-orange-500"
+              />
+              <StatCard
+                title="Rejected"
+                value={stats.rejectedRequests}
+                icon={XCircle}
+                desc="Denied"
+                color="text-red-500"
+              />
             </div>
 
             <div className="grid gap-4 md:grid-cols-7">
               <Card className="col-span-7 lg:col-span-4">
-                <CardHeader><CardTitle>Pending Employee Approvals</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle>Pending Employee Approvals</CardTitle>
+                </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="h-40 flex items-center justify-center">Loading view...</div>
+                    <div className="h-40 flex items-center justify-center">
+                      Loading view...
+                    </div>
                   ) : requests.length === 0 ? (
                     <div className="h-40 flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-md">
                       <CheckCircle2 className="h-8 w-8 mb-2 text-green-500" />
@@ -259,7 +305,9 @@ export default function AdminDashboard() {
                       <TableBody>
                         {requests.map((emp) => (
                           <TableRow key={emp.user_id}>
-                            <TableCell className="font-medium">{emp.first_name} {emp.last_name}</TableCell>
+                            <TableCell className="font-medium">
+                              {emp.first_name} {emp.last_name}
+                            </TableCell>
                             <TableCell>{emp.email}</TableCell>
                             <TableCell>
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -268,8 +316,20 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" className="text-destructive" onClick={() => handleReject(emp)}>Reject</Button>
-                                <Button size="sm" onClick={() => handleApprove(emp)}>Approve</Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive"
+                                  onClick={() => handleReject(emp)}
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApprove(emp)}
+                                >
+                                  Approve
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -281,15 +341,27 @@ export default function AdminDashboard() {
               </Card>
 
               <Card className="col-span-7 lg:col-span-3">
-                <CardHeader><CardTitle>Distribution</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle>Distribution</CardTitle>
+                </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={false}
+                          className="stroke-muted"
+                        />
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                        />
                         <YAxis axisLine={false} tickLine={false} />
-                        <RechartsTooltip cursor={{ fill: "hsl(var(--muted)/0.4)" }} />
+                        <RechartsTooltip
+                          cursor={{ fill: "hsl(var(--muted)/0.4)" }}
+                        />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                           {chartData.map((_, i) => (
                             <Cell key={i} fill={CHART_COLORS[i]} />
