@@ -1,23 +1,17 @@
-import { Bell, Search, LogOut, User, Shield } from "lucide-react";
+import { Bell, LogOut, User, Shield, Menu } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { RoleBadge } from "@/components/ui/RoleBadge";
-import { AppRole } from "@/types/roles"; // IMPORTANT
+import { AppRole } from "@/types/roles";
 
 export function DashboardHeader() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -30,21 +24,17 @@ export function DashboardHeader() {
     "U";
 
   return (
-    <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 gap-5">
-      {/* Search */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search leads, accounts, opportunities..."
-            className="pl-10 bg-muted/50"
-          />
-        </div>
+    <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 relative">
+
+      {/* SEARCH (LEFT SIDE) */}
+      <div className="flex-1 max-w-md hidden sm:block">
+        <Input placeholder="Search..." className="pl-4 bg-muted/50" />
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center gap-4">
-        {/* Role Badge */}
+      {/* RIGHT SIDE DESKTOP */}
+      <div className="hidden md:flex items-center gap-4 ml-auto">
+
+        {/* Role always visible now */}
         {role && <RoleBadge role={role} />}
 
         {/* Notifications */}
@@ -53,58 +43,80 @@ export function DashboardHeader() {
           <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
         </Button>
 
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
+        {/*  Profile */}
+        <Button variant="ghost" onClick={() => navigate("/dashboard/profile")}>
+          <User className="h-4 w-4 mr-1" />
+          Profile
+        </Button>
 
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">
-                  {user?.user_metadata?.first_name}{" "}
-                  {user?.user_metadata?.last_name}
-                </p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
-                </p>
-              </div>
-            </DropdownMenuLabel>
+        {role === AppRole.ADMIN && (
+          <Button variant="ghost" onClick={() => navigate("/admin")}>
+            <Shield className="h-4 w-4 mr-1" />
+            Admin
+          </Button>
+        )}
 
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem onClick={() => navigate("/dashboard/profile")}>
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </DropdownMenuItem>
-
-            {/* ADMIN ONLY */}
-            {role === AppRole.ADMIN && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/admin")}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Admin Panel
-                </DropdownMenuItem>
-              </>
-            )}
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button variant="destructive" onClick={handleSignOut}>
+          <LogOut className="h-4 w-4 mr-1" />
+          Logout
+        </Button>
       </div>
+
+      {/* MOBILE RIGHT SIDE */}
+      <div className="md:hidden ml-auto flex items-center gap-2">
+
+        {/* small notif */}
+        <Button variant="ghost" size="icon">
+          <Bell className="h-5 w-5" />
+        </Button>
+
+        {/*menu on RIGHT */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <Menu className="h-6 w-6" />
+        </Button>
+      </div>
+
+      {/* MOBILE DROPDOWN */}
+      {mobileOpen && (
+        <div className="absolute top-16 right-2 w-64 bg-card border border-border rounded-xl shadow-lg p-4 flex flex-col gap-3 z-50 md:hidden">
+
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Avatar className="h-9 w-9">
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-medium">
+                {user?.user_metadata?.first_name}
+              </p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+
+          {/*Role always visible */}
+          {role && <RoleBadge role={role} />}
+
+          <Button variant="ghost" onClick={() => navigate("/dashboard/profile")}>
+            <User className="h-4 w-4 mr-2" />
+            Profile
+          </Button>
+
+          {role === AppRole.ADMIN && (
+            <Button variant="ghost" onClick={() => navigate("/admin")}>
+              <Shield className="h-4 w-4 mr-2" />
+              Admin Panel
+            </Button>
+          )}
+
+          <Button variant="destructive" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+      )}
     </header>
   );
 }

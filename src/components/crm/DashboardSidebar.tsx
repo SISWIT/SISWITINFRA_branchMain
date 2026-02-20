@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -37,9 +38,17 @@ const menuItems = [
       { title: "Leads", icon: Users, path: "/dashboard/crm/leads" },
       { title: "Accounts", icon: Building2, path: "/dashboard/crm/accounts" },
       { title: "Contacts", icon: UserCircle, path: "/dashboard/crm/contacts" },
-      { title: "Opportunities", icon: Target, path: "/dashboard/crm/opportunities" },
+      {
+        title: "Opportunities",
+        icon: Target,
+        path: "/dashboard/crm/opportunities",
+      },
       { title: "Pipeline", icon: Target, path: "/dashboard/crm/pipeline" },
-      { title: "Activities", icon: Calendar, path: "/dashboard/crm/activities" },
+      {
+        title: "Activities",
+        icon: Calendar,
+        path: "/dashboard/crm/activities",
+      },
     ],
   },
   {
@@ -54,7 +63,11 @@ const menuItems = [
     title: "CLM",
     items: [
       { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/clm" },
-      { title: "Contracts", icon: FileSignature, path: "/dashboard/clm/contracts" },
+      {
+        title: "Contracts",
+        icon: FileSignature,
+        path: "/dashboard/clm/contracts",
+      },
       { title: "Templates", icon: FileText, path: "/dashboard/clm/templates" },
     ],
   },
@@ -62,10 +75,22 @@ const menuItems = [
     title: "Documents",
     items: [
       { title: "All Documents", icon: FileStack, path: "/dashboard/documents" },
-      { title: "Create Document", icon: FilePlus, path: "/dashboard/documents/create" },
-      { title: "Templates", icon: FileText, path: "/dashboard/documents/templates" },
+      {
+        title: "Create Document",
+        icon: FilePlus,
+        path: "/dashboard/documents/create",
+      },
+      {
+        title: "Templates",
+        icon: FileText,
+        path: "/dashboard/documents/templates",
+      },
       { title: "History", icon: History, path: "/dashboard/documents/history" },
-      { title: "Pending Signatures", icon: Send, path: "/dashboard/documents/pending" },
+      {
+        title: "Pending Signatures",
+        icon: Send,
+        path: "/dashboard/documents/pending",
+      },
     ],
   },
   {
@@ -74,7 +99,11 @@ const menuItems = [
       { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard/erp" },
       { title: "Inventory", icon: Package, path: "/dashboard/erp/inventory" },
       { title: "Procurement", icon: Truck, path: "/dashboard/erp/procurement" },
-      { title: "Production", icon: BarChart3, path: "/dashboard/erp/production" },
+      {
+        title: "Production",
+        icon: BarChart3,
+        path: "/dashboard/erp/production",
+      },
       { title: "Finance", icon: DollarSign, path: "/dashboard/erp/finance" },
     ],
   },
@@ -95,22 +124,23 @@ export function DashboardSidebar() {
 
   const location = useLocation();
 
-  const linkBase =
-    "flex items-center py-2 rounded-lg transition-colors mx-2";
+  const linkBase = "flex items-center py-2 rounded-lg transition-colors mx-2";
 
   return (
     <aside
       className={cn(
         "h-screen bg-card border-r border-border flex flex-col transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
       )}
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         {!collapsed && (
-          <span className="text-xl font-bold text-foreground">
-            SIS<span className="text-gradient">WIT</span>
-          </span>
+          <Link to="/">
+            <span className="text-xl font-bold text-foreground">
+              SIS<span className="text-gradient">WIT</span>
+            </span>
+          </Link>
         )}
 
         <Button
@@ -141,7 +171,7 @@ export function DashboardSidebar() {
                     collapsed ? "justify-center px-2" : "gap-3 px-4",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )
                 }
               >
@@ -174,7 +204,7 @@ export function DashboardSidebar() {
                           collapsed ? "justify-center px-2" : "gap-3 px-4",
                           isActive
                             ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted",
                         )
                       }
                     >
@@ -206,7 +236,7 @@ export function DashboardSidebar() {
               collapsed ? "justify-center px-2" : "gap-3 px-4",
               isActive
                 ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )
           }
         >

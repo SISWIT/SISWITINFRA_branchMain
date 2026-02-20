@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -45,12 +47,16 @@ const PendingSignaturesPage = () => {
   const handleRemind = async (signatureId: string) => {
     try {
       await sendReminderMutation.mutateAsync(signatureId);
-    } catch {
-      // Error toast is handled in the mutation hook.
+      toast.success("Reminder sent successfully");
+      refetch(); // Refresh to update reminder counts
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send reminder");
     }
   };
 
   const handleSendBulkReminders = async () => {
+    if (pendingSignatures.length === 0) return;
+    
     setIsSendingBulkReminders(true);
     try {
       const promises = pendingSignatures.map((sig) =>
@@ -58,23 +64,34 @@ const PendingSignaturesPage = () => {
       );
 
       const results = await Promise.allSettled(promises);
-      const successCount = results.filter((r) => r.status === "fulfilled").length;
-      const failureCount = results.filter((r) => r.status === "rejected").length;
+      
+      const successful = results.filter((r) => r.status === "fulfilled");
+      const failed = results.filter((r) => r.status === "rejected");
 
-      if (successCount > 0) {
+      if (successful.length > 0) {
         toast.success(
-          `Sent ${successCount} reminder${successCount !== 1 ? "s" : ""}`,
+          `Successfully sent ${successful.length} reminder${successful.length !== 1 ? "s" : ""}`,
         );
       }
-      if (failureCount > 0) {
+
+      if (failed.length > 0) {
+        // Log individual errors to console for debugging
+        failed.forEach((f, i) => console.error(`Reminder ${i} failed:`, (f as PromiseRejectedResult).reason));
+        
         toast.error(
-          `${failureCount} reminder${failureCount !== 1 ? "s" : ""} failed`,
+          `${failed.length} reminder${failed.length !== 1 ? "s" : ""} failed to send.`,
         );
       }
+
+      // Always refetch to show updated counts regardless of partial failures
+      refetch();
+    } catch (err) {
+      toast.error("An unexpected error occurred during bulk operations");
     } finally {
       setIsSendingBulkReminders(false);
     }
   };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
@@ -97,7 +114,7 @@ const PendingSignaturesPage = () => {
             disabled={isSendingBulkReminders || pendingSignatures.length === 0}
           >
             <Mail className="mr-2 h-4 w-4" />
-            Send Reminders
+            {isSendingBulkReminders ? "Sending..." : "Send Reminders"}
           </Button>
         </div>
       </div>
