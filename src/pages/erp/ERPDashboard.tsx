@@ -218,7 +218,7 @@ export default function ERPDashboard() {
             <CardContent>
               <div className="space-y-4">
                 {stats?.recentOrders?.length ? (
-                  stats.recentOrders.map((order: any) => (
+                  stats.recentOrders.map((order: SimplePurchaseOrder) => (
                     <div key={order.id} className="flex items-center justify-between p-3 rounded-lg border">
                       <div>
                         <p className="font-medium">{order.accounts?.name || "Unknown Vendor"}</p>

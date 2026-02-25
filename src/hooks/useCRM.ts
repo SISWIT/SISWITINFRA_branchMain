@@ -1,742 +1,1611 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
-import type { Lead, Account, Contact, Opportunity, Activity, Product, Quote, QuoteItem } from "@/types/crm";
-import { toast } from "sonner"; // Assuming you use sonner or use-toast
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-// Leads - UPDATED: Filter by current user
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { useAuth } from "@/hooks/useAuth";
+import { useTenant } from "@/hooks/useTenant";
+import type {
+  Account,
+  Activity,
+  ActivityType,
+  Contact,
+  Lead,
+  LeadSource,
+  LeadStatus,
+  Opportunity,
+  OpportunityStage,
+  Product,
+  Quote,
+  QuoteItem,
+  QuoteStatus,
+} from "@/types/crm";
+import {
+  applyModuleMutationScope,
+  applyModuleReadScope,
+  buildModuleCreatePayload,
+  isModuleScopeReady,
+  requireTenantScope,
+  type ModuleScopeContext,
+} from "@/lib/module-scope";
+import { softDeleteRecord } from "@/lib/soft-delete";
+import { writeAuditLog } from "@/lib/audit";
+
+type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
+type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
+type LeadUpdate = Database["public"]["Tables"]["leads"]["Update"];
+
+type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
+type AccountInsert = Database["public"]["Tables"]["accounts"]["Insert"];
+type AccountUpdate = Database["public"]["Tables"]["accounts"]["Update"];
+
+type ContactRow = Database["public"]["Tables"]["contacts"]["Row"];
+type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
+type ContactUpdate = Database["public"]["Tables"]["contacts"]["Update"];
+
+type OpportunityRow = Database["public"]["Tables"]["opportunities"]["Row"];
+type OpportunityInsert = Database["public"]["Tables"]["opportunities"]["Insert"];
+type OpportunityUpdate = Database["public"]["Tables"]["opportunities"]["Update"];
+
+type ActivityRow = Database["public"]["Tables"]["activities"]["Row"];
+type ActivityInsert = Database["public"]["Tables"]["activities"]["Insert"];
+type ActivityUpdate = Database["public"]["Tables"]["activities"]["Update"];
+
+type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
+
+type QuoteRow = Database["public"]["Tables"]["quotes"]["Row"];
+type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
+type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
+
+type QuoteItemRow = Database["public"]["Tables"]["quote_items"]["Row"];
+type QuoteItemInsert = Database["public"]["Tables"]["quote_items"]["Insert"];
+
+interface DashboardStats {
+  totalLeads: number;
+  totalAccounts: number;
+  openOpportunities: number;
+  totalQuotes: number;
+  opportunitiesByStage: Record<string, number>;
+  pipelineValue: number;
+  expectedRevenue: number;
+  wonDeals: number;
+  wonValue: number;
+  winRate: number;
+}
+
+const LEAD_STATUSES: LeadStatus[] = ["new", "contacted", "qualified", "unqualified", "converted"];
+const LEAD_SOURCES: LeadSource[] = [
+  "website",
+  "referral",
+  "cold_call",
+  "advertisement",
+  "social_media",
+  "trade_show",
+  "other",
+];
+const OPPORTUNITY_STAGES: OpportunityStage[] = [
+  "new",
+  "qualified",
+  "proposal",
+  "negotiation",
+  "closed_won",
+  "closed_lost",
+];
+const ACTIVITY_TYPES: ActivityType[] = ["call", "email", "meeting", "task", "note"];
+const QUOTE_STATUSES: QuoteStatus[] = [
+  "draft",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "sent",
+  "accepted",
+  "expired",
+];
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function asLeadStatus(value: string | null | undefined): LeadStatus {
+  if (value && LEAD_STATUSES.includes(value as LeadStatus)) {
+    return value as LeadStatus;
+  }
+  return "new";
+}
+
+function asLeadSource(value: string | null | undefined): LeadSource | undefined {
+  if (value && LEAD_SOURCES.includes(value as LeadSource)) {
+    return value as LeadSource;
+  }
+  return undefined;
+}
+
+function asOpportunityStage(value: string | null | undefined): OpportunityStage {
+  if (value && OPPORTUNITY_STAGES.includes(value as OpportunityStage)) {
+    return value as OpportunityStage;
+  }
+  return "new";
+}
+
+function asActivityType(value: string | null | undefined): ActivityType {
+  if (value && ACTIVITY_TYPES.includes(value as ActivityType)) {
+    return value as ActivityType;
+  }
+  return "task";
+}
+
+function asQuoteStatus(value: string | null | undefined): QuoteStatus {
+  if (value && QUOTE_STATUSES.includes(value as QuoteStatus)) {
+    return value as QuoteStatus;
+  }
+  return "draft";
+}
+
+function mapLead(row: LeadRow): Lead {
+  return {
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    company: row.company ?? undefined,
+    job_title: row.title ?? undefined,
+    status: asLeadStatus(row.lead_status),
+    source: asLeadSource(row.lead_source),
+    website: row.website ?? undefined,
+    converted_at: row.converted_at ?? undefined,
+    converted_account_id: row.converted_to_account_id ?? undefined,
+    converted_contact_id: row.converted_to_contact_id ?? undefined,
+    converted_opportunity_id: row.converted_to_opportunity_id ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_by: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapAccount(row: AccountRow): Account {
+  return {
+    id: row.id,
+    name: row.name,
+    industry: row.industry ?? undefined,
+    website: row.website ?? undefined,
+    phone: row.phone ?? undefined,
+    email: row.domain ?? undefined,
+    address: row.billing_address ?? undefined,
+    city: row.billing_city ?? undefined,
+    state: row.billing_state ?? undefined,
+    country: row.billing_country ?? undefined,
+    postal_code: row.billing_zip ?? undefined,
+    annual_revenue: row.annual_revenue ?? undefined,
+    employee_count: row.number_of_employees ?? undefined,
+    description: row.ownership ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_by: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapContact(row: ContactRow): Contact {
+  return {
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    mobile: row.mobile_phone ?? undefined,
+    job_title: row.job_title ?? undefined,
+    department: row.department ?? undefined,
+    account_id: row.account_id ?? undefined,
+    address: row.address ?? undefined,
+    city: row.city ?? undefined,
+    state: row.state ?? undefined,
+    country: row.country ?? undefined,
+    postal_code: row.zip ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_by: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapOpportunity(row: OpportunityRow): Opportunity {
+  return {
+    id: row.id,
+    name: row.name,
+    account_id: row.account_id ?? undefined,
+    contact_id: row.contact_id ?? undefined,
+    stage: asOpportunityStage(row.stage),
+    amount: row.amount ?? undefined,
+    probability: row.probability ?? undefined,
+    expected_revenue: row.expected_revenue ?? undefined,
+    close_date: row.close_date ?? undefined,
+    lead_source: asLeadSource(row.lead_source),
+    description: row.next_step ?? undefined,
+    next_step: row.next_step ?? undefined,
+    is_closed: row.is_closed ?? undefined,
+    is_won: row.is_won ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_by: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapActivity(row: ActivityRow): Activity {
+  const isCompleted = row.status === "completed" || Boolean(row.completed_at);
+
+  const related = {
+    lead_id: row.related_to_type === "lead" ? row.related_to_id ?? undefined : undefined,
+    account_id: row.related_to_type === "account" ? row.related_to_id ?? undefined : undefined,
+    contact_id: row.related_to_type === "contact" ? row.related_to_id ?? undefined : undefined,
+    opportunity_id: row.related_to_type === "opportunity" ? row.related_to_id ?? undefined : undefined,
+  };
+
+  return {
+    id: row.id,
+    type: asActivityType(row.type),
+    subject: row.subject,
+    description: row.description ?? undefined,
+    due_date: row.due_date ?? undefined,
+    completed_at: row.completed_at ?? undefined,
+    is_completed: isCompleted,
+    priority: row.priority ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_by: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+    ...related,
+  };
+}
+
+function mapProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    name: row.name,
+    sku: row.sku,
+    description: row.description ?? undefined,
+    category: row.family ?? undefined,
+    unit_price: row.list_price ?? 0,
+    is_active: row.is_active ?? true,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapQuote(row: QuoteRow): Quote {
+  return {
+    id: row.id,
+    quote_number: row.quote_number,
+    opportunity_id: row.opportunity_id ?? undefined,
+    account_id: row.account_id ?? undefined,
+    contact_id: row.contact_id ?? undefined,
+    status: asQuoteStatus(row.status),
+    subtotal: row.subtotal ?? undefined,
+    discount_percent: row.discount_percent ?? undefined,
+    discount_amount: row.discount_amount ?? undefined,
+    tax_percent: row.tax_percent ?? undefined,
+    tax_amount: row.tax_amount ?? undefined,
+    total: row.total_amount ?? undefined,
+    valid_until: row.expiration_date ?? undefined,
+    terms: row.payment_terms ?? undefined,
+    notes: row.notes ?? undefined,
+    approved_by: row.approved_by ?? undefined,
+    approved_at: row.approved_at ?? undefined,
+    owner_id: row.owner_id ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function mapQuoteItem(row: QuoteItemRow): QuoteItem {
+  return {
+    id: row.id,
+    quote_id: row.quote_id,
+    product_id: row.product_id ?? undefined,
+    product_name: row.product_name,
+    description: row.description ?? undefined,
+    quantity: row.quantity,
+    unit_price: row.unit_price,
+    discount_percent: row.discount_percent ?? undefined,
+    total: row.total ?? undefined,
+    sort_order: row.sort_order ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+function resolveActivityRelation(activity: Partial<Activity>): { relatedType: string | null; relatedId: string | null } {
+  if (activity.opportunity_id) {
+    return { relatedType: "opportunity", relatedId: activity.opportunity_id };
+  }
+  if (activity.lead_id) {
+    return { relatedType: "lead", relatedId: activity.lead_id };
+  }
+  if (activity.account_id) {
+    return { relatedType: "account", relatedId: activity.account_id };
+  }
+  if (activity.contact_id) {
+    return { relatedType: "contact", relatedId: activity.contact_id };
+  }
+  return { relatedType: null, relatedId: null };
+}
+
+function useCrmScope() {
+  const { user, role } = useAuth();
+  const { tenant, tenantLoading } = useTenant();
+
+  const scope: ModuleScopeContext = {
+    tenantId: tenant?.id ?? null,
+    userId: user?.id ?? null,
+    role,
+  };
+
+  return {
+    scope,
+    tenantId: scope.tenantId,
+    userId: scope.userId,
+    enabled: isModuleScopeReady(scope, tenantLoading),
+  };
+}
+
+async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext) {
+  const query = supabase.from("quotes").select("id").eq("id", quoteId);
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"] });
+  const result = await scoped.maybeSingle();
+  if (result.error || !result.data) {
+    throw new Error("Quote not found or not accessible");
+  }
+}
+
+// ===== LEADS =====
 export function useLeads() {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["leads", user?.id],
-    enabled: !!user,
+    queryKey: ["leads", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("leads").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Lead[];
+
+      return (data ?? []).map((row) => mapLead(row as LeadRow));
     },
   });
 }
 
 export function useCreateLead() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (lead: Omit<Partial<Lead>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("leads")
-        .insert({
-          first_name: lead.first_name || '',
-          last_name: lead.last_name || '',
-          email: lead.email,
-          phone: lead.phone,
-          company: lead.company,
-          job_title: lead.job_title,
-          status: lead.status,
-          source: lead.source,
-          description: lead.description,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (lead: Omit<Partial<Lead>, "id" | "created_at" | "updated_at">) => {
+      const payload = buildModuleCreatePayload<LeadInsert>(
+        {
+          first_name: lead.first_name || "",
+          last_name: lead.last_name || "",
+          email: lead.email ?? null,
+          phone: lead.phone ?? null,
+          company: lead.company ?? null,
+          title: lead.job_title ?? null,
+          lead_status: lead.status ?? "new",
+          lead_source: lead.source ?? null,
+          website: lead.website ?? null,
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("leads").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "lead_create",
+        entityType: "lead",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapLead(data as LeadRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       toast.success("Lead created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating lead: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating lead: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateLead() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("leads")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: LeadUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.first_name !== undefined) payload.first_name = updates.first_name;
+      if (updates.last_name !== undefined) payload.last_name = updates.last_name;
+      if (updates.email !== undefined) payload.email = updates.email ?? null;
+      if (updates.phone !== undefined) payload.phone = updates.phone ?? null;
+      if (updates.company !== undefined) payload.company = updates.company ?? null;
+      if (updates.job_title !== undefined) payload.title = updates.job_title ?? null;
+      if (updates.status !== undefined) payload.lead_status = updates.status;
+      if (updates.source !== undefined) payload.lead_source = updates.source ?? null;
+      if (updates.website !== undefined) payload.website = updates.website ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("leads").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "lead_update",
+        entityType: "lead",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapLead(data as LeadRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       toast.success("Lead updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating lead: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating lead: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteLead() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("leads").delete().eq("id", id);
-      if (error) throw error;
+      const access = await applyModuleMutationScope(
+        supabase.from("leads").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Lead not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "leads",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete lead");
+
+      void writeAuditLog({
+        action: "lead_delete",
+        entityType: "lead",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-      toast.success("Lead deleted successfully");
+      toast.success("Lead moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting lead: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting lead: " + getErrorMessage(error));
     },
   });
 }
 
-// Accounts - UPDATED: Filter by current user
+// ===== ACCOUNTS =====
 export function useAccounts() {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["accounts", user?.id],
-    enabled: !!user,
+    queryKey: ["accounts", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("*")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("accounts").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Account[];
+
+      return (data ?? []).map((row) => mapAccount(row as AccountRow));
     },
   });
 }
 
 export function useCreateAccount() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (account: Omit<Partial<Account>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("accounts")
-        .insert({
-          name: account.name || '',
-          industry: account.industry,
-          website: account.website,
-          phone: account.phone,
-          email: account.email,
-          address: account.address,
-          city: account.city,
-          state: account.state,
-          country: account.country,
-          postal_code: account.postal_code, // ADDED: Now saves zip code
-          description: account.description,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (account: Omit<Partial<Account>, "id" | "created_at" | "updated_at">) => {
+      const payload = buildModuleCreatePayload<AccountInsert>(
+        {
+          name: account.name || "",
+          industry: account.industry ?? null,
+          website: account.website ?? null,
+          phone: account.phone ?? null,
+          domain: account.email ?? null,
+          annual_revenue: account.annual_revenue ?? null,
+          number_of_employees: account.employee_count ?? null,
+          billing_address: account.address ?? null,
+          billing_city: account.city ?? null,
+          billing_state: account.state ?? null,
+          billing_country: account.country ?? null,
+          billing_zip: account.postal_code ?? null,
+          ownership: account.description ?? null,
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("accounts").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "account_create",
+        entityType: "account",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapAccount(data as AccountRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       toast.success("Account created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating account: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating account: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateAccount() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("accounts")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: AccountUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.industry !== undefined) payload.industry = updates.industry ?? null;
+      if (updates.website !== undefined) payload.website = updates.website ?? null;
+      if (updates.phone !== undefined) payload.phone = updates.phone ?? null;
+      if (updates.email !== undefined) payload.domain = updates.email ?? null;
+      if (updates.annual_revenue !== undefined) payload.annual_revenue = updates.annual_revenue ?? null;
+      if (updates.employee_count !== undefined) payload.number_of_employees = updates.employee_count ?? null;
+      if (updates.address !== undefined) payload.billing_address = updates.address ?? null;
+      if (updates.city !== undefined) payload.billing_city = updates.city ?? null;
+      if (updates.state !== undefined) payload.billing_state = updates.state ?? null;
+      if (updates.country !== undefined) payload.billing_country = updates.country ?? null;
+      if (updates.postal_code !== undefined) payload.billing_zip = updates.postal_code ?? null;
+      if (updates.description !== undefined) payload.ownership = updates.description ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("accounts").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "account_update",
+        entityType: "account",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapAccount(data as AccountRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       toast.success("Account updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating account: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating account: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("accounts").delete().eq("id", id);
-      if (error) throw error;
+      const access = await applyModuleMutationScope(
+        supabase.from("accounts").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Account not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "accounts",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete account");
+
+      void writeAuditLog({
+        action: "account_delete",
+        entityType: "account",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast.success("Account deleted successfully");
+      toast.success("Account moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting account: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting account: " + getErrorMessage(error));
     },
   });
 }
 
-// Contacts - UPDATED: Filter by current user and optional accountId
+// ===== CONTACTS =====
 export function useContacts(accountId?: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["contacts", user?.id, accountId],
-    enabled: !!user,
+    queryKey: ["contacts", tenantId, userId, accountId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      let query = supabase
-        .from("contacts")
-        .select("*, account:accounts(*)")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-      
+      let scopedQuery = applyModuleReadScope(
+        supabase.from("contacts").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
       if (accountId) {
-        query = query.eq("account_id", accountId);
+        scopedQuery = scopedQuery.eq("account_id", accountId);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Contact[];
+
+      return (data ?? []).map((row) => mapContact(row as ContactRow));
     },
   });
 }
 
 export function useCreateContact() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (contact: Omit<Partial<Contact>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .insert({
-          first_name: contact.first_name || '',
-          last_name: contact.last_name || '',
-          email: contact.email,
-          phone: contact.phone,
-          job_title: contact.job_title,
-          department: contact.department,
-          account_id: contact.account_id,
-          description: contact.description,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (contact: Omit<Partial<Contact>, "id" | "created_at" | "updated_at">) => {
+      const payload = buildModuleCreatePayload<ContactInsert>(
+        {
+          first_name: contact.first_name || "",
+          last_name: contact.last_name || "",
+          email: contact.email ?? null,
+          phone: contact.phone ?? null,
+          mobile_phone: contact.mobile ?? null,
+          job_title: contact.job_title ?? null,
+          department: contact.department ?? null,
+          account_id: contact.account_id ?? null,
+          address: contact.address ?? null,
+          city: contact.city ?? null,
+          state: contact.state ?? null,
+          country: contact.country ?? null,
+          zip: contact.postal_code ?? null,
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("contacts").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contact_create",
+        entityType: "contact",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapContact(data as ContactRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contact created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating contact: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating contact: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateContact() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contact> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: ContactUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.first_name !== undefined) payload.first_name = updates.first_name;
+      if (updates.last_name !== undefined) payload.last_name = updates.last_name;
+      if (updates.email !== undefined) payload.email = updates.email ?? null;
+      if (updates.phone !== undefined) payload.phone = updates.phone ?? null;
+      if (updates.mobile !== undefined) payload.mobile_phone = updates.mobile ?? null;
+      if (updates.job_title !== undefined) payload.job_title = updates.job_title ?? null;
+      if (updates.department !== undefined) payload.department = updates.department ?? null;
+      if (updates.account_id !== undefined) payload.account_id = updates.account_id ?? null;
+      if (updates.address !== undefined) payload.address = updates.address ?? null;
+      if (updates.city !== undefined) payload.city = updates.city ?? null;
+      if (updates.state !== undefined) payload.state = updates.state ?? null;
+      if (updates.country !== undefined) payload.country = updates.country ?? null;
+      if (updates.postal_code !== undefined) payload.zip = updates.postal_code ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("contacts").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contact_update",
+        entityType: "contact",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapContact(data as ContactRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contact updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating contact: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating contact: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteContact() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contacts").delete().eq("id", id);
-      if (error) throw error;
+      const access = await applyModuleMutationScope(
+        supabase.from("contacts").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Contact not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "contacts",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete contact");
+
+      void writeAuditLog({
+        action: "contact_delete",
+        entityType: "contact",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      toast.success("Contact deleted successfully");
+      toast.success("Contact moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting contact: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting contact: " + getErrorMessage(error));
     },
   });
 }
 
-// Opportunities - UPDATED: Filter by current user and optional accountId
+// ===== OPPORTUNITIES =====
 export function useOpportunities(accountId?: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["opportunities", user?.id, accountId],
-    enabled: !!user,
+    queryKey: ["opportunities", tenantId, userId, accountId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      let query = supabase
-        .from("opportunities")
-        .select("*, account:accounts(*), contact:contacts(*)")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      let scopedQuery = applyModuleReadScope(
+        supabase.from("opportunities").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
 
       if (accountId) {
-        query = query.eq("account_id", accountId);
+        scopedQuery = scopedQuery.eq("account_id", accountId);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Opportunity[];
+
+      return (data ?? []).map((row) => mapOpportunity(row as OpportunityRow));
     },
   });
 }
 
 export function useCreateOpportunity() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (opportunity: Omit<Partial<Opportunity>, 'id' | 'created_at' | 'updated_at' | 'expected_revenue'>) => {
-      const { data, error } = await supabase
-        .from("opportunities")
-        .insert({
-          name: opportunity.name || '',
-          account_id: opportunity.account_id,
-          contact_id: opportunity.contact_id,
-          stage: opportunity.stage,
-          amount: opportunity.amount,
-          close_date: opportunity.close_date,
-          description: opportunity.description,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (opportunity: Omit<Partial<Opportunity>, "id" | "created_at" | "updated_at" | "expected_revenue">) => {
+      const amount = opportunity.amount ?? 0;
+      const probability = opportunity.probability ?? 0;
+
+      const payload = buildModuleCreatePayload<OpportunityInsert>(
+        {
+          name: opportunity.name || "",
+          account_id: opportunity.account_id ?? null,
+          contact_id: opportunity.contact_id ?? null,
+          stage: opportunity.stage ?? "new",
+          amount,
+          probability,
+          expected_revenue: (amount * probability) / 100,
+          close_date: opportunity.close_date ?? null,
+          lead_source: opportunity.lead_source ?? null,
+          next_step: opportunity.description ?? opportunity.next_step ?? null,
+          is_closed: false,
+          is_won: false,
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("opportunities").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "opportunity_create",
+        entityType: "opportunity",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapOpportunity(data as OpportunityRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
       toast.success("Opportunity created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating opportunity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating opportunity: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateOpportunity() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Opportunity> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("opportunities")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: OpportunityUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      const amount = updates.amount;
+      const probability = updates.probability;
+
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.account_id !== undefined) payload.account_id = updates.account_id ?? null;
+      if (updates.contact_id !== undefined) payload.contact_id = updates.contact_id ?? null;
+      if (updates.stage !== undefined) payload.stage = updates.stage;
+      if (updates.amount !== undefined) payload.amount = updates.amount ?? null;
+      if (updates.probability !== undefined) payload.probability = updates.probability ?? null;
+      if (updates.close_date !== undefined) payload.close_date = updates.close_date ?? null;
+      if (updates.lead_source !== undefined) payload.lead_source = updates.lead_source ?? null;
+      if (updates.description !== undefined || updates.next_step !== undefined) {
+        payload.next_step = updates.description ?? updates.next_step ?? null;
+      }
+      if (updates.is_closed !== undefined) payload.is_closed = updates.is_closed ?? null;
+      if (updates.is_won !== undefined) payload.is_won = updates.is_won ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+
+      if (amount !== undefined || probability !== undefined) {
+        const safeAmount = amount ?? 0;
+        const safeProbability = probability ?? 0;
+        payload.expected_revenue = (safeAmount * safeProbability) / 100;
+      }
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("opportunities").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "opportunity_update",
+        entityType: "opportunity",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapOpportunity(data as OpportunityRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
       toast.success("Opportunity updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating opportunity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating opportunity: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteOpportunity() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("opportunities").delete().eq("id", id);
-      if (error) throw error;
+      const access = await applyModuleMutationScope(
+        supabase.from("opportunities").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Opportunity not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "opportunities",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete opportunity");
+
+      void writeAuditLog({
+        action: "opportunity_delete",
+        entityType: "opportunity",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities"] });
-      toast.success("Opportunity deleted successfully");
+      toast.success("Opportunity moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting opportunity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting opportunity: " + getErrorMessage(error));
     },
   });
 }
 
-// Activities - UPDATED: Filter by current user
+// ===== ACTIVITIES =====
 export function useActivities(filters?: { opportunityId?: string; leadId?: string; accountId?: string }) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["activities", user?.id, filters],
-    enabled: !!user,
+    queryKey: ["activities", tenantId, userId, filters],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      let query = supabase.from("activities").select("*")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-      
-      if (filters?.opportunityId) query = query.eq("opportunity_id", filters.opportunityId);
-      if (filters?.leadId) query = query.eq("lead_id", filters.leadId);
-      if (filters?.accountId) query = query.eq("account_id", filters.accountId);
-      
-      const { data, error } = await query;
+      let scopedQuery = applyModuleReadScope(
+        supabase.from("activities").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      if (filters?.opportunityId) {
+        scopedQuery = scopedQuery.eq("related_to_type", "opportunity").eq("related_to_id", filters.opportunityId);
+      }
+      if (filters?.leadId) {
+        scopedQuery = scopedQuery.eq("related_to_type", "lead").eq("related_to_id", filters.leadId);
+      }
+      if (filters?.accountId) {
+        scopedQuery = scopedQuery.eq("related_to_type", "account").eq("related_to_id", filters.accountId);
+      }
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Activity[];
+
+      return (data ?? []).map((row) => mapActivity(row as ActivityRow));
     },
   });
 }
 
 export function useCreateActivity() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (activity: Omit<Partial<Activity>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("activities")
-        .insert({
-          type: activity.type || 'task',
-          subject: activity.subject || '',
-          description: activity.description,
-          due_date: activity.due_date,
-          opportunity_id: activity.opportunity_id,
-          lead_id: activity.lead_id,
-          account_id: activity.account_id,
-          contact_id: activity.contact_id,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (activity: Omit<Partial<Activity>, "id" | "created_at" | "updated_at">) => {
+      const { relatedType, relatedId } = resolveActivityRelation(activity);
+      const isCompleted = Boolean(activity.is_completed);
+
+      const payload = buildModuleCreatePayload<ActivityInsert>(
+        {
+          type: activity.type ?? "task",
+          subject: activity.subject || "",
+          description: activity.description ?? null,
+          due_date: activity.due_date ?? null,
+          priority: activity.priority ?? "medium",
+          related_to_type: relatedType,
+          related_to_id: relatedId,
+          status: isCompleted ? "completed" : "open",
+          completed_at: isCompleted ? new Date().toISOString() : null,
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("activities").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "activity_create",
+        entityType: "activity",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapActivity(data as ActivityRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
       toast.success("Activity created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating activity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating activity: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateActivity() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Activity> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("activities")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const relation = resolveActivityRelation(updates);
+      const payload: ActivityUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.type !== undefined) payload.type = updates.type;
+      if (updates.subject !== undefined) payload.subject = updates.subject;
+      if (updates.description !== undefined) payload.description = updates.description ?? null;
+      if (updates.due_date !== undefined) payload.due_date = updates.due_date ?? null;
+      if (updates.priority !== undefined) payload.priority = updates.priority ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+      if (relation.relatedType !== null || relation.relatedId !== null) {
+        payload.related_to_type = relation.relatedType;
+        payload.related_to_id = relation.relatedId;
+      }
+      if (updates.is_completed !== undefined) {
+        payload.status = updates.is_completed ? "completed" : "open";
+        payload.completed_at = updates.is_completed ? new Date().toISOString() : null;
+      }
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("activities").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "activity_update",
+        entityType: "activity",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapActivity(data as ActivityRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
       toast.success("Activity updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating activity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating activity: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteActivity() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("activities").delete().eq("id", id);
-      if (error) throw error;
+      const access = await applyModuleMutationScope(
+        supabase.from("activities").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Activity not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "activities",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete activity");
+
+      void writeAuditLog({
+        action: "activity_delete",
+        entityType: "activity",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
-      toast.success("Activity deleted successfully");
+      toast.success("Activity moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting activity: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting activity: " + getErrorMessage(error));
     },
   });
 }
 
-// Products
+// ===== PRODUCTS =====
 export function useProducts() {
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["products"],
+    queryKey: ["products", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("products").select("*").eq("is_active", true),
+        scope,
+        { ownerColumns: [] },
+      );
+
+      const { data, error } = await scopedQuery.order("name");
       if (error) throw error;
-      return data as Product[];
+
+      return (data ?? []).map((row) => mapProduct(row as ProductRow));
     },
   });
 }
 
 export function useCreateProduct() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { scope, tenantId, userId } = useCrmScope();
 
   return useMutation({
-    mutationFn: async (product: Omit<Partial<Product>, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from("products")
-        .insert({
-          name: product.name || '',
-          sku: product.sku,
-          description: product.description,
-          category: product.category,
-          unit_price: product.unit_price,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+    mutationFn: async (product: Omit<Partial<Product>, "id" | "created_at" | "updated_at">) => {
+      const payload = buildModuleCreatePayload<ProductInsert>(
+        {
+          name: product.name || "",
+          description: product.description ?? null,
+          family: product.category ?? null,
+          list_price: product.unit_price ?? 0,
+          cost_price: product.unit_price ?? 0,
+          sku: product.sku || `SKU-${Date.now()}`,
+          is_active: product.is_active ?? true,
+        },
+        scope,
+        { ownerColumn: null },
+      );
+
+      const { data, error } = await supabase.from("products").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "product_create",
+        entityType: "product",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapProduct(data as ProductRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating product: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating product: " + getErrorMessage(error));
     },
   });
 }
 
-// Quotes
-// Quotes - UPDATED: Filter by current user
+// ===== QUOTES =====
 export function useQuotes() {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["quotes", user?.id],
-    enabled: !!user,
+    queryKey: ["quotes", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*, opportunity:opportunities(*), account:accounts(*)")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("quotes").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Quote[];
+
+      return (data ?? []).map((row) => mapQuote(row as QuoteRow));
     },
   });
 }
 
 export function useQuote(id: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useCrmScope();
+
   return useQuery({
-    queryKey: ["quote", id, user?.id],
-    enabled: !!id && !!user,
+    queryKey: ["quote", id, tenantId, userId],
+    enabled: enabled && Boolean(id),
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*, opportunity:opportunities(*), account:accounts(*)")
-        .eq("id", id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .single();
+      const scopedQuoteQuery = applyModuleReadScope(
+        supabase.from("quotes").select("*").eq("id", id),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+      const { data, error } = await scopedQuoteQuery.single();
       if (error) throw error;
-      
+
+      const { tenantId: requiredTenantId } = requireTenantScope(scope);
       const { data: items, error: itemsError } = await supabase
         .from("quote_items")
         .select("*")
         .eq("quote_id", id)
+        .eq("tenant_id", requiredTenantId)
+        .is("deleted_at", null)
         .order("sort_order");
       if (itemsError) throw itemsError;
-      
-      return { ...data, items } as Quote;
+
+      return {
+        ...mapQuote(data as QuoteRow),
+        items: (items ?? []).map((item) => mapQuoteItem(item as QuoteItemRow)),
+      } as Quote;
     },
   });
 }
 
 export function useCreateQuote() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (quote: Partial<Quote>) => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .insert({ ...quote, owner_id: user?.id, created_by: user?.id })
-        .select()
-        .single();
+    mutationFn: async (quote: Omit<Partial<Quote>, "id" | "created_at" | "updated_at">) => {
+      const payload = buildModuleCreatePayload<QuoteInsert>(
+        {
+          quote_number: quote.quote_number || `QT-${Date.now()}`,
+          opportunity_id: quote.opportunity_id ?? null,
+          account_id: quote.account_id ?? null,
+          contact_id: quote.contact_id ?? null,
+          status: quote.status ?? "draft",
+          subtotal: quote.subtotal ?? 0,
+          discount_percent: quote.discount_percent ?? 0,
+          discount_amount: quote.discount_amount ?? 0,
+          tax_percent: quote.tax_percent ?? 0,
+          tax_amount: quote.tax_amount ?? 0,
+          total_amount: quote.total ?? 0,
+          expiration_date: quote.valid_until ?? null,
+          payment_terms: quote.terms ?? null,
+          notes: quote.notes ?? null,
+          quote_date: new Date().toISOString(),
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("quotes").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "quote_create",
+        entityType: "quote",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapQuote(data as QuoteRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       toast.success("Quote created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating quote: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating quote: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateQuote() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Quote> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("quotes")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: QuoteUpdate = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.quote_number !== undefined) payload.quote_number = updates.quote_number;
+      if (updates.opportunity_id !== undefined) payload.opportunity_id = updates.opportunity_id ?? null;
+      if (updates.account_id !== undefined) payload.account_id = updates.account_id ?? null;
+      if (updates.contact_id !== undefined) payload.contact_id = updates.contact_id ?? null;
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.subtotal !== undefined) payload.subtotal = updates.subtotal ?? null;
+      if (updates.discount_percent !== undefined) payload.discount_percent = updates.discount_percent ?? null;
+      if (updates.discount_amount !== undefined) payload.discount_amount = updates.discount_amount ?? null;
+      if (updates.tax_percent !== undefined) payload.tax_percent = updates.tax_percent ?? null;
+      if (updates.tax_amount !== undefined) payload.tax_amount = updates.tax_amount ?? null;
+      if (updates.total !== undefined) payload.total_amount = updates.total ?? null;
+      if (updates.valid_until !== undefined) payload.expiration_date = updates.valid_until ?? null;
+      if (updates.terms !== undefined) payload.payment_terms = updates.terms ?? null;
+      if (updates.notes !== undefined) payload.notes = updates.notes ?? null;
+      if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("quotes").update(payload).eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "quote_update",
+        entityType: "quote",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload as unknown as Record<string, unknown>,
+      });
+
+      return mapQuote(data as QuoteRow);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote", variables.id] });
       toast.success("Quote updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating quote: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating quote: " + getErrorMessage(error));
     },
   });
 }
 
-// Quote Items
 export function useCreateQuoteItem() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
-    mutationFn: async (item: { quote_id: string; product_name: string; unit_price: number; quantity?: number; product_id?: string; description?: string; discount_percent?: number }) => {
-      const { data, error } = await supabase
-        .from("quote_items")
-        .insert({
-          quote_id: item.quote_id,
-          product_name: item.product_name,
-          unit_price: item.unit_price,
-          quantity: item.quantity || 1,
-          product_id: item.product_id,
-          description: item.description,
-          discount_percent: item.discount_percent,
-        })
-        .select()
-        .single();
+    mutationFn: async (item: Omit<Partial<QuoteItem>, "id" | "created_at">) => {
+      const quoteId = item.quote_id || "";
+      await ensureQuoteAccessible(quoteId, scope);
+
+      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const payload: QuoteItemInsert = {
+        quote_id: quoteId,
+        tenant_id: requiredTenantId,
+        product_id: item.product_id ?? null,
+        product_name: item.product_name || "",
+        description: item.description ?? null,
+        quantity: item.quantity ?? 1,
+        unit_price: item.unit_price ?? 0,
+        discount_percent: item.discount_percent ?? 0,
+        total: item.total ?? 0,
+        sort_order: item.sort_order ?? 0,
+      };
+
+      const { data, error } = await supabase.from("quote_items").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "quote_item_create",
+        entityType: "quote_item",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapQuoteItem(data as QuoteItemRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["quote"] });
+      toast.success("Quote item added successfully");
     },
-    onError: (error) => {
-      toast.error("Error adding item: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error adding quote item: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteQuoteItem() {
   const queryClient = useQueryClient();
-  
+  const { scope, tenantId, userId } = useCrmScope();
+
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("quote_items").delete().eq("id", id);
-      if (error) throw error;
+      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const itemResult = await supabase
+        .from("quote_items")
+        .select("id, quote_id, tenant_id")
+        .eq("id", id)
+        .eq("tenant_id", requiredTenantId)
+        .maybeSingle();
+
+      if (itemResult.error || !itemResult.data) {
+        throw new Error("Quote item not found or not accessible");
+      }
+
+      await ensureQuoteAccessible(itemResult.data.quote_id, scope);
+
+      const deleted = await softDeleteRecord({
+        table: "quote_items",
+        id,
+        userId,
+      });
+      if (!deleted) throw new Error("Failed to delete quote item");
+
+      void writeAuditLog({
+        action: "quote_item_delete",
+        entityType: "quote_item",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       queryClient.invalidateQueries({ queryKey: ["quote"] });
+      toast.success("Quote item moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error removing item: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error removing quote item: " + getErrorMessage(error));
     },
   });
 }
 
-
-// Contracts - MOVED TO useCLM.ts
-// Contract Templates - MOVED TO useCLM.ts
-
-// Dashboard Stats - UPDATED: Filter by current user
+// ===== DASHBOARD STATS =====
 export function useDashboardStats() {
-  const { user } = useAuth();
-  return useQuery({
-    queryKey: ["dashboard_stats", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const [leads, opportunities, accounts, quotes, contracts] = await Promise.all([
-        supabase.from("leads").select("id, status", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-        supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_won, is_closed").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-        supabase.from("accounts").select("id", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-        supabase.from("quotes").select("id, status, total", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-        supabase.from("contracts").select("id, status, value", { count: "exact" }).or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-      ]);
+  const { scope, enabled, tenantId, userId } = useCrmScope();
 
-      const opps = opportunities.data || [];
-      const openOpps = opps.filter(o => !o.is_closed);
-      const wonOpps = opps.filter(o => o.is_won);
+  return useQuery({
+    queryKey: ["crm_dashboard_stats", tenantId, userId],
+    enabled,
+    queryFn: async (): Promise<DashboardStats> => {
+      const leadsQuery = applyModuleReadScope(
+        supabase.from("leads").select("id", { count: "exact", head: true }),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const accountsQuery = applyModuleReadScope(
+        supabase.from("accounts").select("id", { count: "exact", head: true }),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const quotesQuery = applyModuleReadScope(
+        supabase.from("quotes").select("id", { count: "exact", head: true }),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const opportunitiesQuery = applyModuleReadScope(
+        supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_closed, is_won"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const [{ count: leadsCount, error: leadsError }, { count: accountsCount, error: accountsError }, { count: quotesCount, error: quotesError }, { data: oppData, error: oppError }] =
+        await Promise.all([leadsQuery, accountsQuery, quotesQuery, opportunitiesQuery]);
+
+      if (leadsError) throw leadsError;
+      if (accountsError) throw accountsError;
+      if (quotesError) throw quotesError;
+      if (oppError) throw oppError;
+
+      const oppRows = (oppData ?? []) as Pick<OpportunityRow, "stage" | "amount" | "expected_revenue" | "is_closed" | "is_won">[];
+      const opportunitiesByStage = oppRows.reduce<Record<string, number>>((acc, opp) => {
+        const stage = opp.stage ?? "new";
+        acc[stage] = (acc[stage] ?? 0) + 1;
+        return acc;
+      }, {});
+
+      const openOpps = oppRows.filter((row) => row.is_closed !== true);
+      const closedOpps = oppRows.filter((row) => row.is_closed === true);
+      const wonOpps = oppRows.filter((row) => row.is_won === true);
+
+      const pipelineValue = openOpps.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      const expectedRevenue = openOpps.reduce((sum, row) => sum + Number(row.expected_revenue ?? 0), 0);
+      const wonValue = wonOpps.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      const winRate = closedOpps.length > 0 ? (wonOpps.length / closedOpps.length) * 100 : 0;
 
       return {
-        totalLeads: leads.count || 0,
-        totalAccounts: accounts.count || 0,
-        totalOpportunities: opps.length,
+        totalLeads: leadsCount ?? 0,
+        totalAccounts: accountsCount ?? 0,
         openOpportunities: openOpps.length,
-        pipelineValue: openOpps.reduce((sum, o) => sum + (o.amount || 0), 0),
-        expectedRevenue: openOpps.reduce((sum, o) => sum + (o.expected_revenue || 0), 0),
+        totalQuotes: quotesCount ?? 0,
+        opportunitiesByStage,
+        pipelineValue,
+        expectedRevenue,
         wonDeals: wonOpps.length,
-        wonValue: wonOpps.reduce((sum, o) => sum + (o.amount || 0), 0),
-        winRate: opps.filter(o => o.is_closed).length > 0
-          ? (wonOpps.length / opps.filter(o => o.is_closed).length) * 100
-          : 0,
-        totalQuotes: quotes.count || 0,
-        totalContracts: contracts.count || 0,
-        opportunitiesByStage: opps.reduce((acc, o) => {
-          acc[o.stage] = (acc[o.stage] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
+        wonValue,
+        winRate,
       };
     },
   });

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, ComponentType } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useMemo, useState, ComponentType } from "react";
+import { useNavigate, Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { tenantAppPath } from "@/lib/routes";
 import {
   Calculator,
   FileText,
@@ -29,17 +30,6 @@ import {
   FileStack,
   Boxes,
 } from "lucide-react";
-
-/* --- CONFIGURATION --- */
-
-const DASHBOARD_ROUTES = {
-  NEW_QUOTE: "/dashboard/cpq/quotes/new",
-  NEW_CONTRACT: "/dashboard/clm/contracts",
-  CREATE_DOC: "/dashboard/documents/create",
-  INVENTORY: "/dashboard/erp/inventory",
-  CONTACTS: "/dashboard/crm/contacts",
-  ACTIVITIES: "/dashboard/crm/activities",
-} as const;
 
 /* --- TYPES --- */
 
@@ -61,52 +51,61 @@ interface Stat {
   label: string;
   value: string;
   change: string;
-  icon: ComponentType<any>;
+  icon: ComponentType<{ className?: string }>;
 }
 
 interface QuickAction {
-  icon: ComponentType<any>;
+  icon: ComponentType<{ className?: string }>;
   title: string;
   description: string;
   color: string;
   route: string;
 }
 
-const quickActions: QuickAction[] = [
+const buildDashboardRoutes = (tenantSlug: string) => ({
+  NEW_QUOTE: tenantAppPath(tenantSlug, "cpq/quotes/new"),
+  NEW_CONTRACT: tenantAppPath(tenantSlug, "clm/contracts"),
+  CREATE_DOC: tenantAppPath(tenantSlug, "documents/create"),
+  INVENTORY: tenantAppPath(tenantSlug, "erp/inventory"),
+  CONTACTS: tenantAppPath(tenantSlug, "crm/contacts"),
+  ACTIVITIES: tenantAppPath(tenantSlug, "crm/activities"),
+});
+
+const buildQuickActions = (routes: ReturnType<typeof buildDashboardRoutes>): QuickAction[] => [
   {
     icon: Calculator,
     title: "Create Quote",
     description: "Start a new CPQ quote",
     color: "from-primary to-primary/60",
-    route: DASHBOARD_ROUTES.NEW_QUOTE,
+    route: routes.NEW_QUOTE,
   },
   {
     icon: FileText,
     title: "New Contract",
     description: "Draft a new contract",
     color: "from-accent to-accent/60",
-    route: DASHBOARD_ROUTES.NEW_CONTRACT,
+    route: routes.NEW_CONTRACT,
   },
   {
     icon: FileStack,
     title: "Create Document",
     description: "Generate a new document",
     color: "from-chart-4 to-chart-4/60",
-    route: DASHBOARD_ROUTES.CREATE_DOC,
+    route: routes.CREATE_DOC,
   },
   {
     icon: Boxes,
     title: "Update Inventory",
     description: "Manage stock levels",
     color: "from-orange-500 to-orange-500/60",
-    route: DASHBOARD_ROUTES.INVENTORY,
+    route: routes.INVENTORY,
   },
   {
     icon: Users,
     title: "Add Contact",
     description: "Add a new customer",
     color: "from-chart-3 to-chart-3/60",
-    route: DASHBOARD_ROUTES.CONTACTS,
+    route: routes.CONTACTS,
   },
 ];
 
@@ -114,6 +113,10 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+
+  const dashboardRoutes = useMemo(() => buildDashboardRoutes(tenantSlug), [tenantSlug]);
+  const quickActions = useMemo(() => buildQuickActions(dashboardRoutes), [dashboardRoutes]);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -254,7 +257,7 @@ const Dashboard = () => {
           <div className="rounded-2xl p-5 md:p-8 bg-gradient-to-br from-primary/10 to-background border border-border flex flex-col md:flex-row justify-between gap-5">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
-                Welcome back, {firstName} 👋
+                Welcome back, {firstName}
               </h1>
               <p className="text-muted-foreground mt-1 text-sm md:text-base">
                 Here's what's happening in your business today.
@@ -356,7 +359,7 @@ const Dashboard = () => {
               <h2 className="text-lg md:text-xl font-semibold">
                 Recent Activity
               </h2>
-              <Link to={DASHBOARD_ROUTES.ACTIVITIES}>
+              <Link to={dashboardRoutes.ACTIVITIES}>
                 <Button size="sm" variant="ghost">
                   View All
                 </Button>
@@ -365,7 +368,7 @@ const Dashboard = () => {
 
             {recentActivity.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                No recent activity yet 🚀
+                No recent activity yet
               </div>
             ) : (
               <div className="space-y-3">
@@ -400,3 +403,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useTenant } from "./useTenant";
 import type {
   AutoDocument,
   DocumentESignature,
@@ -10,6 +11,11 @@ import type {
   DocumentVersion,
 } from "@/types/documents";
 import { toast } from "sonner";
+import { enqueueDocumentPdfJob, enqueueEmailSendJob, enqueueReminderJob } from "@/lib/jobs";
+import { softDeleteRecord } from "@/lib/soft-delete";
+import { writeAuditLog } from "@/lib/audit";
+import { applyTenantOwnershipScope, withOwnershipCreate } from "@/lib/data-ownership";
+import { isPlatformRole } from "@/types/roles";
 
 type DocumentESignatureWithDocument = DocumentESignature & {
   document?: Pick<AutoDocument, "id" | "name" | "type" | "status" | "created_at" | "updated_at"> | null;
@@ -95,11 +101,12 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise
 
 // ===== DOCUMENT TEMPLATES =====
 export function useDocumentTemplates() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const { tenant } = useTenant();
   useDocumentsRealtime(user?.id, "templates");
 
   return useQuery({
-    queryKey: ["document_templates", user?.id],
+    queryKey: ["document_templates", user?.id, tenant?.id],
     enabled: !!user,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -107,11 +114,19 @@ export function useDocumentTemplates() {
         throw new Error("User not authenticated");
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("document_templates")
         .select("*")
+        .is("deleted_at", null)
         .or(`created_by.eq.${user.id},is_public.eq.true`)
         .order("updated_at", { ascending: false });
+
+      query = applyTenantOwnershipScope(query, {
+        tenantId: tenant?.id,
+        isPlatformAdmin: isPlatformRole(role),
+      });
+
+      const { data, error } = await query;
 
       if (error) {
         if (isMissingTableError(error)) {
@@ -128,12 +143,12 @@ export function useDocumentTemplates() {
 export function useCreateDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<DocumentTemplate>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("document_templates")
-        .insert({
+      const payload = withOwnershipCreate(
+        {
           name: template.name || "",
           type: template.type || "other",
           description: template.description,
@@ -142,13 +157,32 @@ export function useCreateDocumentTemplate() {
           is_active: template.is_active ?? true,
           is_public: template.is_public ?? false,
           created_by: user?.id,
-        })
+        },
+        {
+          tenantId: tenant?.id,
+          userId: user?.id,
+          isPlatformAdmin: false,
+        },
+      );
+
+      const { data, error } = await supabase
+        .from("document_templates")
+        .insert(payload)
         .select()
         .single();
 
       if (error) {
         throw error;
       }
+
+      void writeAuditLog({
+        action: "document_template_created",
+        entityType: "document_templates",
+        entityId: data.id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+        newValues: { name: data.name, type: data.type, is_public: data.is_public },
+      });
 
       return data;
     },
@@ -164,6 +198,8 @@ export function useCreateDocumentTemplate() {
 
 export function useUpdateDocumentTemplate() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<DocumentTemplate> & { id: string }) => {
@@ -177,6 +213,15 @@ export function useUpdateDocumentTemplate() {
       if (error) {
         throw error;
       }
+
+      void writeAuditLog({
+        action: "document_template_updated",
+        entityType: "document_templates",
+        entityId: id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+        newValues: updates,
+      });
 
       return data;
     },
@@ -192,18 +237,31 @@ export function useUpdateDocumentTemplate() {
 
 export function useDeleteDocumentTemplate() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("document_templates").delete().eq("id", id);
-
-      if (error) {
-        throw error;
+      const ok = await softDeleteRecord({
+        table: "document_templates",
+        id,
+        userId: user?.id ?? null,
+      });
+      if (!ok) {
+        throw new Error("Failed to soft-delete template");
       }
+
+      void writeAuditLog({
+        action: "document_template_soft_deleted",
+        entityType: "document_templates",
+        entityId: id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document_templates"] });
-      toast.success("Document template deleted successfully");
+      toast.success("Document template moved to recycle bin");
     },
     onError: (error) => {
       toast.error("Error deleting document template: " + error.message);
@@ -213,11 +271,12 @@ export function useDeleteDocumentTemplate() {
 
 // ===== AUTO DOCUMENTS =====
 export function useAutoDocuments() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const { tenant } = useTenant();
   useDocumentsRealtime(user?.id, "documents");
 
   return useQuery({
-    queryKey: ["auto_documents", user?.id],
+    queryKey: ["auto_documents", user?.id, tenant?.id],
     enabled: !!user,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -225,11 +284,17 @@ export function useAutoDocuments() {
         throw new Error("User not authenticated");
       }
 
-      const { data, error } = await supabase
-        .from("auto_documents")
-        .select("*")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      let query = supabase.from("auto_documents").select("*").is("deleted_at", null);
+      query = applyTenantOwnershipScope(query, {
+        tenantId: tenant?.id,
+        isPlatformAdmin: isPlatformRole(role),
+      });
+
+      if (!isPlatformRole(role)) {
+        query = query.or(`owner_id.eq.${user.id},created_by.eq.${user.id}`);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) {
         throw error;
@@ -241,22 +306,33 @@ export function useAutoDocuments() {
 }
 
 export function useAutoDocument(id: string) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const { tenant } = useTenant();
 
   return useQuery({
-    queryKey: ["auto_document", id, user?.id],
+    queryKey: ["auto_document", id, user?.id, tenant?.id],
     enabled: !!id && !!user,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("auto_documents")
         .select("*")
         .eq("id", id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .single();
+        .is("deleted_at", null);
+
+      query = applyTenantOwnershipScope(query, {
+        tenantId: tenant?.id,
+        isPlatformAdmin: isPlatformRole(role),
+      });
+
+      if (!isPlatformRole(role)) {
+        query = query.or(`owner_id.eq.${user.id},created_by.eq.${user.id}`);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) {
         throw error;
@@ -270,12 +346,16 @@ export function useAutoDocument(id: string) {
 export function useCreateAutoDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (doc: Omit<Partial<AutoDocument>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("auto_documents")
-        .insert({
+      if (!tenant?.id) {
+        throw new Error("Tenant context is required");
+      }
+
+      const payload = withOwnershipCreate(
+        {
           name: doc.name || "",
           type: doc.type || "other",
           status: doc.status || "draft",
@@ -290,13 +370,40 @@ export function useCreateAutoDocument() {
           generated_from: doc.generated_from || "template",
           owner_id: user?.id,
           created_by: user?.id,
-        })
+        },
+        {
+          tenantId: tenant.id,
+          userId: user?.id,
+          isPlatformAdmin: false,
+        },
+      );
+
+      const { data, error } = await supabase
+        .from("auto_documents")
+        .insert(payload)
         .select()
         .single();
 
       if (error) {
         throw error;
       }
+
+      void enqueueDocumentPdfJob({
+        tenantId: tenant.id,
+        documentId: data.id,
+        documentName: data.name,
+        format: doc.format ?? "pdf",
+        createdBy: user?.id,
+      });
+
+      void writeAuditLog({
+        action: "document_created",
+        entityType: "auto_documents",
+        entityId: data.id,
+        tenantId: tenant.id,
+        userId: user?.id ?? null,
+        newValues: { name: data.name, status: data.status, type: data.type },
+      });
 
       return data as AutoDocument;
     },
@@ -312,6 +419,8 @@ export function useCreateAutoDocument() {
 
 export function useUpdateAutoDocument() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AutoDocument> & { id: string }) => {
@@ -325,6 +434,15 @@ export function useUpdateAutoDocument() {
       if (error) {
         throw error;
       }
+
+      void writeAuditLog({
+        action: "document_updated",
+        entityType: "auto_documents",
+        entityId: id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+        newValues: updates,
+      });
 
       return data as AutoDocument;
     },
@@ -341,18 +459,31 @@ export function useUpdateAutoDocument() {
 
 export function useDeleteAutoDocument() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("auto_documents").delete().eq("id", id);
-
-      if (error) {
-        throw error;
+      const ok = await softDeleteRecord({
+        table: "auto_documents",
+        id,
+        userId: user?.id ?? null,
+      });
+      if (!ok) {
+        throw new Error("Failed to soft-delete document");
       }
+
+      void writeAuditLog({
+        action: "document_soft_deleted",
+        entityType: "auto_documents",
+        entityId: id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
-      toast.success("Document deleted successfully");
+      toast.success("Document moved to recycle bin");
     },
     onError: (error) => {
       toast.error("Error deleting document: " + error.message);
@@ -400,15 +531,25 @@ export function useDocumentESignatures(documentId?: string) {
 export function useCreateDocumentESignature() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (signature: Omit<Partial<DocumentESignature>, "id" | "created_at" | "updated_at">) => {
-      // document_id is required – don't silently insert with an empty string
       if (!signature.document_id) {
-        throw new Error("document_id is required to create an e‑signature");
+        throw new Error("document_id is required to create an e-signature");
       }
 
-      // insert the signature first
+      let resolvedTenantId = tenant?.id ?? null;
+      if (!resolvedTenantId) {
+        const { data: documentRef } = await supabase
+          .from("auto_documents")
+          .select("tenant_id")
+          .eq("id", signature.document_id)
+          .maybeSingle();
+
+        resolvedTenantId = (documentRef as { tenant_id?: string } | null)?.tenant_id ?? null;
+      }
+
       const { data, error } = await supabase
         .from("document_esignatures")
         .insert({
@@ -428,7 +569,6 @@ export function useCreateDocumentESignature() {
         throw error;
       }
 
-      // conditionally update document state so we don't regress a terminal status
       const { error: updateDocError } = await supabase
         .from("auto_documents")
         .update({ status: "sent" })
@@ -436,10 +576,35 @@ export function useCreateDocumentESignature() {
         .eq("status", "draft");
 
       if (updateDocError) {
-        // the insert succeeded but the document update failed;
-        // the conditional eq prevents changing a non‑draft document
         throw updateDocError;
       }
+
+      if (resolvedTenantId && signature.recipient_email) {
+        void enqueueEmailSendJob({
+          tenantId: resolvedTenantId,
+          to: signature.recipient_email,
+          template: "document_signature_request",
+          payload: {
+            document_id: signature.document_id,
+            signature_id: data.id,
+            recipient_name: signature.recipient_name ?? null,
+          },
+          createdBy: user?.id ?? null,
+        });
+      }
+
+      void writeAuditLog({
+        action: "document_signature_requested",
+        entityType: "document_esignatures",
+        entityId: data.id,
+        tenantId: resolvedTenantId,
+        userId: user?.id ?? null,
+        newValues: {
+          document_id: data.document_id,
+          recipient_email: data.recipient_email,
+          status: data.status,
+        },
+      });
 
       return data as DocumentESignature;
     },
@@ -457,6 +622,8 @@ export function useCreateDocumentESignature() {
 
 export function useUpdateDocumentESignature() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async ({ id, document_id, ...updates }: Partial<DocumentESignature> & { id: string }) => {
@@ -480,6 +647,15 @@ export function useUpdateDocumentESignature() {
         await syncAutoDocumentStatusFromSignatures(document_id);
       }
 
+      void writeAuditLog({
+        action: "document_signature_updated",
+        entityType: "document_esignatures",
+        entityId: id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+        newValues: updates,
+      });
+
       return data as DocumentESignature;
     },
     onSuccess: (_, variables) => {
@@ -498,12 +674,14 @@ export function useUpdateDocumentESignature() {
 
 export function useSendDocumentReminder() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   return useMutation({
     mutationFn: async (signatureId: string) => {
       const { data: current, error: currentError } = await supabase
         .from("document_esignatures")
-        .select("id, reminder_count")
+        .select("id, reminder_count, recipient_email, document_id")
         .eq("id", signatureId)
         .single();
 
@@ -525,6 +703,29 @@ export function useSendDocumentReminder() {
       if (error) {
         throw error;
       }
+
+      if (tenant?.id && data.recipient_email) {
+        void enqueueReminderJob({
+          tenantId: tenant.id,
+          recipientEmail: data.recipient_email,
+          entityType: "document_signature",
+          entityId: data.id,
+          createdBy: user?.id ?? null,
+        });
+      }
+
+      void writeAuditLog({
+        action: "document_signature_reminder_sent",
+        entityType: "document_esignatures",
+        entityId: data.id,
+        tenantId: tenant?.id ?? null,
+        userId: user?.id ?? null,
+        newValues: {
+          reminder_count: data.reminder_count,
+          last_reminder_at: data.last_reminder_at,
+          document_id: data.document_id,
+        },
+      });
 
       return data as DocumentESignature;
     },
@@ -689,3 +890,4 @@ export function useRemoveDocumentPermission() {
     },
   });
 }
+

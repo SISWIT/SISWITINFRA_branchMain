@@ -23,6 +23,15 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
 };
 
+interface RecentContract {
+  id: string;
+  name: string;
+  contract_number: string | null;
+  status: string | null;
+  created_at: string | null;
+  value: number | null;
+}
+
 export default function CLMDashboard() {
   const { user } = useAuth();
   const { data: stats } = useQuery({
@@ -35,7 +44,7 @@ export default function CLMDashboard() {
         supabase.from("contract_templates").select("*", { count: "exact" }).or(`created_by.eq.${user.id},is_public.eq.true`),
       ]);
 
-      const contracts = contractsRes.data || [];
+      const contracts = (contractsRes.data ?? []) as RecentContract[];
       const totalTemplates = templatesRes.count || 0;
       const totalContracts = contracts.length;
       const draftContracts = contracts.filter((c) => c.status === "draft").length;
@@ -173,7 +182,7 @@ export default function CLMDashboard() {
             <CardContent>
               <div className="space-y-4">
                 {stats?.recentContracts?.length ? (
-                  stats.recentContracts.map((contract: any) => (
+                  stats.recentContracts.map((contract) => (
                     <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                       <div>
                         <p className="font-medium">{contract.name}</p>

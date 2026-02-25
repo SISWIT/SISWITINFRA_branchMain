@@ -39,7 +39,7 @@ const stats = [
 ];
 
 const milestones = [
-  { year: "2018", title: "Company Founded", description: "Siriusinfra was born with a vision to unify business operations." },
+  { year: "2018", title: "Company Founded", description: "SISWIT was born with a vision to unify business operations." },
   { year: "2019", title: "CPQ Launch", description: "Launched our first product - the Configure, Price, Quote module." },
   { year: "2020", title: "CLM Addition", description: "Expanded platform with Contract Lifecycle Management." },
   { year: "2021", title: "CRM Integration", description: "Completed the unified platform with CRM capabilities." },

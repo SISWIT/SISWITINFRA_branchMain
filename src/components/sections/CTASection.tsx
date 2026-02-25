@@ -28,7 +28,7 @@ export function CTASection() {
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
             Join 500+ enterprises that have already streamlined their CPQ, CLM, and CRM 
-            processes with Siriusinfra. Get started with a personalized demo today.
+            processes with SISWIT. Get started with a personalized demo today.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

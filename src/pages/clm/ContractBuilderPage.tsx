@@ -14,6 +14,11 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export default function ContractBuilderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -143,12 +148,12 @@ export default function ContractBuilderPage() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (contract: any) => {
+    onSuccess: (contract: { id: string }) => {
       queryClient.invalidateQueries({ queryKey: ["contracts-list"] });
       toast.success("Contract created successfully");
       navigate(`/dashboard/clm/contracts/${contract.id}`);
     },
-    onError: (error: any) => toast.error("Failed to create contract: " + (error?.message || String(error))),
+    onError: (error: unknown) => toast.error("Failed to create contract: " + getErrorMessage(error)),
   });
 
   const formatCurrency = (value: number) => {

@@ -1,133 +1,277 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
-import type { Contract, ContractTemplate, ESignature, ContractScan } from "@/types/clm";
+﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useTenant } from "@/hooks/useTenant";
+import type { Contract, ContractScan, ContractTemplate, ESignature } from "@/types/clm";
+import { canReadAllTenantRows } from "@/types/roles";
+import {
+  applyModuleMutationScope,
+  applyModuleReadScope,
+  buildModuleCreatePayload,
+  isModuleScopeReady,
+  requireTenantScope,
+  type ModuleScopeContext,
+} from "@/lib/module-scope";
+import { softDeleteRecord } from "@/lib/soft-delete";
+import { writeAuditLog } from "@/lib/audit";
+import { enqueueContractExpiryAlert, enqueueEmailSendJob, enqueueReminderJob } from "@/lib/jobs";
+
+type ContractStatus =
+  | "draft"
+  | "pending_review"
+  | "pending_approval"
+  | "approved"
+  | "sent"
+  | "signed"
+  | "expired"
+  | "cancelled";
+
+interface ESignatureRow {
+  id: string;
+  contract_id: string;
+  signer_email: string;
+  signer_name: string;
+  status: string | null;
+  signed_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function mapESignature(row: ESignatureRow): ESignature {
+  return {
+    id: row.id,
+    contract_id: row.contract_id,
+    recipient_email: row.signer_email,
+    recipient_name: row.signer_name,
+    status: (row.status ?? "pending") as ESignature["status"],
+    signed_at: row.signed_at ?? undefined,
+    created_at: row.created_at ?? new Date().toISOString(),
+    updated_at: row.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function useClmScope() {
+  const { user, role } = useAuth();
+  const { tenant, tenantLoading } = useTenant();
+
+  const scope: ModuleScopeContext = {
+    tenantId: tenant?.id ?? null,
+    userId: user?.id ?? null,
+    role,
+  };
+
+  return {
+    scope,
+    tenantId: scope.tenantId,
+    userId: scope.userId,
+    enabled: isModuleScopeReady(scope, tenantLoading),
+  };
+}
+
+async function ensureContractAccessible(contractId: string, scope: ModuleScopeContext) {
+  const query = supabase.from("contracts").select("id").eq("id", contractId);
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"] });
+  const result = await scoped.maybeSingle();
+  if (result.error || !result.data) {
+    throw new Error("Contract not found or not accessible");
+  }
+}
 
 // ===== CONTRACT TEMPLATES =====
 export function useContractTemplates() {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useClmScope();
+
   return useQuery({
-    queryKey: ["contract_templates", user?.id],
-    enabled: !!user,
+    queryKey: ["contract_templates", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
+      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const isTenantWideReader = canReadAllTenantRows(scope.role);
+
+      let query = supabase
         .from("contract_templates")
         .select("*")
-        .or(`created_by.eq.${user.id},is_public.eq.true`)
+        .eq("tenant_id", requiredTenantId)
+        .is("deleted_at", null)
         .order("name");
+
+      if (!isTenantWideReader && userId) {
+        query = query.or(`created_by.eq.${userId},is_public.eq.true`);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data as ContractTemplate[];
+      return (data ?? []) as ContractTemplate[];
     },
   });
 }
 
 export function useCreateContractTemplate() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<ContractTemplate>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .insert({
+      const payload = buildModuleCreatePayload(
+        {
           name: template.name || "",
           type: template.type || "",
           content: template.content || "",
           is_active: template.is_active ?? true,
           is_public: template.is_public ?? false,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+        },
+        scope,
+        { ownerColumn: "created_by", createdByColumn: "created_by" },
+      );
+
+      const { data, error } = await supabase.from("contract_templates").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contract_template_create",
+        entityType: "contract_template",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return data as ContractTemplate;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
       toast.success("Contract template created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating contract template: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating contract template: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateContractTemplate() {
   const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContractTemplate> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const scopedQuery = applyModuleMutationScope(
+        supabase
+          .from("contract_templates")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", id),
+        scope,
+        ["created_by"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contract_template_update",
+        entityType: "contract_template",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: updates,
+      });
+
+      return data as ContractTemplate;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
       toast.success("Contract template updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating contract template: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating contract template: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteContractTemplate() {
   const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contract_templates").delete().eq("id", id);
-      if (error) throw error;
+      const accessQuery = applyModuleMutationScope(
+        supabase.from("contract_templates").select("id").eq("id", id),
+        scope,
+        ["created_by"],
+      );
+
+      const accessResult = await accessQuery.maybeSingle();
+      if (accessResult.error || !accessResult.data) {
+        throw new Error("Template not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "contract_templates",
+        id,
+        userId,
+      });
+
+      if (!deleted) throw new Error("Failed to delete template");
+
+      void writeAuditLog({
+        action: "contract_template_delete",
+        entityType: "contract_template",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_templates"] });
-      toast.success("Contract template deleted successfully");
+      toast.success("Contract template moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting contract template: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting contract template: " + getErrorMessage(error));
     },
   });
 }
 
 // ===== CONTRACTS =====
 export function useContracts() {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useClmScope();
+
   return useQuery({
-    queryKey: ["contracts", user?.id],
-    enabled: !!user,
+    queryKey: ["contracts", tenantId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("contracts")
-        .select("*")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("contracts").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Contract[];
+      return (data ?? []) as Contract[];
     },
   });
 }
 
 export function useContract(id: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useClmScope();
+
   return useQuery({
-    queryKey: ["contract", id, user?.id],
-    enabled: !!id && !!user,
+    queryKey: ["contract", id, tenantId, userId],
+    enabled: enabled && Boolean(id),
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("contracts")
-        .select("*")
-        .eq("id", id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .single();
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("contracts").select("*").eq("id", id),
+        scope,
+        { ownerColumns: ["owner_id"] },
+      );
+
+      const { data, error } = await scopedQuery.single();
       if (error) throw error;
       return data as Contract;
     },
@@ -136,15 +280,14 @@ export function useContract(id: string) {
 
 export function useCreateContract() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (contract: Omit<Partial<Contract>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .insert({
+      const payload = buildModuleCreatePayload(
+        {
           name: contract.name || "",
-          contract_number: contract.contract_number,
+          contract_number: contract.contract_number || `CTR-${Date.now()}`,
           template_id: contract.template_id,
           opportunity_id: contract.opportunity_id,
           quote_id: contract.quote_id,
@@ -155,206 +298,376 @@ export function useCreateContract() {
           start_date: contract.start_date,
           end_date: contract.end_date,
           value: contract.value,
-          owner_id: user?.id,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+        },
+        scope,
+      );
+
+      const { data, error } = await supabase.from("contracts").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      if (tenantId && data.end_date) {
+        const endDate = new Date(data.end_date);
+        const now = new Date();
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const daysUntilExpiry = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / msPerDay));
+        void enqueueContractExpiryAlert({
+          tenantId,
+          contractId: data.id,
+          contractName: data.name,
+          daysUntilExpiry,
+          createdBy: userId,
+        });
+      }
+
+      void writeAuditLog({
+        action: "contract_create",
+        entityType: "contract",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return data as Contract;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
       toast.success("Contract created successfully");
     },
-    onError: (error) => {
-      toast.error("Error creating contract: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error creating contract: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateContract() {
   const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contract> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const scopedQuery = applyModuleMutationScope(
+        supabase
+          .from("contracts")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
-      return data;
+
+      if (tenantId && updates.end_date) {
+        const endDate = new Date(updates.end_date);
+        const now = new Date();
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const daysUntilExpiry = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / msPerDay));
+        void enqueueContractExpiryAlert({
+          tenantId,
+          contractId: id,
+          contractName: data.name,
+          daysUntilExpiry,
+          createdBy: userId,
+        });
+      }
+
+      void writeAuditLog({
+        action: "contract_update",
+        entityType: "contract",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: updates,
+      });
+
+      return data as Contract;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
       queryClient.invalidateQueries({ queryKey: ["contract"] });
       toast.success("Contract updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating contract: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating contract: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteContract() {
   const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contracts").delete().eq("id", id);
-      if (error) throw error;
+      const accessQuery = applyModuleMutationScope(
+        supabase.from("contracts").select("id").eq("id", id),
+        scope,
+        ["owner_id"],
+      );
+
+      const accessResult = await accessQuery.maybeSingle();
+      if (accessResult.error || !accessResult.data) {
+        throw new Error("Contract not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "contracts",
+        id,
+        userId,
+      });
+
+      if (!deleted) throw new Error("Failed to delete contract");
+
+      void writeAuditLog({
+        action: "contract_delete",
+        entityType: "contract",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success("Contract deleted successfully");
+      toast.success("Contract moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting contract: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting contract: " + getErrorMessage(error));
     },
   });
 }
 
 // ===== E-SIGNATURES =====
 export function useESignatures(contractId: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useClmScope();
+
   return useQuery({
-    queryKey: ["esignatures", contractId, user?.id],
-    enabled: !!contractId && !!user,
+    queryKey: ["esignatures", contractId, tenantId, userId],
+    enabled: enabled && Boolean(contractId),
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      await ensureContractAccessible(contractId, scope);
+
       const { data, error } = await supabase
         .from("contract_esignatures")
-        .select("*")
+        .select("id, contract_id, signer_email, signer_name, status, signed_at, created_at, updated_at")
         .eq("contract_id", contractId)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
+
       if (error) throw error;
-      return data as ESignature[];
+      return (data ?? []).map((item) => mapESignature(item as ESignatureRow));
     },
   });
 }
 
 export function useCreateESignature() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (sig: Omit<Partial<ESignature>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("contract_esignatures")
-        .insert({
-          contract_id: sig.contract_id || "",
-          recipient_email: sig.recipient_email || "",
-          recipient_name: sig.recipient_name || "",
-          status: sig.status || "pending",
-          expires_at: sig.expires_at,
-        })
-        .select()
-        .single();
+      const contractId = sig.contract_id || "";
+      await ensureContractAccessible(contractId, scope);
+
+      const payload = {
+        contract_id: contractId,
+        signer_email: sig.recipient_email || "",
+        signer_name: sig.recipient_name || "",
+        status: sig.status || "pending",
+        sent_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase.from("contract_esignatures").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      if (tenantId && sig.recipient_email) {
+        void enqueueEmailSendJob({
+          tenantId,
+          to: sig.recipient_email,
+          template: "contract_signature_request",
+          payload: {
+            contract_id: contractId,
+            recipient_name: sig.recipient_name,
+          },
+          createdBy: userId,
+        });
+
+        void enqueueReminderJob({
+          tenantId,
+          recipientEmail: sig.recipient_email,
+          entityType: "contract_signature",
+          entityId: data.id,
+          createdBy: userId,
+        });
+      }
+
+      void writeAuditLog({
+        action: "contract_esignature_create",
+        entityType: "contract_esignature",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return mapESignature(data as ESignatureRow);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["esignatures", variables.contract_id] });
       toast.success("E-signature request sent successfully");
     },
-    onError: (error) => {
-      toast.error("Error sending e-signature request: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error sending e-signature request: " + getErrorMessage(error));
     },
   });
 }
 
 export function useUpdateESignature() {
   const queryClient = useQueryClient();
+  const { tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ESignature> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("contract_esignatures")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+      const payload: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.status) payload.status = updates.status;
+      if (updates.signed_at) payload.signed_at = updates.signed_at;
+
+      const { data, error } = await supabase.from("contract_esignatures").update(payload).eq("id", id).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contract_esignature_update",
+        entityType: "contract_esignature",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload,
+      });
+
+      return mapESignature(data as ESignatureRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["esignatures"] });
       toast.success("E-signature updated successfully");
     },
-    onError: (error) => {
-      toast.error("Error updating e-signature: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error updating e-signature: " + getErrorMessage(error));
     },
   });
 }
 
 // ===== CONTRACT SCANS =====
 export function useContractScans(contractId: string) {
-  const { user } = useAuth();
+  const { scope, enabled, tenantId, userId } = useClmScope();
+
   return useQuery({
-    queryKey: ["contract_scans", contractId, user?.id],
-    enabled: !!contractId && !!user,
+    queryKey: ["contract_scans", contractId, tenantId, userId],
+    enabled: enabled && Boolean(contractId),
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("contract_scans")
-        .select("*")
-        .eq("contract_id", contractId)
-        .order("created_at", { ascending: false });
+      await ensureContractAccessible(contractId, scope);
+
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("contract_scans").select("*").eq("contract_id", contractId),
+        scope,
+        { ownerColumns: ["created_by"] },
+      );
+
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
-      return data as ContractScan[];
+      return (data ?? []) as ContractScan[];
     },
   });
 }
 
 export function useCreateContractScan() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (scan: Omit<Partial<ContractScan>, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
-        .from("contract_scans")
-        .insert({
-          contract_id: scan.contract_id || "",
+      const contractId = scan.contract_id || "";
+      await ensureContractAccessible(contractId, scope);
+
+      const payload = buildModuleCreatePayload(
+        {
+          contract_id: contractId,
           file_path: scan.file_path,
           file_name: scan.file_name,
           content_type: scan.content_type,
           file_size: scan.file_size,
           ocr_text: scan.ocr_text,
           scan_date: scan.scan_date || new Date().toISOString(),
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+        },
+        scope,
+        { ownerColumn: "created_by", createdByColumn: "created_by" },
+      );
+
+      const { data, error } = await supabase.from("contract_scans").insert(payload).select().single();
       if (error) throw error;
-      return data;
+
+      void writeAuditLog({
+        action: "contract_scan_create",
+        entityType: "contract_scan",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return data as ContractScan;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["contract_scans", variables.contract_id] });
       toast.success("Contract scan uploaded successfully");
     },
-    onError: (error) => {
-      toast.error("Error uploading contract scan: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error uploading contract scan: " + getErrorMessage(error));
     },
   });
 }
 
 export function useDeleteContractScan() {
   const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contract_scans").delete().eq("id", id);
-      if (error) throw error;
+      const accessQuery = applyModuleMutationScope(
+        supabase.from("contract_scans").select("id").eq("id", id),
+        scope,
+        ["created_by"],
+      );
+
+      const accessResult = await accessQuery.maybeSingle();
+      if (accessResult.error || !accessResult.data) {
+        throw new Error("Contract scan not found or not accessible");
+      }
+
+      const deleted = await softDeleteRecord({
+        table: "contract_scans",
+        id,
+        userId,
+      });
+
+      if (!deleted) throw new Error("Failed to delete contract scan");
+
+      void writeAuditLog({
+        action: "contract_scan_delete",
+        entityType: "contract_scan",
+        entityId: id,
+        tenantId,
+        userId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_scans"] });
-      toast.success("Contract scan deleted successfully");
+      toast.success("Contract scan moved to recycle bin");
     },
-    onError: (error) => {
-      toast.error("Error deleting contract scan: " + error.message);
+    onError: (error: unknown) => {
+      toast.error("Error deleting contract scan: " + getErrorMessage(error));
     },
   });
 }

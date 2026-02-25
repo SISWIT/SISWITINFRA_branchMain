@@ -1,299 +1,298 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Download, Send, CheckCircle, XCircle, Edit, PenTool, FileText, Clock, Building, User, Calendar, DollarSign, Shield } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+﻿import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Clock,
+  Download,
+  Edit,
+  FileText,
+  PenTool,
+  Send,
+  XCircle,
+} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  draft: { label: "Draft", color: "bg-muted text-muted-foreground" },
-  pending_review: { label: "Pending Review", color: "bg-warning/20 text-warning-foreground" },
-  pending_approval: { label: "Pending Approval", color: "bg-warning/20 text-warning-foreground" },
-  approved: { label: "Approved", color: "bg-info/20 text-info-foreground" },
-  sent: { label: "Sent for Signature", color: "bg-primary/20 text-primary" },
-  signed: { label: "Signed", color: "bg-success/20 text-success-foreground" },
-  expired: { label: "Expired", color: "bg-destructive/20 text-destructive" },
-  cancelled: { label: "Cancelled", color: "bg-muted text-muted-foreground" },
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { tenantModulePath } from "@/lib/routes";
+
+type ContractRow = Database["public"]["Tables"]["contracts"]["Row"];
+type ContractStatus = ContractRow["status"] extends string ? ContractRow["status"] : string;
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  pending_review: { label: "Pending Review", className: "bg-warning/20 text-warning-foreground" },
+  pending_approval: { label: "Pending Approval", className: "bg-warning/20 text-warning-foreground" },
+  approved: { label: "Approved", className: "bg-info/20 text-info-foreground" },
+  sent: { label: "Sent for Signature", className: "bg-primary/20 text-primary" },
+  signed: { label: "Signed", className: "bg-success/20 text-success-foreground" },
+  expired: { label: "Expired", className: "bg-destructive/20 text-destructive" },
+  cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground" },
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export default function ContractDetailPage() {
-  const { id } = useParams();
+  const { id, tenantSlug } = useParams<{ id: string; tenantSlug: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { data: contract, isLoading , user?.id],
-    enabled: !!id && !!user,
+  const contractsRootPath = tenantSlug
+    ? tenantModulePath(tenantSlug, "clm", "contracts")
+    : "/dashboard/clm/contracts";
+
+  const toTenantPath = (suffix = "") => {
+    if (!tenantSlug) {
+      return suffix ? `${contractsRootPath}/${suffix}` : contractsRootPath;
+    }
+    const normalized = suffix.replace(/^\/+/, "");
+    return normalized
+      ? tenantModulePath(tenantSlug, "clm", `contracts/${normalized}`)
+      : tenantModulePath(tenantSlug, "clm", "contracts");
+  };
+
+  const { data: contract, isLoading, isError, error } = useQuery({
+    queryKey: ["contract-detail", id, user?.id],
+    enabled: Boolean(id && user?.id),
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
+      if (!id || !user?.id) throw new Error("User or contract context is missing");
+
+      const { data, error: queryError } = await supabase
         .from("contracts")
-        .select("*, accounts(name, email, phone), contacts(first_name, last_name, email), quotes(quote_number, total)")
-        .eq("id", id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`accounts(name, email, phone), contacts(first_name, last_name, email), quotes(quote_number, total)")
+        .select("*")
         .eq("id", id)
         .single();
-      if (error) throw error;
-      return data;
+
+      if (queryError) throw queryError;
+      return data as ContractRow;
     },
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (status: string) => {
-      const updates: any = { status };
-      if (status === "signed") {
-        updates.signed_at = new Date().toISOString();
-      }
-      const { error } = await supabase.from("contracts").update(updates).eq("id", id);
-      if (error) throw error;
+    mutationFn: async (status: ContractStatus) => {
+      if (!id) throw new Error("Missing contract id");
+      const updates: Database["public"]["Tables"]["contracts"]["Update"] = {
+        status,
+        updated_at: new Date().toISOString(),
+        ...(status === "signed" ? { signed_date: new Date().toISOString() } : {}),
+      };
+
+      const { error: updateError } = await supabase.from("contracts").update(updates).eq("id", id);
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contract-detail", id] });
+      void queryClient.invalidateQueries({ queryKey: ["contract-detail", id, user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["contracts"] });
       toast.success("Contract status updated");
     },
-    onError: (error) => toast.error("Failed to update: " + error.message),
+    onError: (mutationError: unknown) => {
+      toast.error(`Failed to update contract status: ${getErrorMessage(mutationError)}`);
+    },
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
+  const status = contract?.status ?? "draft";
+  const statusConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
+
+  const formatCurrency = (value: number | null) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(value ?? 0);
   };
 
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-muted rounded w-1/3" />
-          <div className="h-64 bg-muted rounded" />
+        <div className="h-8 w-1/3 rounded bg-muted" />
+        <div className="h-64 rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-6 text-center">
+        <h2 className="text-lg font-semibold">Failed to load contract</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{getErrorMessage(error)}</p>
+        <div className="mt-4">
+          <Button variant="outline" onClick={() => navigate(contractsRootPath)}>
+            Back to contracts
+          </Button>
         </div>
+      </div>
     );
   }
 
   if (!contract) {
     return (
-      <div className="text-center py-12">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold">Contract not found</h2>
-          <Button variant="link" onClick={() => navigate("/dashboard/clm/contracts")}>Go back to contracts</Button>
-        </div>
+      <div className="py-12 text-center">
+        <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold">Contract not found</h2>
+        <Button variant="link" onClick={() => navigate(contractsRootPath)}>
+          Go back to contracts
+        </Button>
+      </div>
     );
   }
 
-  const statusConfig = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
-
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold">{contract.contract_number || contract.name}</h1>
-                <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-              </div>
-              <p className="text-muted-foreground">Created on {format(new Date(contract.created_at), "MMMM d, yyyy")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold md:text-3xl">{contract.contract_number || contract.name}</h1>
+              <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
             </div>
-          </div>
-          <div className="flex gap-2">
-            {contract.status === "draft" && (
-              <>
-                <Button variant="outline" onClick={() => navigate(`/dashboard/clm/contracts/${id}/edit`)}>
-                  <Edit className="h-4 w-4 mr-2" />Edit
-                </Button>
-                <Button onClick={() => updateStatusMutation.mutate("pending_review")}>
-                  <Send className="h-4 w-4 mr-2" />Submit for Review
-                </Button>
-              </>
-            )}
-            {contract.status === "pending_review" && (
-              <>
-                <Button variant="outline" onClick={() => updateStatusMutation.mutate("draft")}>
-                  <XCircle className="h-4 w-4 mr-2" />Send Back
-                </Button>
-                <Button onClick={() => updateStatusMutation.mutate("approved")}>
-                  <CheckCircle className="h-4 w-4 mr-2" />Approve
-                </Button>
-              </>
-            )}
-            {contract.status === "approved" && (
-              <Button asChild>
-                <Link to={`/dashboard/clm/contracts/${id}/sign`}>
-                  <PenTool className="h-4 w-4 mr-2" />Send for Signature
-                </Link>
-              </Button>
-            )}
-            {contract.status === "sent" && (
-              <Button onClick={() => updateStatusMutation.mutate("signed")}>
-                <CheckCircle className="h-4 w-4 mr-2" />Mark as Signed
-              </Button>
-            )}
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />Export PDF
-            </Button>
+            <p className="text-muted-foreground">
+              Created on {contract.created_at ? format(new Date(contract.created_at), "MMMM d, yyyy") : "-"}
+            </p>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Contract Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{contract.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex items-start gap-3">
-                    <Building className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Account</p>
-                      <p className="font-medium">{contract.accounts?.name || "—"}</p>
-                      <p className="text-sm text-muted-foreground">{contract.accounts?.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contact</p>
-                      <p className="font-medium">{contract.contacts ? `${contract.contacts.first_name} ${contract.contacts.last_name}` : "—"}</p>
-                      <p className="text-sm text-muted-foreground">{contract.contacts?.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contract Period</p>
-                      <p className="font-medium">
-                        {contract.start_date ? format(new Date(contract.start_date), "MMM d, yyyy") : "—"} to{" "}
-                        {contract.end_date ? format(new Date(contract.end_date), "MMM d, yyyy") : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contract Value</p>
-                      <p className="font-medium text-lg">{formatCurrency(contract.value || 0)}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="flex flex-wrap gap-2">
+          {status === "draft" && (
+            <>
+              <Button variant="outline" onClick={() => navigate(toTenantPath(`${id}/edit`))}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              <Button onClick={() => updateStatusMutation.mutate("pending_review")}> 
+                <Send className="mr-2 h-4 w-4" />
+                Submit for Review
+              </Button>
+            </>
+          )}
 
-            {/* Contract Content */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Content</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {contract.content ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <pre className="whitespace-pre-wrap font-sans text-sm">{contract.content}</pre>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">No content available</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {status === "pending_review" && (
+            <>
+              <Button variant="outline" onClick={() => updateStatusMutation.mutate("draft")}>
+                <XCircle className="mr-2 h-4 w-4" />
+                Send Back
+              </Button>
+              <Button onClick={() => updateStatusMutation.mutate("approved")}>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+            </>
+          )}
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Contract #</span>
-                    <span className="font-medium">{contract.contract_number || "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Value</span>
-                    <span className="font-semibold text-primary">{formatCurrency(contract.value || 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                  </div>
-                </div>
+          {status === "approved" && (
+            <Button asChild>
+              <Link to={toTenantPath(`${id}/sign`)}>
+                <PenTool className="mr-2 h-4 w-4" />
+                Send for Signature
+              </Link>
+            </Button>
+          )}
 
-                <Separator />
+          {status === "sent" && (
+            <Button onClick={() => updateStatusMutation.mutate("signed")}>
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Mark as Signed
+            </Button>
+          )}
 
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Created:</span>
-                    <span>{format(new Date(contract.created_at), "MMM d, yyyy")}</span>
-                  </div>
-                  {contract.signed_at && (
-                    <div className="flex items-center gap-2">
-                      <PenTool className="h-4 w-4 text-success" />
-                      <span className="text-muted-foreground">Signed:</span>
-                      <span>{format(new Date(contract.signed_at), "MMM d, yyyy")}</span>
-                    </div>
-                  )}
-                </div>
-
-                {contract.quotes && (
-                  <>
-                    <Separator />
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-sm text-muted-foreground">From Quote</p>
-                      <p className="font-medium">{contract.quotes.quote_number}</p>
-                      <p className="text-sm">{formatCurrency(contract.quotes.total || 0)}</p>
-                    </div>
-                  </>
-                )}
-
-                {contract.status === "approved" && (
-                  <>
-                    <Separator />
-                    <Button className="w-full" asChild>
-                      <Link to={`/dashboard/clm/contracts/${id}/sign`}>
-                        <PenTool className="h-4 w-4 mr-2" />Send for Signature
-                      </Link>
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Lifecycle */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Lifecycle
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {["draft", "pending_review", "approved", "sent", "signed"].map((stage, i) => {
-                    const stageConfig = STATUS_CONFIG[stage];
-                    const isActive = stage === contract.status;
-                    const isPast = ["draft", "pending_review", "approved", "sent", "signed"].indexOf(contract.status) > i;
-                    return (
-                      <div key={stage} className={`flex items-center gap-3 p-2 rounded-lg ${isActive ? "bg-primary/10 border border-primary/30" : isPast ? "opacity-60" : "opacity-40"}`}>
-                        <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs ${isPast || isActive ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                          {isPast ? <CheckCircle className="h-4 w-4" /> : i + 1}
-                        </div>
-                        <span className={isActive ? "font-medium" : ""}>{stageConfig.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Button variant="outline" disabled>
+            <Download className="mr-2 h-4 w-4" />
+            Export PDF
+          </Button>
         </div>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>{contract.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Contract Number</span>
+                <span className="font-medium">{contract.contract_number}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Value</span>
+                <span className="font-medium">{formatCurrency(contract.value)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Start Date</span>
+                <span>{contract.start_date ? format(new Date(contract.start_date), "MMM d, yyyy") : "-"}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">End Date</span>
+                <span>{contract.end_date ? format(new Date(contract.end_date), "MMM d, yyyy") : "-"}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Contract Content</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {contract.content ? (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <pre className="whitespace-pre-wrap font-sans text-sm">{contract.content}</pre>
+                </div>
+              ) : (
+                <p className="py-8 text-center text-muted-foreground">No content available</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Timeline</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>Created: {contract.created_at ? format(new Date(contract.created_at), "PPp") : "-"}</span>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">Current Status</p>
+                <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button className="w-full" variant="outline" onClick={() => navigate(contractsRootPath)}>
+                Back to list
+              </Button>
+              <Button className="w-full" variant="outline" onClick={() => navigate(toTenantPath(`${id}/edit`))}>
+                Edit contract
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }

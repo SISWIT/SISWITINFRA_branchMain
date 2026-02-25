@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FileText, Plus, Search, Eye, Edit, Trash2, Send, CheckCircle, XCircle, Clock, PenTool, Upload } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
   pending_review: { label: "Pending Review", color: "bg-warning/20 text-warning-foreground", icon: Clock },
   pending_approval: { label: "Pending Approval", color: "bg-warning/20 text-warning-foreground", icon: Clock },
@@ -48,9 +49,9 @@ export default function ContractsListPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const updates: any = { status };
+      const updates: { status: string; signed_date?: string } = { status };
       if (status === "signed") {
-        updates.signed_at = new Date().toISOString();
+        updates.signed_date = new Date().toISOString();
       }
       const { error } = await supabase.from("contracts").update(updates).eq("id", id);
       if (error) throw error;

@@ -15,8 +15,8 @@ const contactInfo = [
   {
     icon: Mail,
     title: "Email",
-    value: "abc@siriusinfra.com",
-    link: "mailto:abc@siriusinfra.com",
+    value: "info@siswit.com",
+    link: "mailto:info@siswit.com",
   },
   {
     icon: Phone,
@@ -100,7 +100,7 @@ const Contact = () => {
                 </h1>
                 <p className="text-lg text-muted-foreground">
                   Have questions? Want a demo? Our team is here to help you transform 
-                  your business with Siriusinfra.
+                  your business with SISWIT.
                 </p>
               </div>
               <div className="hidden lg:block">
@@ -309,10 +309,10 @@ const Contact = () => {
                     Looking for custom solutions for your enterprise? Our team is ready to help.
                   </p>
                   <a
-                    href="mailto:enterprise@siriusinfra.com"
+                    href="mailto:enterprise@siswit.com"
                     className="text-primary font-medium hover:underline"
                   >
-                    abc@siriusinfra.com
+                    enterprise@siswit.com
                   </a>
                 </div>
               </div>

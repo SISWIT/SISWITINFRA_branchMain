@@ -66,6 +66,11 @@ export interface ContractRow {
   created_at: string;
 }
 
+interface AccountOption {
+  id: string;
+  name: string;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   pending_review: "Pending Review",
@@ -285,7 +290,7 @@ export default function ContractsPage() {
                     <SelectValue placeholder="Select a client..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map((acc: any) => (
+                    {(accounts as AccountOption[]).map((acc) => (
                       <SelectItem key={acc.id} value={acc.id}>
                         {acc.name}
                       </SelectItem>

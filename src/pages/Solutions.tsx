@@ -170,7 +170,7 @@ const Solutions = () => {
               Tailored for Your <span className="text-gradient">Business</span>
             </h1>
             <p className="text-muted-foreground">
-              From startups to enterprises, Siriusinfra grows with you.
+              From startups to enterprises, SISWIT grows with you.
             </p>
           </div>
         </section>

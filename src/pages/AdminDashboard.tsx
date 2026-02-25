@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { ComponentType } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -57,11 +58,16 @@ interface AdminStats {
   rejectedRequests: number;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 const SIDEBAR_ITEMS = [
-  { name: "Overview", icon: LayoutDashboard, href: "/admin", active: true },
-  { name: "User Management", icon: Users, href: "/admin/users", active: false },
-  { name: "Audit Logs", icon: FileText, href: "/admin/logs", active: false },
-  { name: "Settings", icon: Settings, href: "/admin/settings", active: false },
+  { name: "Overview", icon: LayoutDashboard, href: "/platform", active: true },
+  { name: "User Management", icon: Users, href: "/platform/users", active: false },
+  { name: "Audit Logs", icon: FileText, href: "/platform/logs", active: false },
+  { name: "Settings", icon: Settings, href: "/platform/settings", active: false },
 ];
 
 export default function AdminDashboard() {
@@ -78,6 +84,12 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const unsafeSupabase = supabase as unknown as {
+        from: (table: string) => {
+          select: (columns: string) => Promise<{ data: unknown[] | null; error: { message: string } | null }>;
+        };
+      };
+
       // 1. Fetch Stats in parallel
       const [
         totalUsersRes,
@@ -95,9 +107,7 @@ export default function AdminDashboard() {
           .from("signup_requests")
           .select("*", { count: "exact", head: true })
           .eq("status", "rejected"),
-        // Fix 1: Cast supabase to 'any' to allow querying the View
-        // that isn't in your generated types yet.
-        (supabase as any).from("admin_pending_approvals").select("*"),
+        unsafeSupabase.from("admin_pending_approvals").select("*"),
       ]);
 
       if (pendingViewRes.error) throw pendingViewRes.error;
@@ -114,12 +124,12 @@ export default function AdminDashboard() {
         activeEmployees: activeEmployeesRes.count ?? 0,
         rejectedRequests: rejectedRequestsRes.count ?? 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("error in fetchData", error);
       toast({
         variant: "destructive",
         title: "Error fetching data",
-        description: error.message || "Unable to load admin dashboard data.",
+        description: getErrorMessage(error) || "Unable to load admin dashboard data.",
       });
     } finally {
       setLoading(false);
@@ -155,11 +165,11 @@ export default function AdminDashboard() {
       });
 
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Failed",
-        description: error.message,
+        description: getErrorMessage(error),
       });
     }
   };
@@ -185,11 +195,11 @@ export default function AdminDashboard() {
         description: `${request.email} request rejected.`,
       });
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Failed",
-        description: error.message,
+        description: getErrorMessage(error),
       });
     }
   };
@@ -380,7 +390,15 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, desc, color }: any) {
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: ComponentType<{ className?: string }>;
+  desc: string;
+  color?: string;
+}
+
+function StatCard({ title, value, icon: Icon, desc, color }: StatCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

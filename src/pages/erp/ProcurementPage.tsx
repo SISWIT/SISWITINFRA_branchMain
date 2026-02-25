@@ -43,6 +43,39 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface PurchaseOrderRow {
+  id: string;
+  order_number: string;
+  po_number?: string | null;
+  vendor_id: string | null;
+  total_amount: number | null;
+  status: string;
+  order_date: string | null;
+  expected_delivery_date: string | null;
+  accounts: { name: string } | null;
+}
+
+interface PurchaseOrderFormInput {
+  id?: string;
+  order_number: string;
+  po_number?: string;
+  vendor_id: string;
+  total_amount: number;
+  status: string;
+  order_date: string;
+  expected_delivery_date: string | null;
+}
+
+interface VendorOption {
+  id: string;
+  name: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 // Status Colors Helper
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 border-slate-200",
@@ -57,8 +90,8 @@ export default function ProcurementPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   // State for managing Edit/Delete selections
-  const [editingOrder, setEditingOrder] = useState<any>(null); 
-  const [orderToDelete, setOrderToDelete] = useState<any>(null); 
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrderRow | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderRow | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -82,10 +115,9 @@ export default function ProcurementPage() {
 
   // 2. CREATE / UPDATE MUTATION - UPDATED: Include user ID
   const upsertOrderMutation = useMutation({
-    mutationFn: async (orderData: any) => {
+    mutationFn: async (orderData: PurchaseOrderFormInput) => {
       // Clean up the object to remove UI-only fields if necessary
       const payload = { ...orderData, created_by: user?.id };
-      delete payload.accounts; // Don't send the joined object back to DB
 
       if (payload.id) {
         // Update logic
@@ -116,10 +148,10 @@ export default function ProcurementPage() {
       setIsSheetOpen(false);
       setEditingOrder(null);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ 
         title: "Operation Failed", 
-        description: err.message, 
+        description: getErrorMessage(err), 
         variant: "destructive" 
       });
     }
@@ -140,17 +172,17 @@ export default function ProcurementPage() {
       });
       setOrderToDelete(null); // Close alert dialog
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ 
         title: "Delete Failed", 
-        description: err.message, 
+        description: getErrorMessage(err), 
         variant: "destructive" 
       });
     }
   });
 
   // Action Handlers
-  const handleEditClick = (order: any) => {
+  const handleEditClick = (order: PurchaseOrderRow) => {
     setEditingOrder(order);
     setIsSheetOpen(true);
   };
@@ -160,7 +192,7 @@ export default function ProcurementPage() {
     setIsSheetOpen(true);
   };
 
-  const handleDeleteClick = (order: any) => {
+  const handleDeleteClick = (order: PurchaseOrderRow) => {
     setOrderToDelete(order); // This triggers the Alert Dialog to open
   };
 
@@ -321,7 +353,15 @@ export default function ProcurementPage() {
 }
 
 // SECTION: Form Component
-function PurchaseOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (data: any) => void, isLoading: boolean, initialData?: any }) {
+function PurchaseOrderForm({
+  onSubmit,
+  isLoading,
+  initialData,
+}: {
+  onSubmit: (data: PurchaseOrderFormInput) => void;
+  isLoading: boolean;
+  initialData?: PurchaseOrderRow | null;
+}) {
   const [formData, setFormData] = useState({
     order_number: initialData?.order_number || `PO-${Math.floor(1000 + Math.random() * 9000)}`,
     vendor_id: initialData?.vendor_id || "", 
@@ -344,7 +384,7 @@ function PurchaseOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (da
     if (!formData.vendor_id) return;
 
     // We send 'order_number' AND 'po_number' to ensure backend compatibility
-    const payload: any = {
+    const payload: PurchaseOrderFormInput = {
       order_number: formData.order_number,
       po_number: formData.order_number,
       vendor_id: formData.vendor_id,
@@ -381,7 +421,7 @@ function PurchaseOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (da
           onChange={(e) => setFormData({...formData, vendor_id: e.target.value})}
         >
           <option value="">-- Select Vendor --</option>
-          {vendors?.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          {(vendors as VendorOption[] | null)?.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
       </div>
 

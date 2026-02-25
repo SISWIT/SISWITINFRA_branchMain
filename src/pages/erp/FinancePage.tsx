@@ -26,6 +26,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface TransactionFormData {
+  description: string;
+  amount: number;
+  transaction_type: string;
+  category: string;
+  transaction_date: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export default function FinancePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -70,7 +83,7 @@ export default function FinancePage() {
 
   // 3. ADD TRANSACTION MUTATION - UPDATED: Include user ID
   const addTransactionMutation = useMutation({
-    mutationFn: async (newRecord: any) => {
+    mutationFn: async (newRecord: TransactionFormData) => {
       const recordWithUser = { ...newRecord, created_by: user?.id };
       const { data, error } = await supabase.from("financial_records").insert([recordWithUser]).select();
       if (error) throw error;
@@ -81,8 +94,8 @@ export default function FinancePage() {
       toast({ title: "Recorded", description: "Financial transaction saved successfully." });
       setIsSheetOpen(false);
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    onError: (err: unknown) => {
+      toast({ title: "Error", description: getErrorMessage(err), variant: "destructive" });
     }
   });
 
@@ -240,7 +253,7 @@ export default function FinancePage() {
 }
 
 // FORM COMPONENT
-function TransactionForm({ onSubmit, isLoading }: { onSubmit: (data: any) => void, isLoading: boolean }) {
+function TransactionForm({ onSubmit, isLoading }: { onSubmit: (data: TransactionFormData) => void; isLoading: boolean }) {
   const [formData, setFormData] = useState({
     description: "",
     amount: "",

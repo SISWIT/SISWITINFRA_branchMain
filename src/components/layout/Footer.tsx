@@ -35,7 +35,7 @@ const socialLinks = [
   { name: "LinkedIn", icon: Linkedin, href: "#" },
   { name: "Twitter", icon: Twitter, href: "#" },
   { name: "YouTube", icon: Youtube, href: "#" },
-  { name: "Email", icon: Mail, href: "mailto:hello@siriusinfra.com" },
+  { name: "Email", icon: Mail, href: "mailto:support@siswit.com" },
 ];
 
 export function Footer() {

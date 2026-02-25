@@ -2,11 +2,32 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, Home, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
+import { organizationOwnerPath, platformPath, tenantDashboardPath, tenantPortalPath } from "@/lib/routes";
+import { isPlatformRole } from "@/types/roles";
 
 const Unauthorized = () => {
   const { role } = useAuth();
+  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
-  const homeLink = role === "employee" ? "/dashboard" : "/";
+  const workspaceSlug = organization?.slug ?? tenant?.slug;
+
+  const homeLink =
+    isPlatformRole(role)
+      ? platformPath()
+      : role === "owner"
+        ? organizationOwnerPath()
+        : role === "admin" || role === "manager" || role === "employee" || role === "user"
+          ? workspaceSlug
+            ? tenantDashboardPath(workspaceSlug)
+            : "/"
+          : role === "client"
+            ? workspaceSlug
+              ? tenantPortalPath(workspaceSlug)
+              : "/"
+          : "/";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

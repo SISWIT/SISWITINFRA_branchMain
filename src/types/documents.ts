@@ -17,6 +17,7 @@ export type DocumentESignatureStatus = "pending" | "signed" | "rejected" | "expi
 
 export interface AutoDocument {
   id: string;
+  tenant_id?: string;
   name: string;
   type: DocumentType;
   status: DocumentStatus;
@@ -31,12 +32,15 @@ export interface AutoDocument {
   generated_from?: string;
   owner_id?: string;
   created_by?: string;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface DocumentTemplate {
   id: string;
+  tenant_id?: string;
   name: string;
   type: DocumentType;
   description?: string;
@@ -45,6 +49,8 @@ export interface DocumentTemplate {
   is_active?: boolean;
   is_public?: boolean;
   created_by?: string;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
   created_at: string;
   updated_at: string;
 }

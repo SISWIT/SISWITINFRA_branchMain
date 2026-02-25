@@ -1,87 +1,208 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { AppRole } from "@/types/roles"; // Ensure this matches your actual path
+import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
 import { Loader2 } from "lucide-react";
+import { organizationDashboardPath, organizationPortalPath, platformPath } from "@/lib/routes";
+import {
+  canAccessClientPortal,
+  canAccessTenantWorkspace,
+  isPendingApproval,
+  isPlatformRole,
+  isTenantAdminRole,
+} from "@/types/roles";
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  allowedRoles?: AppRole[];
-  redirectTo?: string;
+function RouteLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 }
 
-export function ProtectedRoute({ children, allowedRoles, redirectTo = "/auth" }: ProtectedRouteProps) {
-  const { user, role, isApproved, loading } = useAuth();
-  const location = useLocation();
+/**
+ * Platform Admin Route - Only for SaaS owner
+ */
+export function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-4">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      <p className="text-muted-foreground">Loading...</p>
-      </div>
-      </div>
-    );
+    return <RouteLoader />;
   }
   
-  // 1. If not logged in, send to login page
-  if (!user) {
-    return <Navigate to={redirectTo} state={{ from: location }} replace />;
-  }
-  
-  // 2. If logged in but role doesn't match the allowed roles
-  // 2. If role not yet loaded, wait
-  if (allowedRoles && !role) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  // 3. If role exists but not allowed
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    if (role === AppRole.ADMIN) {
-      return <Navigate to="/admin" replace />;
-    }
+  if (!user || !isPlatformRole(role ?? "pending_approval")) {
     return <Navigate to="/unauthorized" replace />;
   }
-  
-  // 4. Block unapproved employees
-  if (role === AppRole.EMPLOYEE && isApproved === false) {
-    return <Navigate to="/pending-approval" replace />;
-  }
-  
-  
   
   return <>{children}</>;
 }
 
-// --- SPECIFIC ROUTE GUARDS ---
+/**
+ * Pending Approval Route - For users waiting for admin approval
+ */
+export function PendingApprovalRoute({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+  const { tenant } = useTenant();
+  const { organization } = useOrganization();
+  
+  if (loading) {
+    return <RouteLoader />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+  
+  // Allow access if role is pending_approval
+  if (isPendingApproval(role ?? "pending_approval")) {
+    return <>{children}</>;
+  }
+  
+  // If already approved, redirect to appropriate dashboard
+  if (isPlatformRole(role ?? "pending_approval")) {
+    return <Navigate to={platformPath()} replace />;
+  }
+  if (canAccessTenantWorkspace(role)) {
+    const workspaceSlug = organization?.slug ?? tenant?.slug;
+    if (!workspaceSlug) return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={organizationDashboardPath(workspaceSlug)} replace />;
+  }
+  if (role === "client") {
+    const workspaceSlug = organization?.slug ?? tenant?.slug;
+    if (!workspaceSlug) return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={organizationPortalPath(workspaceSlug)} replace />;
+  }
+  
+  return <Navigate to="/auth/sign-in" replace />;
+}
 
-// 1. For Employees (Dashboard, etc.)
+/**
+ * Tenant Admin Route - For tenant admins and users
+ */
+export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+  
+  if (loading) {
+    return <RouteLoader />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+  
+  // Platform admin can also access
+  if (isPlatformRole(role ?? "pending_approval")) {
+    return <>{children}</>;
+  }
+
+  if (canAccessTenantWorkspace(role)) {
+    return <>{children}</>;
+  }
+
+  if (isPendingApproval(role ?? "pending_approval")) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+  
+  return <Navigate to="/unauthorized" replace />;
+}
+
+/**
+ * Client/User Route - For external customers (portal access)
+ */
+export function ClientRoute({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+  
+  if (loading) {
+    return <RouteLoader />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+  
+  if (role === "client") {
+    return <>{children}</>;
+  }
+
+  if (isPendingApproval(role ?? "pending_approval")) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
+  if (canAccessClientPortal(role)) {
+    return <>{children}</>;
+  }
+  
+  return <Navigate to="/unauthorized" replace />;
+}
+
+/**
+ * Organization Owner Route - owner/admin controls
+ */
+export function OrganizationOwnerRoute({ children }: { children: React.ReactNode }) {
+  const { user, role, loading } = useAuth();
+
+  if (loading) {
+    return <RouteLoader />;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+
+  if (isPlatformRole(role ?? null) || role === "owner" || role === "admin") {
+    return <>{children}</>;
+  }
+
+  if (canAccessTenantWorkspace(role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (role === "client") {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (isPendingApproval(role ?? null)) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
+  return <Navigate to="/unauthorized" replace />;
+}
+
+/**
+ * Legacy compatibility - maps old EmployeeRoute to TenantUser
+ */
 export function EmployeeRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute allowedRoles={[AppRole.EMPLOYEE]}>
-    {children}
-    </ProtectedRoute>
-  );
+  return <TenantAdminRoute>{children}</TenantAdminRoute>;
 }
 
-// 2. For Standard Users (Clients)
-export function UserRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute allowedRoles={[AppRole.USER]}>
-    {children}
-    </ProtectedRoute>
-  );
+/**
+ * Legacy compatibility - maps old CustomerRoute to ClientRoute
+ */
+export function CustomerRoute({ children }: { children: React.ReactNode }) {
+  return <ClientRoute>{children}</ClientRoute>;
 }
 
-// 3. For Admins (Admin Panel) - ADDED THIS
+/**
+ * Admin Route - Either platform admin or tenant admin
+ */
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute allowedRoles={[AppRole.ADMIN]}>
-    {children}
-    </ProtectedRoute>
-  );
+  const { user, role, loading } = useAuth();
+  
+  if (loading) {
+    return <RouteLoader />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+  
+  if (isPlatformRole(role ?? "pending_approval") || isTenantAdminRole(role)) {
+    return <>{children}</>;
+  }
+
+  if (isPendingApproval(role ?? "pending_approval")) {
+    return <Navigate to="/pending-approval" replace />;
+  }
+  
+  return <Navigate to="/unauthorized" replace />;
 }

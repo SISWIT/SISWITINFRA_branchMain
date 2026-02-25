@@ -14,6 +14,30 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 
+interface InventoryListItem {
+  id: string;
+  quantity_on_hand: number;
+  reorder_level: number | null;
+  warehouse_location: string | null;
+  products: {
+    name: string | null;
+    sku: string | null;
+    category: string | null;
+  } | null;
+}
+
+interface InventoryFormData {
+  product_id: string;
+  quantity_on_hand: number;
+  reorder_level: number;
+  warehouse_location: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -65,7 +89,7 @@ export default function InventoryPage() {
 
   // SECTION: Add Item Mutation
   const addItemMutation = useMutation({
-    mutationFn: async (newItem: any) => {
+    mutationFn: async (newItem: InventoryFormData) => {
       const { data, error } = await supabase
         .from("inventory_items")
         .insert([{ ...newItem, created_by: user?.id }])
@@ -78,12 +102,12 @@ export default function InventoryPage() {
       toast({ title: "Success", description: "Stock record created." });
       setIsSheetOpen(false);
     },
-    onError: (err: any) => {
-      toast({ title: "Database Error", description: err.message, variant: "destructive" });
+    onError: (err: unknown) => {
+      toast({ title: "Database Error", description: getErrorMessage(err), variant: "destructive" });
     }
   });
 
-  const filteredItems = inventory?.filter((item: any) => 
+  const filteredItems = (inventory as InventoryListItem[] | undefined)?.filter((item) => 
     item.products?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.products?.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -156,7 +180,7 @@ export default function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((item: any) => {
+                  {filteredItems.map((item) => {
                     const isLow = item.quantity_on_hand <= (item.reorder_level || 0);
                     return (
                       <TableRow key={item.id} className="hover:bg-muted/5 transition-colors">
@@ -207,7 +231,7 @@ export default function InventoryPage() {
 }
 
 // SECTION: Form Component with Product Picker
-function InventoryForm({ onSubmit, isLoading }: { onSubmit: (data: any) => void, isLoading: boolean }) {
+function InventoryForm({ onSubmit, isLoading }: { onSubmit: (data: InventoryFormData) => void; isLoading: boolean }) {
   const [formData, setFormData] = useState({
     product_id: "",
     quantity_on_hand: 0,

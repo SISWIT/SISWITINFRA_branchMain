@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { Package, Plus, Trash2, Calculator, Save, Send, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,14 +32,17 @@ export default function QuoteBuilderPage() {
   const accountId = searchParams.get("account_id");
   const isEditMode = !!quoteId;
 
-  const defaultValidDate = new Date();
-  defaultValidDate.setDate(defaultValidDate.getDate() + 30);
+  const defaultValidDate = useMemo(() => {
+    const next = new Date();
+    next.setDate(next.getDate() + 30);
+    return next.toISOString().split("T")[0];
+  }, []);
 
   const [quoteData, setQuoteData] = useState({
     account_id: accountId || "",
     contact_id: "",
     opportunity_id: opportunityId || "",
-    valid_until: defaultValidDate.toISOString().split('T')[0],
+    valid_until: defaultValidDate,
     terms: "Net 30 days",
     notes: "",
     discount_percent: 0,
@@ -61,14 +64,14 @@ export default function QuoteBuilderPage() {
         account_id: existingQuote.account_id || "",
         contact_id: existingQuote.contact_id || "",
         opportunity_id: existingQuote.opportunity_id || "",
-        valid_until: existingQuote.valid_until || defaultValidDate.toISOString().split('T')[0],
+        valid_until: existingQuote.valid_until || defaultValidDate,
         terms: existingQuote.terms || "Net 30 days",
         notes: existingQuote.notes || "",
         discount_percent: existingQuote.discount_percent || 0,
         tax_percent: existingQuote.tax_percent || 18,
       });
     }
-  }, [isEditMode, existingQuote, isLoadingQuote]);
+  }, [defaultValidDate, isEditMode, existingQuote, isLoadingQuote]);
 
   useEffect(() => {
     if (isEditMode && existingItems && !isLoadingItems) {
@@ -159,7 +162,7 @@ export default function QuoteBuilderPage() {
     setSelectedProduct("");
   };
 
-  const updateItem = (index: number, field: keyof LocalQuoteItem, value: any) => {
+  const updateItem = (index: number, field: keyof LocalQuoteItem, value: LocalQuoteItem[keyof LocalQuoteItem]) => {
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
 

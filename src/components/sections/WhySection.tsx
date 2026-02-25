@@ -109,7 +109,7 @@ export function WhySection() {
             <span className="text-gradient">Loved by Teams</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            We've engineered Siriusinfra to meet the most demanding enterprise requirements 
+            We've engineered SISWIT to meet the most demanding enterprise requirements 
             while keeping it intuitive enough for every team member.
           </p>
         </div>

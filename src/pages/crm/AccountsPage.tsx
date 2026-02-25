@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   useAccounts,
@@ -399,7 +400,7 @@ export default function AccountsPage() {
 }
 
 // section wrapper
-function Section({ title, children }: any) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="border rounded-lg p-4 space-y-4">
       <h3 className="text-sm font-semibold text-muted-foreground">{title}</h3>
@@ -409,7 +410,7 @@ function Section({ title, children }: any) {
 }
 
 // responsive grid helper
-function Grid({ cols, children }: any) {
+function Grid({ cols, children }: { cols: 2 | 3 | 4; children: ReactNode }) {
   return (
     <div
       className={`grid gap-4 ${
@@ -432,7 +433,13 @@ function InputField({
   onChange,
   placeholder,
   type = "text",
-}: any) {
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: string;
+}) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>

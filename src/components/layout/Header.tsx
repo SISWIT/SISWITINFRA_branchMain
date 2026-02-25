@@ -13,8 +13,11 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { AppRole } from "@/types/roles";
+import { organizationOwnerPath, platformPath, tenantDashboardPath, tenantPortalPath } from "@/lib/routes";
 
 import {
   DropdownMenu,
@@ -42,11 +45,25 @@ export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, signOut, loading } = useAuth();
+  const { organization } = useOrganization();
+  const { tenant } = useTenant();
 
-  const isAdmin = role === AppRole.ADMIN;
-  const isEmployee = role === AppRole.EMPLOYEE;
-  const isUser = role === AppRole.USER;
-  const dashboardHref = isAdmin ? "/admin" : isEmployee ? "/dashboard" : "/";
+  const isPlatformAdmin = role === AppRole.PLATFORM_SUPER_ADMIN || role === AppRole.PLATFORM_ADMIN;
+  const isOwner = role === AppRole.OWNER;
+  const isTenantMember =
+    role === AppRole.OWNER || role === AppRole.ADMIN || role === AppRole.MANAGER || role === AppRole.EMPLOYEE || role === AppRole.USER;
+  const isClientUser = role === AppRole.CLIENT;
+  const tenantSlug = organization?.slug ?? tenant?.slug ?? "";
+
+  const dashboardHref = isPlatformAdmin
+    ? platformPath()
+    : isOwner
+      ? organizationOwnerPath()
+    : isTenantMember && tenantSlug
+      ? tenantDashboardPath(tenantSlug)
+      : isClientUser && tenantSlug
+        ? tenantPortalPath(tenantSlug)
+        : "/";
 
   const isActive = (href: string) =>
     location.pathname === href || location.pathname.startsWith(href + "/");
@@ -160,7 +177,7 @@ export function Header() {
               <Link to={dashboardHref}>
                 <Button variant="outline" size="sm" className="gap-2">
                   <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
+                  {isClientUser ? "My Portal" : "Dashboard"}
                 </Button>
               </Link>
             )}
@@ -169,14 +186,14 @@ export function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
-                    {isAdmin ? <Shield /> : <User />}
+                    {isPlatformAdmin ? <Shield /> : <User />}
                   </Button>
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent align="end">
                   {role && (
                     <div className="px-2 py-1">
-                      <RoleBadge role={role} size="sm" />
+                      <RoleBadge role={role as AppRole} size="sm" />
                     </div>
                   )}
 
@@ -193,12 +210,12 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <div className="flex gap-2">
-                <Link to="/auth">
+                <Link to="/auth/sign-in">
                   <Button variant="outline" size="sm">
                     Sign In
                   </Button>
                 </Link>
-                <Link to="/auth">
+                <Link to="/auth/organization-signup">
                   <Button variant="hero" size="sm">
                     Get Started
                   </Button>
@@ -273,31 +290,45 @@ export function Header() {
               ))}
             </div>
 
-            {(isEmployee || isAdmin) && (
+            {(isTenantMember || isPlatformAdmin) && (
               <div className="space-y-1">
                 <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Workspace
                 </p>
 
-                {isEmployee && (
+                {isOwner && (
                   <Link
-                    to="/dashboard"
+                    to={organizationOwnerPath()}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      location.pathname.startsWith("/dashboard")
+                      location.pathname.startsWith("/organization")
                         ? "bg-primary/10 text-primary"
                         : "hover:bg-secondary text-foreground/80"
                     }`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Employee Dashboard
+                    Organization Dashboard
                   </Link>
                 )}
 
-                {isAdmin && (
+                {isTenantMember && tenantSlug && (
                   <Link
-                    to="/admin"
+                    to={tenantDashboardPath(tenantSlug)}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      location.pathname.startsWith("/admin")
+                      location.pathname.startsWith(`/${tenantSlug}/app`)
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-secondary text-foreground/80"
+                    }`}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Workspace Dashboard
+                  </Link>
+                )}
+
+                {isPlatformAdmin && (
+                  <Link
+                    to={platformPath()}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      location.pathname.startsWith("/platform")
                         ? "bg-primary/10 text-primary"
                         : "hover:bg-secondary text-foreground/80"
                     }`}
@@ -308,6 +339,26 @@ export function Header() {
                 )}
               </div>
             )}
+
+            {isClientUser && tenantSlug && (
+              <div className="space-y-1">
+                <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  My Portal
+                </p>
+
+                <Link
+                  to={tenantPortalPath(tenantSlug)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    location.pathname.startsWith(`/${tenantSlug}/app/portal`)
+                      ? "bg-primary/10 text-primary"
+                      : "hover:bg-secondary text-foreground/80"
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Customer Portal
+                </Link>
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t border-border bg-secondary/20">
@@ -315,7 +366,7 @@ export function Header() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 px-1 mb-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                    {isAdmin ? (
+                    {isPlatformAdmin ? (
                       <Shield className="h-5 w-5 text-primary" />
                     ) : (
                       <User className="h-5 w-5 text-primary" />
@@ -326,7 +377,7 @@ export function Header() {
                       My Account
                     </span>
                     <div className="flex">
-                      {role && <RoleBadge role={role} size="sm" />}
+                      {role && <RoleBadge role={role as AppRole} size="sm" />}
                     </div>
                   </div>
                 </div>
@@ -342,12 +393,12 @@ export function Header() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                <Link to="/auth">
+                <Link to="/auth/sign-in">
                   <Button variant="outline" className="w-full">
                     Sign In
                   </Button>
                 </Link>
-                <Link to="/auth">
+                <Link to="/auth/organization-signup">
                   <Button variant="hero" className="w-full">
                     Get Started
                   </Button>

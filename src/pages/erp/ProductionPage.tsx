@@ -42,6 +42,41 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface ProductionOrderRow {
+  id: string;
+  order_number: string;
+  product_id: string | null;
+  quantity_to_produce: number;
+  status: string;
+  start_date: string | null;
+  due_date: string | null;
+  products: {
+    name: string | null;
+    sku: string | null;
+  } | null;
+}
+
+interface ProductionOrderFormInput {
+  id?: string;
+  order_number: string;
+  product_id: string;
+  quantity_to_produce: number;
+  status: string;
+  start_date: string;
+  due_date: string | null;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
+  sku: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 // Status Visuals
 const STATUS_STYLES: Record<string, string> = {
   planned: "bg-slate-100 text-slate-700 border-slate-200",
@@ -55,8 +90,8 @@ export default function ProductionPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   // State for Edit/Delete
-  const [editingOrder, setEditingOrder] = useState<any>(null); 
-  const [orderToDelete, setOrderToDelete] = useState<any>(null); 
+  const [editingOrder, setEditingOrder] = useState<ProductionOrderRow | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<ProductionOrderRow | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -86,9 +121,8 @@ export default function ProductionPage() {
 
   // 2. CREATE / UPDATE MUTATION - UPDATED: Include user ID
   const upsertOrderMutation = useMutation({
-    mutationFn: async (orderData: any) => {
+    mutationFn: async (orderData: ProductionOrderFormInput) => {
       const payload = { ...orderData, created_by: user?.id };
-      delete payload.products; // Remove the joined data before sending to DB
 
       if (payload.id) {
         // Update
@@ -118,8 +152,8 @@ export default function ProductionPage() {
       setIsSheetOpen(false);
       setEditingOrder(null);
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    onError: (err: unknown) => {
+      toast({ title: "Error", description: getErrorMessage(err), variant: "destructive" });
     }
   });
 
@@ -151,7 +185,7 @@ export default function ProductionPage() {
     }
   });
 
-  const handleEditClick = (order: any) => {
+  const handleEditClick = (order: ProductionOrderRow) => {
     setEditingOrder(order);
     setIsSheetOpen(true);
   };
@@ -327,7 +361,15 @@ export default function ProductionPage() {
 }
 
 // FORM COMPONENT
-function ProductionOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (data: any) => void, isLoading: boolean, initialData?: any }) {
+function ProductionOrderForm({
+  onSubmit,
+  isLoading,
+  initialData,
+}: {
+  onSubmit: (data: ProductionOrderFormInput) => void;
+  isLoading: boolean;
+  initialData?: ProductionOrderRow | null;
+}) {
   const [formData, setFormData] = useState({
     order_number: initialData?.order_number || `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
     product_id: initialData?.product_id || "",
@@ -350,7 +392,7 @@ function ProductionOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (
     e.preventDefault();
     if (!formData.product_id) return;
 
-    const payload: any = { ...formData };
+    const payload: ProductionOrderFormInput = { ...formData };
     if (!payload.due_date) payload.due_date = null; // Handle empty date
     if (initialData?.id) payload.id = initialData.id;
 
@@ -377,7 +419,7 @@ function ProductionOrderForm({ onSubmit, isLoading, initialData }: { onSubmit: (
           onChange={(e) => setFormData({...formData, product_id: e.target.value})}
         >
           <option value="">-- Select Product --</option>
-          {products?.map((p: any) => (
+          {(products as ProductOption[] | null)?.map((p) => (
             <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
           ))}
         </select>

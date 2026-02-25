@@ -137,7 +137,7 @@ export function LeadershipSection() {
             Meet the Leadership Team
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            The visionaries driving Siriusinfra forward
+            The visionaries driving SISWIT forward
           </p>
         </div>
 

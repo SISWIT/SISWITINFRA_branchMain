@@ -53,7 +53,7 @@ export default function ESignaturePage() {
     }
   };
 
-  const updateSigner = (id: string, field: keyof Signer, value: any) => {
+  const updateSigner = (id: string, field: keyof Signer, value: Signer[keyof Signer]) => {
     setSigners(signers.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
   };
 
