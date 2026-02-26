@@ -75,11 +75,11 @@ export interface QuoteItem {
 
 // Status colors
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
-  draft: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-  pending_approval: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  accepted: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  expired: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  draft: 'bg-secondary text-secondary-foreground',
+  pending_approval: 'bg-warning/15 text-warning',
+  approved: 'bg-success/15 text-success',
+  rejected: 'bg-destructive/15 text-destructive',
+  sent: 'bg-info/15 text-info',
+  accepted: 'bg-primary/15 text-primary',
+  expired: 'bg-secondary text-secondary-foreground',
 };

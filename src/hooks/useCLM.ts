@@ -1,9 +1,9 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
 import type { Contract, ContractScan, ContractTemplate, ESignature } from "@/types/clm";
 import { canReadAllTenantRows } from "@/types/roles";
 import {
@@ -11,7 +11,7 @@ import {
   applyModuleReadScope,
   buildModuleCreatePayload,
   isModuleScopeReady,
-  requireTenantScope,
+  requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/lib/module-scope";
 import { softDeleteRecord } from "@/lib/soft-delete";
@@ -59,19 +59,21 @@ function mapESignature(row: ESignatureRow): ESignature {
 
 function useClmScope() {
   const { user, role } = useAuth();
-  const { tenant, tenantLoading } = useTenant();
+  const { organization, organizationLoading } = useOrganization();
 
   const scope: ModuleScopeContext = {
-    tenantId: tenant?.id ?? null,
+    organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
     role,
   };
 
   return {
     scope,
-    tenantId: scope.tenantId,
+    organizationId: scope.organizationId,
+    // Compatibility alias to avoid touching downstream query keys yet.
+    tenantId: scope.organizationId,
     userId: scope.userId,
-    enabled: isModuleScopeReady(scope, tenantLoading),
+    enabled: isModuleScopeReady(scope, organizationLoading),
   };
 }
 
@@ -92,13 +94,13 @@ export function useContractTemplates() {
     queryKey: ["contract_templates", tenantId, userId],
     enabled,
     queryFn: async () => {
-      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const isTenantWideReader = canReadAllTenantRows(scope.role);
 
       let query = supabase
         .from("contract_templates")
         .select("*")
-        .eq("tenant_id", requiredTenantId)
+        .eq("organization_id", requiredOrganizationId)
         .is("deleted_at", null)
         .order("name");
 
@@ -671,3 +673,4 @@ export function useDeleteContractScan() {
     },
   });
 }
+

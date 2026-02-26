@@ -125,7 +125,7 @@ const Pricing = () => {
               </p>
 
               {/* Toggle */}
-              <div className="inline-flex items-center gap-4 p-1 rounded-xl bg-secondary border border-border">
+              <div className="inline-flex items-center gap-4 p-1 rounded-xl bg-secondary/0 border border-border">
                 <button
                   onClick={() => setIsAnnual(false)}
                   className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -250,7 +250,7 @@ const Pricing = () => {
         </section>
 
         {/* FAQ */}
-        <section className="min-h-[80vh] flex flex-col justify-center py-20 bg-secondary/30">
+        <section className="min-h-[80vh] flex flex-col justify-center py-20 bg-secondary/0">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto">
               <div className="text-center mb-12">

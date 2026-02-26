@@ -113,6 +113,58 @@ const integrations = [
   "Slack", "DocuSign", "Stripe", "QuickBooks", "Zendesk"
 ];
 
+const moduleAccentMap: Record<string, {
+  iconShell: string;
+  iconColor: string;
+  bulletShell: string;
+  bulletIcon: string;
+  hoverBorder: string;
+  cta: string;
+}> = {
+  cpq: {
+    iconShell: "bg-gradient-to-br from-info/80 to-primary/80",
+    iconColor: "text-white",
+    bulletShell: "bg-info/20",
+    bulletIcon: "text-info",
+    hoverBorder: "hover:border-info/35",
+    cta: "bg-info text-info-foreground hover:bg-info/90",
+  },
+  clm: {
+    iconShell: "bg-gradient-to-br from-primary/90 to-chart-3/90",
+    iconColor: "text-white",
+    bulletShell: "bg-primary/20",
+    bulletIcon: "text-primary",
+    hoverBorder: "hover:border-primary/35",
+    cta: "bg-primary text-primary-foreground hover:bg-primary/90",
+  },
+  crm: {
+    iconShell: "bg-gradient-to-br from-chart-3/85 to-info/85",
+    iconColor: "text-white",
+    bulletShell: "bg-chart-3/20",
+    bulletIcon: "text-chart-3",
+    hoverBorder: "hover:border-chart-3/35",
+    cta: "bg-chart-3 text-white hover:bg-chart-3/90",
+  },
+  erp: {
+    iconShell: "bg-gradient-to-br from-primary/85 to-info/80",
+    iconColor: "text-white",
+    bulletShell: "bg-primary/20",
+    bulletIcon: "text-primary",
+    hoverBorder: "hover:border-primary/35",
+    cta: "bg-primary text-primary-foreground hover:bg-primary/90",
+  },
+  "document-automation": {
+    iconShell: "bg-gradient-to-br from-success/80 to-info/80",
+    iconColor: "text-white",
+    bulletShell: "bg-success/20",
+    bulletIcon: "text-success",
+    hoverBorder: "hover:border-success/35",
+    cta: "bg-success text-success-foreground hover:bg-success/90",
+  },
+};
+
+const getModuleAccent = (moduleId: string) => moduleAccentMap[moduleId] ?? moduleAccentMap.cpq;
+
 const Products = () => {
   return (
     // overflow-x-hidden avoids blur blobs causing sideways scroll
@@ -160,17 +212,19 @@ const Products = () => {
         </section>
 
         {/* Product Modules */}
-        {modules.map((module, index) => (
-          <section
-            key={module.id}
-            id={module.id}
-            // Mobile: py-12 (breathing room but not huge gaps) Desktop: Full screen focus.
-            className={`py-12 lg:min-h-screen flex flex-col justify-center ${index % 2 === 0 ? "bg-secondary/30" : "bg-background"
-              }`}
-          >
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              {/* Mobile: Flex Column. Desktop: Grid */}
-              <div className="flex flex-col lg:grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+        {modules.map((module, index) => {
+          const accent = getModuleAccent(module.id);
+          return (
+            <section
+              key={module.id}
+              id={module.id}
+              // Mobile: py-12 (breathing room but not huge gaps) Desktop: Full screen focus.
+              className={`py-12 lg:min-h-screen flex flex-col justify-center ${index % 2 === 0 ? "bg-secondary/0" : "bg-background"
+                }`}
+            >
+              <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Mobile: Flex Column. Desktop: Grid */}
+                <div className="flex flex-col lg:grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
 
                 {/* MOBILE LAYOUT LOGIC:
                   We always want the TEXT to appear first on mobile so the user has context before seeing the diagram.
@@ -178,8 +232,8 @@ const Products = () => {
                 */}
                 <div className={`space-y-6 order-1 ${index % 2 === 1 ? "lg:order-2" : ""}`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-primary flex items-center justify-center shrink-0">
-                      <module.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${accent.iconShell}`}>
+                      <module.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${accent.iconColor}`} />
                     </div>
                     <div>
                       <span className="text-xs sm:text-sm text-muted-foreground">
@@ -199,8 +253,8 @@ const Products = () => {
                   <div className="space-y-2">
                     {module.benefits.map((benefit) => (
                       <div key={benefit} className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5 text-primary" />
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${accent.bulletShell}`}>
+                          <Check className={`w-2.5 h-2.5 ${accent.bulletIcon}`} />
                         </div>
                         <span className="text-sm sm:text-base font-medium">
                           {benefit}
@@ -211,7 +265,7 @@ const Products = () => {
 
                   {/* CTA - Full width on mobile for better touch target */}
                   <Link to="/contact" className="block w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto group">
+                    <Button className={`w-full sm:w-auto group ${accent.cta}`}>
                       Explore {module.name}
                       <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
@@ -241,9 +295,9 @@ const Products = () => {
                     {module.features.map((feature) => (
                       <div
                         key={feature.title}
-                        className="p-3 sm:p-4 rounded-lg bg-card border border-border hover:border-primary/30 transition flex flex-col justify-between"
+                        className={`p-3 sm:p-4 rounded-lg bg-card border border-border transition flex flex-col justify-between ${accent.hoverBorder}`}
                       >
-                        <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary mb-2" />
+                        <feature.icon className={`w-4 h-4 sm:w-5 sm:h-5 mb-2 ${accent.bulletIcon}`} />
                         <div>
                           <h3 className="text-sm font-semibold mb-1">
                             {feature.title}
@@ -257,10 +311,11 @@ const Products = () => {
                   </div>
                 </div>
 
+                </div>
               </div>
-            </div>
-          </section>
-        ))}
+            </section>
+          );
+        })}
 
         {/* Integrations */}
         <section className="py-16 sm:py-20">

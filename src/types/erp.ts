@@ -113,31 +113,31 @@ export interface FinancialRecord {
 
 // Status colors
 export const INVENTORY_STATUS_COLORS: Record<InventoryStatus, string> = {
-  in_stock: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  low_stock: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  out_of_stock: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  discontinued: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  in_stock: 'bg-success/15 text-success',
+  low_stock: 'bg-warning/15 text-warning',
+  out_of_stock: 'bg-destructive/15 text-destructive',
+  discontinued: 'bg-secondary text-secondary-foreground',
 };
 
 export const PURCHASE_ORDER_STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
-  draft: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  received: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  draft: 'bg-secondary text-secondary-foreground',
+  pending: 'bg-warning/15 text-warning',
+  approved: 'bg-info/15 text-info',
+  received: 'bg-success/15 text-success',
+  cancelled: 'bg-destructive/15 text-destructive',
 };
 
 export const PRODUCTION_ORDER_STATUS_COLORS: Record<ProductionOrderStatus, string> = {
-  planned: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  in_progress: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  planned: 'bg-info/15 text-info',
+  in_progress: 'bg-warning/15 text-warning',
+  completed: 'bg-success/15 text-success',
+  cancelled: 'bg-destructive/15 text-destructive',
 };
 
 export const FINANCIAL_RECORD_TYPE_COLORS: Record<FinancialRecordType, string> = {
-  income: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  expense: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  asset: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  liability: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-  equity: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  income: 'bg-success/15 text-success',
+  expense: 'bg-destructive/15 text-destructive',
+  asset: 'bg-info/15 text-info',
+  liability: 'bg-warning/15 text-warning',
+  equity: 'bg-primary/15 text-primary',
 };

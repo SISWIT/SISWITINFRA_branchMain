@@ -8,13 +8,23 @@ export type BackgroundJobType =
   | "contract.expiry_alert";
 
 export interface EnqueueJobInput {
-  tenantId: string;
+  organizationId?: string;
+  // Compatibility alias while callers migrate.
+  tenantId?: string;
   jobType: BackgroundJobType;
   payload: Record<string, unknown>;
   priority?: number;
   availableAt?: string;
   maxAttempts?: number;
   createdBy?: string | null;
+}
+
+function resolveOrganizationId(input: { organizationId?: string; tenantId?: string }): string {
+  const value = input.organizationId ?? input.tenantId;
+  if (!value) {
+    throw new Error("organizationId is required to enqueue a background job");
+  }
+  return value;
 }
 
 export async function enqueueJob(input: EnqueueJobInput): Promise<string | null> {
@@ -27,11 +37,13 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<string | null>
       };
     };
   };
+  const organizationId = resolveOrganizationId(input);
 
   const { data, error } = await unsafeSupabase
     .from("background_jobs")
     .insert({
-      tenant_id: input.tenantId,
+      organization_id: organizationId,
+      tenant_id: organizationId,
       job_type: input.jobType,
       payload: input.payload,
       status: "queued",
@@ -50,14 +62,15 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<string | null>
 }
 
 export async function enqueueDocumentPdfJob(input: {
-  tenantId: string;
+  organizationId?: string;
+  tenantId?: string;
   documentId: string;
   documentName: string;
   format?: string;
   createdBy?: string | null;
 }) {
   return enqueueJob({
-    tenantId: input.tenantId,
+    organizationId: input.organizationId ?? input.tenantId,
     jobType: "document.generate_pdf",
     payload: {
       document_id: input.documentId,
@@ -69,14 +82,15 @@ export async function enqueueDocumentPdfJob(input: {
 }
 
 export async function enqueueEmailSendJob(input: {
-  tenantId: string;
+  organizationId?: string;
+  tenantId?: string;
   to: string;
   template: string;
   payload?: Record<string, unknown>;
   createdBy?: string | null;
 }) {
   return enqueueJob({
-    tenantId: input.tenantId,
+    organizationId: input.organizationId ?? input.tenantId,
     jobType: "email.send",
     payload: {
       to: input.to,
@@ -88,14 +102,15 @@ export async function enqueueEmailSendJob(input: {
 }
 
 export async function enqueueReminderJob(input: {
-  tenantId: string;
+  organizationId?: string;
+  tenantId?: string;
   recipientEmail: string;
   entityType: "document_signature" | "contract_signature";
   entityId: string;
   createdBy?: string | null;
 }) {
   return enqueueJob({
-    tenantId: input.tenantId,
+    organizationId: input.organizationId ?? input.tenantId,
     jobType: "email.reminder",
     payload: {
       recipient_email: input.recipientEmail,
@@ -107,14 +122,15 @@ export async function enqueueReminderJob(input: {
 }
 
 export async function enqueueContractExpiryAlert(input: {
-  tenantId: string;
+  organizationId?: string;
+  tenantId?: string;
   contractId: string;
   contractName?: string;
   daysUntilExpiry?: number;
   createdBy?: string | null;
 }) {
   return enqueueJob({
-    tenantId: input.tenantId,
+    organizationId: input.organizationId ?? input.tenantId,
     jobType: "contract.expiry_alert",
     payload: {
       contract_id: input.contractId,

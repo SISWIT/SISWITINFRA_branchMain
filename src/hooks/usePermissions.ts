@@ -9,9 +9,9 @@
  */
 
 import { useAuth } from "./useAuth";
-import { useTenant } from "./useTenant";
+import { useOrganization } from "./useOrganization";
 import { AppRole, isPlatformRole } from "@/types/roles";
-import { ModuleType, isModuleEnabled } from "@/types/tenant";
+import { ModuleType } from "@/types/organization";
 
 /**
  * Permission Check Result
@@ -34,7 +34,7 @@ export interface PermissionResult {
  */
 export function usePermissions() {
   const { user, role: userRole, loading } = useAuth();
-  const { tenant, subscription, hasModule, enabledModules } = useTenant();
+  const { organization, subscription, hasModule, enabledModules } = useOrganization();
 
   const isPlatformAdmin = isPlatformRole(userRole);
   const isTenantAdmin = userRole === "admin";
@@ -129,8 +129,8 @@ export function usePermissions() {
     userRole,
     loading,
     
-    // Tenant info
-    tenant,
+    // Organization info
+    organization,
     subscription,
     enabledModules,
     
@@ -155,7 +155,7 @@ export function usePermissions() {
  */
 export function useAccessControl(requiredRole?: AppRole, requiredModule?: ModuleType) {
   const { user, role: userRole, loading } = useAuth();
-  const { hasModule } = useTenant();
+  const { hasModule } = useOrganization();
 
   const isPlatformAdmin = isPlatformRole(userRole);
   const hasRequiredRole = !requiredRole || userRole === requiredRole || isPlatformAdmin;
@@ -189,18 +189,21 @@ export function useModuleRoute(module: ModuleType) {
 /**
  * Hook for CRUD operations with tenant isolation
  */
-export function useCRUD<T extends { tenant_id?: string }>(tableName: string) {
+export function useCRUD<T extends { organization_id?: string; tenant_id?: string }>(tableName: string) {
   const { user, role: userRole } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
   const isPlatformAdmin = isPlatformRole(userRole);
 
   /**
-   * Get the tenant_id to use for queries
+   * Get the organization_id to use for queries
    */
-  const getTenantId = (): string | undefined => {
+  const getOrganizationId = (): string | undefined => {
     if (isPlatformAdmin) return undefined; // Admin sees all
-    return tenant?.id;
+    return organization?.id;
   };
+
+  // Compatibility alias for legacy call sites.
+  const getTenantId = getOrganizationId;
 
   /**
    * Check if user can create records
@@ -242,6 +245,7 @@ export function useCRUD<T extends { tenant_id?: string }>(tableName: string) {
   };
 
   return {
+    getOrganizationId,
     getTenantId,
     canCreate,
     canRead,

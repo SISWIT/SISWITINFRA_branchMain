@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { useTenant } from "./useTenant";
+import { useOrganization } from "./useOrganization";
 import type {
   AutoDocument,
   DocumentESignature,
@@ -102,11 +102,11 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise
 // ===== DOCUMENT TEMPLATES =====
 export function useDocumentTemplates() {
   const { user, role } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
   useDocumentsRealtime(user?.id, "templates");
 
   return useQuery({
-    queryKey: ["document_templates", user?.id, tenant?.id],
+    queryKey: ["document_templates", user?.id, organization?.id],
     enabled: !!user,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -122,7 +122,7 @@ export function useDocumentTemplates() {
         .order("updated_at", { ascending: false });
 
       query = applyTenantOwnershipScope(query, {
-        tenantId: tenant?.id,
+        organizationId: organization?.id,
         isPlatformAdmin: isPlatformRole(role),
       });
 
@@ -143,7 +143,7 @@ export function useDocumentTemplates() {
 export function useCreateDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<DocumentTemplate>, "id" | "created_at" | "updated_at">) => {
@@ -159,7 +159,7 @@ export function useCreateDocumentTemplate() {
           created_by: user?.id,
         },
         {
-          tenantId: tenant?.id,
+          organizationId: organization?.id,
           userId: user?.id,
           isPlatformAdmin: false,
         },
@@ -179,7 +179,7 @@ export function useCreateDocumentTemplate() {
         action: "document_template_created",
         entityType: "document_templates",
         entityId: data.id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
         newValues: { name: data.name, type: data.type, is_public: data.is_public },
       });
@@ -199,7 +199,7 @@ export function useCreateDocumentTemplate() {
 export function useUpdateDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<DocumentTemplate> & { id: string }) => {
@@ -218,7 +218,7 @@ export function useUpdateDocumentTemplate() {
         action: "document_template_updated",
         entityType: "document_templates",
         entityId: id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
         newValues: updates,
       });
@@ -238,7 +238,7 @@ export function useUpdateDocumentTemplate() {
 export function useDeleteDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -255,7 +255,7 @@ export function useDeleteDocumentTemplate() {
         action: "document_template_soft_deleted",
         entityType: "document_templates",
         entityId: id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
       });
     },
@@ -272,11 +272,11 @@ export function useDeleteDocumentTemplate() {
 // ===== AUTO DOCUMENTS =====
 export function useAutoDocuments() {
   const { user, role } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
   useDocumentsRealtime(user?.id, "documents");
 
   return useQuery({
-    queryKey: ["auto_documents", user?.id, tenant?.id],
+    queryKey: ["auto_documents", user?.id, organization?.id],
     enabled: !!user,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -286,7 +286,7 @@ export function useAutoDocuments() {
 
       let query = supabase.from("auto_documents").select("*").is("deleted_at", null);
       query = applyTenantOwnershipScope(query, {
-        tenantId: tenant?.id,
+        organizationId: organization?.id,
         isPlatformAdmin: isPlatformRole(role),
       });
 
@@ -307,10 +307,10 @@ export function useAutoDocuments() {
 
 export function useAutoDocument(id: string) {
   const { user, role } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useQuery({
-    queryKey: ["auto_document", id, user?.id, tenant?.id],
+    queryKey: ["auto_document", id, user?.id, organization?.id],
     enabled: !!id && !!user,
     queryFn: async () => {
       if (!user?.id) {
@@ -324,7 +324,7 @@ export function useAutoDocument(id: string) {
         .is("deleted_at", null);
 
       query = applyTenantOwnershipScope(query, {
-        tenantId: tenant?.id,
+        organizationId: organization?.id,
         isPlatformAdmin: isPlatformRole(role),
       });
 
@@ -346,12 +346,12 @@ export function useAutoDocument(id: string) {
 export function useCreateAutoDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (doc: Omit<Partial<AutoDocument>, "id" | "created_at" | "updated_at">) => {
-      if (!tenant?.id) {
-        throw new Error("Tenant context is required");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       const payload = withOwnershipCreate(
@@ -372,7 +372,7 @@ export function useCreateAutoDocument() {
           created_by: user?.id,
         },
         {
-          tenantId: tenant.id,
+          organizationId: organization.id,
           userId: user?.id,
           isPlatformAdmin: false,
         },
@@ -389,7 +389,7 @@ export function useCreateAutoDocument() {
       }
 
       void enqueueDocumentPdfJob({
-        tenantId: tenant.id,
+        organizationId: organization.id,
         documentId: data.id,
         documentName: data.name,
         format: doc.format ?? "pdf",
@@ -400,7 +400,7 @@ export function useCreateAutoDocument() {
         action: "document_created",
         entityType: "auto_documents",
         entityId: data.id,
-        tenantId: tenant.id,
+        organizationId: organization.id,
         userId: user?.id ?? null,
         newValues: { name: data.name, status: data.status, type: data.type },
       });
@@ -420,7 +420,7 @@ export function useCreateAutoDocument() {
 export function useUpdateAutoDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AutoDocument> & { id: string }) => {
@@ -439,7 +439,7 @@ export function useUpdateAutoDocument() {
         action: "document_updated",
         entityType: "auto_documents",
         entityId: id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
         newValues: updates,
       });
@@ -460,7 +460,7 @@ export function useUpdateAutoDocument() {
 export function useDeleteAutoDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -477,7 +477,7 @@ export function useDeleteAutoDocument() {
         action: "document_soft_deleted",
         entityType: "auto_documents",
         entityId: id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
       });
     },
@@ -531,7 +531,7 @@ export function useDocumentESignatures(documentId?: string) {
 export function useCreateDocumentESignature() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (signature: Omit<Partial<DocumentESignature>, "id" | "created_at" | "updated_at">) => {
@@ -539,15 +539,15 @@ export function useCreateDocumentESignature() {
         throw new Error("document_id is required to create an e-signature");
       }
 
-      let resolvedTenantId = tenant?.id ?? null;
-      if (!resolvedTenantId) {
+      let resolvedOrganizationId = organization?.id ?? null;
+      if (!resolvedOrganizationId) {
         const { data: documentRef } = await supabase
           .from("auto_documents")
-          .select("tenant_id")
+          .select("organization_id")
           .eq("id", signature.document_id)
           .maybeSingle();
 
-        resolvedTenantId = (documentRef as { tenant_id?: string } | null)?.tenant_id ?? null;
+        resolvedOrganizationId = (documentRef as { organization_id?: string } | null)?.organization_id ?? null;
       }
 
       const { data, error } = await supabase
@@ -579,9 +579,9 @@ export function useCreateDocumentESignature() {
         throw updateDocError;
       }
 
-      if (resolvedTenantId && signature.recipient_email) {
+      if (resolvedOrganizationId && signature.recipient_email) {
         void enqueueEmailSendJob({
-          tenantId: resolvedTenantId,
+          organizationId: resolvedOrganizationId,
           to: signature.recipient_email,
           template: "document_signature_request",
           payload: {
@@ -597,7 +597,7 @@ export function useCreateDocumentESignature() {
         action: "document_signature_requested",
         entityType: "document_esignatures",
         entityId: data.id,
-        tenantId: resolvedTenantId,
+        organizationId: resolvedOrganizationId,
         userId: user?.id ?? null,
         newValues: {
           document_id: data.document_id,
@@ -623,7 +623,7 @@ export function useCreateDocumentESignature() {
 export function useUpdateDocumentESignature() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async ({ id, document_id, ...updates }: Partial<DocumentESignature> & { id: string }) => {
@@ -651,7 +651,7 @@ export function useUpdateDocumentESignature() {
         action: "document_signature_updated",
         entityType: "document_esignatures",
         entityId: id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
         newValues: updates,
       });
@@ -675,7 +675,7 @@ export function useUpdateDocumentESignature() {
 export function useSendDocumentReminder() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (signatureId: string) => {
@@ -704,9 +704,9 @@ export function useSendDocumentReminder() {
         throw error;
       }
 
-      if (tenant?.id && data.recipient_email) {
+      if (organization?.id && data.recipient_email) {
         void enqueueReminderJob({
-          tenantId: tenant.id,
+          organizationId: organization.id,
           recipientEmail: data.recipient_email,
           entityType: "document_signature",
           entityId: data.id,
@@ -718,7 +718,7 @@ export function useSendDocumentReminder() {
         action: "document_signature_reminder_sent",
         entityType: "document_esignatures",
         entityId: data.id,
-        tenantId: tenant?.id ?? null,
+        organizationId: organization?.id ?? null,
         userId: user?.id ?? null,
         newValues: {
           reminder_count: data.reminder_count,
@@ -890,4 +890,5 @@ export function useRemoveDocumentPermission() {
     },
   });
 }
+
 

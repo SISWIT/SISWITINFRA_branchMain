@@ -26,7 +26,7 @@ export function StatsCard({ title, value, subtitle, icon: Icon, trend, className
           {trend && (
             <p className={cn(
               "text-sm font-medium mt-2",
-              trend.isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+              trend.isPositive ? "text-success" : "text-destructive"
             )}>
               {trend.isPositive ? "+" : ""}{trend.value}% from last month
             </p>

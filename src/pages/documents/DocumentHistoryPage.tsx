@@ -19,15 +19,15 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: string; label: string }> = {
-  draft: { icon: FileText, bg: "bg-gray-100", text: "text-gray-800", label: "Draft" },
-  pending_review: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-800", label: "Pending Review" },
-  approved: { icon: CheckCircle2, bg: "bg-emerald-100", text: "text-emerald-800", label: "Approved" },
-  sent: { icon: Send, bg: "bg-sky-100", text: "text-sky-800", label: "Sent for Signature" },
-  signed: { icon: CheckCircle2, bg: "bg-green-100", text: "text-green-800", label: "Signed" },
-  rejected: { icon: XCircle, bg: "bg-red-100", text: "text-red-800", label: "Rejected" },
-  expired: { icon: Clock, bg: "bg-orange-100", text: "text-orange-800", label: "Expired" },
-  published: { icon: CheckCircle2, bg: "bg-blue-100", text: "text-blue-800", label: "Published" },
-  archived: { icon: FileStack, bg: "bg-gray-100", text: "text-gray-800", label: "Archived" },
+  draft: { icon: FileText, bg: "bg-secondary", text: "text-secondary-foreground", label: "Draft" },
+  pending_review: { icon: Clock, bg: "bg-warning/15", text: "text-warning", label: "Pending Review" },
+  approved: { icon: CheckCircle2, bg: "bg-success/15", text: "text-success", label: "Approved" },
+  sent: { icon: Send, bg: "bg-info/15", text: "text-info", label: "Sent for Signature" },
+  signed: { icon: CheckCircle2, bg: "bg-success/15", text: "text-success", label: "Signed" },
+  rejected: { icon: XCircle, bg: "bg-destructive/15", text: "text-destructive", label: "Rejected" },
+  expired: { icon: Clock, bg: "bg-warning/15", text: "text-warning", label: "Expired" },
+  published: { icon: CheckCircle2, bg: "bg-primary/15", text: "text-primary", label: "Published" },
+  archived: { icon: FileStack, bg: "bg-secondary", text: "text-secondary-foreground", label: "Archived" },
 };
 
 const DocumentHistoryPage = () => {

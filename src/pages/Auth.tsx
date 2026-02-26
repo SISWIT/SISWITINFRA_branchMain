@@ -98,15 +98,19 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f0edf7_0%,#e1dced_45%,#d0c9e2_100%)] px-4 py-6 sm:px-6 lg:px-8 dark:bg-[linear-gradient(135deg,#1d1928_0%,#191525_45%,#120f1d_100%)]">
+    <div className="relative min-h-screen gradient-hero px-4 py-6 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 hidden dark:block">
+        <div className="absolute -left-16 top-16 h-72 w-72 rounded-full bg-info/20 blur-3xl" />
+        <div className="absolute bottom-8 right-8 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
+      </div>
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center lg:min-h-[calc(100vh-5rem)]">
-        <div className="w-full animate-scale-in overflow-hidden rounded-3xl border border-white/50 bg-white/70 shadow-[0_30px_80px_-28px_rgba(40,26,74,0.55)] backdrop-blur-sm dark:border-slate-500/35 dark:bg-[rgba(20,16,34,0.94)]">
+        <div className="w-full animate-scale-in overflow-hidden rounded-3xl border border-border/60 bg-card/85 shadow-card backdrop-blur-sm dark:border-primary/20 dark:bg-[rgba(16,12,30,0.88)] dark:shadow-[0_24px_80px_rgba(13,9,34,0.72)]">
           <div className="grid lg:grid-cols-[1.02fr_1fr]">
             <aside className="hidden p-5 lg:block">
-              <div className="relative h-full min-h-[540px] overflow-hidden rounded-2xl border border-white/20 shadow-2xl">
+              <div className="relative h-full min-h-[540px] overflow-hidden rounded-2xl border border-white/20 shadow-2xl dark:border-white/15 dark:shadow-[0_18px_48px_rgba(18,9,45,0.5)]">
                 <img src={heroBg} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(82,69,150,0.36)_0%,rgba(20,15,39,0.92)_100%)]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15)_0%,transparent_45%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--info)/0.34)_0%,hsl(var(--primary)/0.92)_100%)] dark:bg-[linear-gradient(180deg,rgba(63,111,205,0.48)_0%,rgba(78,34,152,0.9)_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.15)_0%,transparent_45%)] dark:bg-[radial-gradient(circle_at_20%_20%,rgba(185,206,255,0.26)_0%,transparent_48%)]" />
                 <div className="relative z-10 flex h-full flex-col justify-between p-5">
                   <div className="flex items-center justify-between gap-4">
                     <span className="inline-flex rounded-full border border-white/25 bg-black/20 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-white">
@@ -136,12 +140,12 @@ const Auth = () => {
             <section className="px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
               <div className="mx-auto w-full max-w-sm">
                 <div className="mb-6 flex items-center justify-between lg:hidden">
-                  <span className="inline-flex rounded-full border border-slate-300/80 bg-white/70 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-slate-900 dark:border-white/20 dark:bg-white/[0.08] dark:text-white">
+                  <span className="inline-flex rounded-full border border-border/80 bg-card/80 px-3 py-1 text-xs font-semibold tracking-[0.2em] text-foreground dark:border-white/20 dark:bg-white/5 dark:text-white">
                     SISWIT
                   </span>
                   <Link
                     to="/"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300/80 bg-white/70 px-3 py-1 text-xs text-slate-700 transition hover:bg-white dark:border-white/15 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.14]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/80 px-3 py-1 text-xs text-muted-foreground transition hover:bg-card dark:border-white/20 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     Back to website
@@ -149,11 +153,11 @@ const Auth = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="inline-flex rounded-full bg-violet-600/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-violet-700 dark:bg-violet-400/20 dark:text-violet-100">
+                  <p className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-primary dark:bg-primary/25 dark:text-primary-foreground">
                     Account Access
                   </p>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Sign in</h1>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">Access your organization workspace.</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground dark:text-white">Sign in</h1>
+                  <p className="text-sm text-muted-foreground dark:text-white/75">Access your organization workspace.</p>
                 </div>
 
                 <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -164,7 +168,7 @@ const Auth = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Email"
                       required
-                      className="h-11 rounded-xl border-slate-300/80 bg-white/70 text-slate-900 placeholder:text-slate-500 focus-visible:ring-violet-400 focus-visible:ring-offset-0 dark:border-slate-500/55 dark:bg-slate-950/45 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:ring-violet-300"
+                      className="h-11 rounded-xl border-input/80 bg-background/80 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-[#d5dbea]/80 dark:bg-[#c3c9d8] dark:text-[#1a2233] dark:placeholder:text-[#5f687e]"
                     />
                   </div>
 
@@ -175,29 +179,29 @@ const Auth = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Password"
                       required
-                      className="h-11 rounded-xl border-slate-300/80 bg-white/70 pr-10 text-slate-900 placeholder:text-slate-500 focus-visible:ring-violet-400 focus-visible:ring-offset-0 dark:border-slate-500/55 dark:bg-slate-950/45 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:ring-violet-300"
+                      className="h-11 rounded-xl border-input/80 bg-background/80 pr-10 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-[#d5dbea]/80 dark:bg-[#c3c9d8] dark:text-[#1a2233] dark:placeholder:text-[#5f687e]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 dark:text-slate-300 dark:hover:text-slate-100 dark:focus-visible:ring-violet-300"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-[#7c859e] dark:hover:text-[#313a52]"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 pt-1 text-sm">
-                    <label className="flex items-center gap-2.5 text-slate-700 dark:text-slate-200">
+                  <div className="flex items-center justify-between gap-4 pt-1 text-sm dark:text-white/75">
+                    <label className="flex items-center gap-2.5 text-muted-foreground dark:text-white/75">
                       <Checkbox
                         checked={rememberMe}
                         onCheckedChange={(v) => setRememberMe(Boolean(v))}
-                        className="border-slate-400 data-[state=checked]:border-violet-500 data-[state=checked]:bg-violet-500 dark:border-slate-500 dark:data-[state=checked]:border-violet-400 dark:data-[state=checked]:bg-violet-400"
+                        className="border-input data-[state=checked]:border-primary data-[state=checked]:bg-primary dark:border-white/40"
                       />
                       <span>Remember me</span>
                     </label>
                     <Link
                       to="/auth/forgot-password"
-                      className="font-medium text-violet-700 hover:underline dark:text-violet-200 dark:hover:text-violet-100"
+                      className="font-medium text-primary hover:underline"
                     >
                       Forgot password?
                     </Link>
@@ -205,7 +209,7 @@ const Auth = () => {
 
                   <Button
                     type="submit"
-                    className="h-11 w-full rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-700/25 transition hover:bg-violet-500 dark:bg-violet-400 dark:shadow-violet-500/35 dark:hover:bg-violet-300"
+                    className="h-11 w-full rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 dark:bg-[#9d84e8] dark:text-white dark:hover:bg-[#ad95f0] dark:shadow-[0_14px_34px_rgba(145,108,237,0.35)]"
                     disabled={submitting || loading}
                   >
                     {submitting ? (
@@ -219,16 +223,16 @@ const Auth = () => {
                   </Button>
                 </form>
 
-                <div className="mt-6 space-y-2 border-t border-slate-200/80 pt-5 text-sm text-slate-600 dark:border-slate-500/35 dark:text-slate-300">
+                <div className="mt-6 space-y-2 border-t border-border/80 pt-5 text-sm text-muted-foreground dark:border-white/15 dark:text-white/70">
                   <p>
                     New organization?{" "}
-                    <Link className="font-medium text-violet-700 hover:underline dark:text-violet-200 dark:hover:text-violet-100" to="/auth/sign-up?tab=organization">
+                    <Link className="font-medium text-primary hover:underline" to="/auth/sign-up?tab=organization">
                       Sign up your organization
                     </Link>
                   </p>
                   <p>
                     Joining as client?{" "}
-                    <Link className="font-medium text-violet-700 hover:underline dark:text-violet-200 dark:hover:text-violet-100" to="/auth/sign-up?tab=client">
+                    <Link className="font-medium text-primary hover:underline" to="/auth/sign-up?tab=client">
                       Client sign up
                     </Link>
                   </p>
@@ -243,3 +247,4 @@ const Auth = () => {
 };
 
 export default Auth;
+

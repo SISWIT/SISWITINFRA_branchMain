@@ -96,23 +96,23 @@ export interface DocumentESignature {
 }
 
 export const DOCUMENT_STATUS_COLORS: Record<DocumentStatus, string> = {
-  draft: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  pending_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  sent: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400",
-  signed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  expired: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  published: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  archived: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  draft: "bg-secondary text-secondary-foreground",
+  pending_review: "bg-warning/15 text-warning",
+  approved: "bg-success/15 text-success",
+  sent: "bg-info/15 text-info",
+  signed: "bg-success/15 text-success",
+  rejected: "bg-destructive/15 text-destructive",
+  expired: "bg-warning/15 text-warning",
+  published: "bg-primary/15 text-primary",
+  archived: "bg-secondary text-secondary-foreground",
 };
 
 export const DOCUMENT_TYPE_COLORS: Record<DocumentType, string> = {
-  proposal: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400",
-  invoice: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  agreement: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  report: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
-  policy: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  manual: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
-  other: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  proposal: "bg-primary/15 text-primary",
+  invoice: "bg-success/15 text-success",
+  agreement: "bg-info/15 text-info",
+  report: "bg-primary/15 text-primary",
+  policy: "bg-warning/15 text-warning",
+  manual: "bg-info/15 text-info",
+  other: "bg-secondary text-secondary-foreground",
 };

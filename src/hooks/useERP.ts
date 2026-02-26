@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
-import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
 import type {
   FinancialRecord,
   InventoryItem,
@@ -18,7 +18,7 @@ import {
   applyModuleReadScope,
   buildModuleCreatePayload,
   isModuleScopeReady,
-  requireTenantScope,
+  requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/lib/module-scope";
 import { softDeleteRecord } from "@/lib/soft-delete";
@@ -193,19 +193,21 @@ function mapFinancialRecord(row: FinancialRecordRow): FinancialRecord {
 
 function useErpScope() {
   const { user, role } = useAuth();
-  const { tenant, tenantLoading } = useTenant();
+  const { organization, organizationLoading } = useOrganization();
 
   const scope: ModuleScopeContext = {
-    tenantId: tenant?.id ?? null,
+    organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
     role,
   };
 
   return {
     scope,
-    tenantId: scope.tenantId,
+    organizationId: scope.organizationId,
+    // Compatibility alias to avoid touching downstream query keys yet.
+    tenantId: scope.organizationId,
     userId: scope.userId,
-    enabled: isModuleScopeReady(scope, tenantLoading),
+    enabled: isModuleScopeReady(scope, organizationLoading),
   };
 }
 
@@ -411,7 +413,7 @@ export function useCreateInventoryItem() {
 
   return useMutation({
     mutationFn: async (item: Omit<Partial<InventoryItem>, "id" | "created_at" | "updated_at" | "quantity_available">) => {
-      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const itemWithOptionalProduct = item as Omit<typeof item, never> & { product_id?: string | null };
       let productId = itemWithOptionalProduct.product_id ?? null;
 
@@ -439,7 +441,7 @@ export function useCreateInventoryItem() {
       const quantityReserved = item.quantity_reserved ?? 0;
 
       const payload: InventoryInsert = {
-        tenant_id: requiredTenantId,
+        organization_id: requiredOrganizationId,
         product_id: productId,
         quantity_on_hand: quantityOnHand,
         quantity_reserved: quantityReserved,
@@ -1173,3 +1175,4 @@ export function useDeleteFinancialRecord() {
     },
   });
 }
+

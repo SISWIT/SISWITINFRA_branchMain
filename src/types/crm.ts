@@ -190,28 +190,28 @@ export const STAGE_PROBABILITIES: Record<OpportunityStage, number> = {
 
 // Status colors
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
-  new: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  contacted: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  qualified: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  unqualified: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  converted: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  new: 'bg-info/15 text-info',
+  contacted: 'bg-warning/15 text-warning',
+  qualified: 'bg-success/15 text-success',
+  unqualified: 'bg-destructive/15 text-destructive',
+  converted: 'bg-primary/15 text-primary',
 };
 
 export const OPPORTUNITY_STAGE_COLORS: Record<OpportunityStage, string> = {
-  new: 'bg-blue-500',
-  qualified: 'bg-cyan-500',
-  proposal: 'bg-yellow-500',
-  negotiation: 'bg-orange-500',
-  closed_won: 'bg-green-500',
-  closed_lost: 'bg-red-500',
+  new: 'bg-info',
+  qualified: 'bg-info',
+  proposal: 'bg-warning',
+  negotiation: 'bg-primary',
+  closed_won: 'bg-success',
+  closed_lost: 'bg-destructive',
 };
 
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
-  draft: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-  pending_approval: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  accepted: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  expired: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  draft: 'bg-secondary text-secondary-foreground',
+  pending_approval: 'bg-warning/15 text-warning',
+  approved: 'bg-success/15 text-success',
+  rejected: 'bg-destructive/15 text-destructive',
+  sent: 'bg-info/15 text-info',
+  accepted: 'bg-primary/15 text-primary',
+  expired: 'bg-secondary text-secondary-foreground',
 };

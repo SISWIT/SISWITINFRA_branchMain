@@ -210,7 +210,7 @@ export default function AdminDashboard() {
     { name: "Rejected", value: stats.rejectedRequests },
   ];
 
-  const CHART_COLORS = ["#22c55e", "#f59e0b", "#ef4444"];
+  const CHART_COLORS = ["hsl(var(--chart-2))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -269,21 +269,21 @@ export default function AdminDashboard() {
                 value={stats.activeEmployees}
                 icon={CheckCircle2}
                 desc="Approved"
-                color="text-green-600"
+                color="text-success"
               />
               <StatCard
                 title="Pending"
                 value={stats.pendingRequests}
                 icon={Clock}
                 desc="Reviewing"
-                color="text-orange-500"
+                color="text-warning"
               />
               <StatCard
                 title="Rejected"
                 value={stats.rejectedRequests}
                 icon={XCircle}
                 desc="Denied"
-                color="text-red-500"
+                color="text-destructive"
               />
             </div>
 
@@ -299,7 +299,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : requests.length === 0 ? (
                     <div className="h-40 flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-md">
-                      <CheckCircle2 className="h-8 w-8 mb-2 text-green-500" />
+                      <CheckCircle2 className="h-8 w-8 mb-2 text-success" />
                       <p>All clear! No pending requests found in view.</p>
                     </div>
                   ) : (
@@ -320,7 +320,7 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell>{emp.email}</TableCell>
                             <TableCell>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning/15 text-warning">
                                 {emp.status}
                               </span>
                             </TableCell>

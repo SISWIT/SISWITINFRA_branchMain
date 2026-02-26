@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
-import { useTenant } from "@/hooks/useTenant";
+import { useOrganization } from "@/hooks/useOrganization";
 import type {
   Account,
   Activity,
@@ -25,7 +25,7 @@ import {
   applyModuleReadScope,
   buildModuleCreatePayload,
   isModuleScopeReady,
-  requireTenantScope,
+  requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/lib/module-scope";
 import { softDeleteRecord } from "@/lib/soft-delete";
@@ -335,19 +335,21 @@ function resolveActivityRelation(activity: Partial<Activity>): { relatedType: st
 
 function useCrmScope() {
   const { user, role } = useAuth();
-  const { tenant, tenantLoading } = useTenant();
+  const { organization, organizationLoading } = useOrganization();
 
   const scope: ModuleScopeContext = {
-    tenantId: tenant?.id ?? null,
+    organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
     role,
   };
 
   return {
     scope,
-    tenantId: scope.tenantId,
+    organizationId: scope.organizationId,
+    // Compatibility alias to avoid touching downstream query keys yet.
+    tenantId: scope.organizationId,
     userId: scope.userId,
-    enabled: isModuleScopeReady(scope, tenantLoading),
+    enabled: isModuleScopeReady(scope, organizationLoading),
   };
 }
 
@@ -1319,12 +1321,12 @@ export function useQuote(id: string) {
       const { data, error } = await scopedQuoteQuery.single();
       if (error) throw error;
 
-      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const { data: items, error: itemsError } = await supabase
         .from("quote_items")
         .select("*")
         .eq("quote_id", id)
-        .eq("tenant_id", requiredTenantId)
+        .eq("organization_id", requiredOrganizationId)
         .is("deleted_at", null)
         .order("sort_order");
       if (itemsError) throw itemsError;
@@ -1454,10 +1456,10 @@ export function useCreateQuoteItem() {
       const quoteId = item.quote_id || "";
       await ensureQuoteAccessible(quoteId, scope);
 
-      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const payload: QuoteItemInsert = {
         quote_id: quoteId,
-        tenant_id: requiredTenantId,
+        organization_id: requiredOrganizationId,
         product_id: item.product_id ?? null,
         product_name: item.product_name || "",
         description: item.description ?? null,
@@ -1499,12 +1501,12 @@ export function useDeleteQuoteItem() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { tenantId: requiredTenantId } = requireTenantScope(scope);
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const itemResult = await supabase
         .from("quote_items")
-        .select("id, quote_id, tenant_id")
+        .select("id, quote_id, organization_id")
         .eq("id", id)
-        .eq("tenant_id", requiredTenantId)
+        .eq("organization_id", requiredOrganizationId)
         .maybeSingle();
 
       if (itemResult.error || !itemResult.data) {

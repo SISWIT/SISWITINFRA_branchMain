@@ -83,14 +83,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  pending_review: "bg-yellow-100 text-yellow-800",
-  pending_approval: "bg-orange-100 text-orange-800",
-  approved: "bg-blue-100 text-blue-800",
-  sent: "bg-indigo-100 text-indigo-800",
-  signed: "bg-green-100 text-green-800",
-  expired: "bg-red-100 text-red-800",
-  cancelled: "bg-gray-200 text-gray-500",
+  draft: "bg-secondary text-secondary-foreground",
+  pending_review: "bg-warning/15 text-warning",
+  pending_approval: "bg-warning/15 text-warning",
+  approved: "bg-info/15 text-info",
+  sent: "bg-primary/15 text-primary",
+  signed: "bg-success/15 text-success",
+  expired: "bg-destructive/15 text-destructive",
+  cancelled: "bg-secondary text-secondary-foreground",
 };
 
 export default function ContractsPage() {
@@ -190,7 +190,7 @@ export default function ContractsPage() {
       key: "status",
       header: "Status",
       cell: (row: ContractRow) => (
-        <Badge className={STATUS_COLORS[row.status] || "bg-gray-100"}>
+        <Badge className={STATUS_COLORS[row.status] || "bg-secondary text-secondary-foreground"}>
           {STATUS_LABELS[row.status] || row.status}
         </Badge>
       ),

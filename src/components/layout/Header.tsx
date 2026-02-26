@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useTenant } from "@/hooks/useTenant";
 import { useOrganization } from "@/hooks/useOrganization";
+import { useTheme } from "@/hooks/useTheme";
 import { RoleBadge } from "@/components/ui/RoleBadge";
 import { AppRole } from "@/types/roles";
 import { organizationOwnerPath, platformPath, tenantDashboardPath, tenantPortalPath } from "@/lib/routes";
@@ -40,13 +41,13 @@ const navigation = [
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [isDark, setIsDark] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, signOut, loading } = useAuth();
   const { organization } = useOrganization();
   const { tenant } = useTenant();
+  const { theme, toggleTheme } = useTheme();
 
   const isPlatformAdmin = role === AppRole.PLATFORM_SUPER_ADMIN || role === AppRole.PLATFORM_ADMIN;
   const isOwner = role === AppRole.OWNER;
@@ -77,20 +78,10 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
   /* -------------------- HANDLERS -------------------- */
-
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle("dark", next);
-  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -159,7 +150,7 @@ export function Header() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                   isActive(item.href)
                     ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 }`}
               >
                 {item.name}
@@ -170,7 +161,7 @@ export function Header() {
           {/* RIGHT SECTION: Desktop Auth/Theme */}
           <div className="hidden lg:flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {isDark ? <Sun /> : <Moon />}
+              {theme === "dark" ? <Sun /> : <Moon />}
             </Button>
 
             {user && (
@@ -227,7 +218,7 @@ export function Header() {
           {/* MOBILE THEME TOGGLE: Pushed to far right by justify-between */}
           <div className="flex lg:hidden">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {isDark ? (
+              {theme === "dark" ? (
                 <Sun className="h-5 w-5" />
               ) : (
                 <Moon className="h-5 w-5" />
@@ -279,7 +270,7 @@ export function Header() {
                   className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive(item.href)
                       ? "bg-primary/10 text-primary"
-                      : "hover:bg-secondary text-foreground/80"
+                      : "hover:bg-primary/10 hover:text-primary text-foreground/80"
                   }`}
                 >
                   {item.name}
@@ -302,7 +293,7 @@ export function Header() {
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       location.pathname.startsWith("/organization")
                         ? "bg-primary/10 text-primary"
-                        : "hover:bg-secondary text-foreground/80"
+                        : "hover:bg-primary/10 hover:text-primary text-foreground/80"
                     }`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
@@ -316,7 +307,7 @@ export function Header() {
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       location.pathname.startsWith(`/${tenantSlug}/app`)
                         ? "bg-primary/10 text-primary"
-                        : "hover:bg-secondary text-foreground/80"
+                        : "hover:bg-primary/10 hover:text-primary text-foreground/80"
                     }`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
@@ -330,7 +321,7 @@ export function Header() {
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       location.pathname.startsWith("/platform")
                         ? "bg-primary/10 text-primary"
-                        : "hover:bg-secondary text-foreground/80"
+                        : "hover:bg-primary/10 hover:text-primary text-foreground/80"
                     }`}
                   >
                     <Shield className="h-4 w-4" />
@@ -351,7 +342,7 @@ export function Header() {
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     location.pathname.startsWith(`/${tenantSlug}/app/portal`)
                       ? "bg-primary/10 text-primary"
-                      : "hover:bg-secondary text-foreground/80"
+                      : "hover:bg-primary/10 hover:text-primary text-foreground/80"
                   }`}
                 >
                   <LayoutDashboard className="h-4 w-4" />
@@ -361,7 +352,7 @@ export function Header() {
             )}
           </div>
 
-          <div className="p-4 border-t border-border bg-secondary/20">
+          <div className="p-4 border-t border-border bg-primary/5">
             {user ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 px-1 mb-3">

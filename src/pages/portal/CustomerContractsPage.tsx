@@ -13,10 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground" },
-  pending_review: { label: "Pending Review", color: "bg-yellow-100 text-yellow-800" },
-  active: { label: "Active", color: "bg-green-100 text-green-800" },
-  expired: { label: "Expired", color: "bg-gray-100 text-gray-800" },
-  cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800" },
+  pending_review: { label: "Pending Review", color: "bg-warning/15 text-warning" },
+  active: { label: "Active", color: "bg-success/15 text-success" },
+  expired: { label: "Expired", color: "bg-secondary text-secondary-foreground" },
+  cancelled: { label: "Cancelled", color: "bg-destructive/15 text-destructive" },
 };
 
 interface CustomerContract {

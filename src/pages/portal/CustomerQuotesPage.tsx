@@ -14,12 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
-  pending_approval: { label: "Pending Approval", color: "bg-yellow-100 text-yellow-800", icon: Clock },
-  approved: { label: "Approved", color: "bg-blue-100 text-blue-800", icon: CheckCircle },
-  rejected: { label: "Rejected", color: "bg-red-100 text-red-800", icon: XCircle },
+  pending_approval: { label: "Pending Approval", color: "bg-warning/15 text-warning", icon: Clock },
+  approved: { label: "Approved", color: "bg-info/15 text-info", icon: CheckCircle },
+  rejected: { label: "Rejected", color: "bg-destructive/15 text-destructive", icon: XCircle },
   sent: { label: "Sent", color: "bg-primary/20 text-primary", icon: Send },
-  accepted: { label: "Accepted", color: "bg-green-100 text-green-800", icon: CheckCircle },
-  expired: { label: "Expired", color: "bg-gray-100 text-gray-800", icon: XCircle },
+  accepted: { label: "Accepted", color: "bg-success/15 text-success", icon: CheckCircle },
+  expired: { label: "Expired", color: "bg-secondary text-secondary-foreground", icon: XCircle },
 };
 
 interface CustomerQuote {

@@ -72,11 +72,11 @@ const TYPE_ICONS: Record<ActivityType, React.ElementType> = {
 };
 
 const TYPE_COLORS: Record<ActivityType, string> = {
-  call: "bg-blue-100 text-blue-700",
-  email: "bg-indigo-100 text-indigo-700",
-  meeting: "bg-purple-100 text-purple-700",
-  task: "bg-green-100 text-green-700",
-  note: "bg-yellow-100 text-yellow-700",
+  call: "bg-info/15 text-info",
+  email: "bg-primary/15 text-primary",
+  meeting: "bg-primary/15 text-primary",
+  task: "bg-success/15 text-success",
+  note: "bg-warning/15 text-warning",
 };
 
 export default function ActivitiesPage() {
@@ -159,7 +159,7 @@ export default function ActivitiesPage() {
           className="text-muted-foreground hover:text-primary transition-colors"
         >
           {row.is_completed ? (
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <CheckCircle2 className="h-5 w-5 text-success" />
           ) : (
             <Circle className="h-5 w-5" />
           )}
@@ -181,7 +181,7 @@ export default function ActivitiesPage() {
       cell: (row: ActivityRow) => {
         const Icon = TYPE_ICONS[row.type] || Circle;
         return (
-          <Badge className={`flex items-center gap-1 w-fit ${TYPE_COLORS[row.type] || "bg-gray-100"}`}>
+          <Badge className={`flex items-center gap-1 w-fit ${TYPE_COLORS[row.type] || "bg-secondary text-secondary-foreground"}`}>
             <Icon className="h-3 w-3" />
             <span className="capitalize">{row.type}</span>
           </Badge>
@@ -193,8 +193,8 @@ export default function ActivitiesPage() {
       header: "Priority",
       cell: (row: ActivityRow) => (
         <span className={`text-xs uppercase font-bold ${
-          row.priority === 'high' ? 'text-red-600' : 
-          row.priority === 'low' ? 'text-gray-500' : 'text-orange-500'
+          row.priority === 'high' ? 'text-destructive' : 
+          row.priority === 'low' ? 'text-muted-foreground' : 'text-warning'
         }`}>
           {row.priority || "MEDIUM"}
         </span>
@@ -209,7 +209,7 @@ export default function ActivitiesPage() {
           const date = new Date(row.due_date);
           const isOverdue = date < new Date() && !row.is_completed;
           return (
-            <div className={`flex items-center gap-2 ${isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+            <div className={`flex items-center gap-2 ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
               <Calendar className="h-3 w-3" />
               <span>{format(date, "MMM d, yyyy")}</span>
             </div>

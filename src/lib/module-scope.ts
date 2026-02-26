@@ -2,7 +2,9 @@ import type { AppRole } from "@/types/roles";
 import { canReadAllTenantRows, isOwnerScopedRole } from "@/types/roles";
 
 export interface ModuleScopeContext {
-  tenantId: string | null;
+  organizationId: string | null;
+  // Compatibility alias during tenant->organization migration.
+  tenantId?: string | null;
   userId: string | null;
   role: AppRole | null;
 }
@@ -23,18 +25,29 @@ interface CreatePayloadOptions {
   createdByColumn?: string | null;
 }
 
-export function isModuleScopeReady(scope: ModuleScopeContext, tenantLoading: boolean): boolean {
-  return Boolean(scope.tenantId && scope.userId && scope.role && !tenantLoading);
+function getScopeOrganizationId(scope: ModuleScopeContext): string | null {
+  return scope.organizationId ?? scope.tenantId ?? null;
 }
 
-export function requireTenantScope(scope: ModuleScopeContext): { tenantId: string; userId: string } {
+export function isModuleScopeReady(scope: ModuleScopeContext, organizationLoading: boolean): boolean {
+  return Boolean(getScopeOrganizationId(scope) && scope.userId && scope.role && !organizationLoading);
+}
+
+export function requireOrganizationScope(scope: ModuleScopeContext): { organizationId: string; userId: string } {
   if (!scope.userId) {
     throw new Error("User not authenticated");
   }
-  if (!scope.tenantId) {
-    throw new Error("Tenant context is required");
+  const organizationId = getScopeOrganizationId(scope);
+  if (!organizationId) {
+    throw new Error("Organization context is required");
   }
-  return { tenantId: scope.tenantId, userId: scope.userId };
+  return { organizationId, userId: scope.userId };
+}
+
+// Compatibility alias for existing tenant-scoped call sites.
+export function requireTenantScope(scope: ModuleScopeContext): { tenantId: string; userId: string } {
+  const { organizationId, userId } = requireOrganizationScope(scope);
+  return { tenantId: organizationId, userId };
 }
 
 export function applyModuleReadScope<TQuery extends ScopedQuery<TQuery>>(
@@ -42,11 +55,11 @@ export function applyModuleReadScope<TQuery extends ScopedQuery<TQuery>>(
   scope: ModuleScopeContext,
   options: ReadScopeOptions = {},
 ): TQuery {
-  const { tenantId, userId } = requireTenantScope(scope);
+  const { organizationId, userId } = requireOrganizationScope(scope);
   const ownerColumns = options.ownerColumns ?? ["owner_id"];
   const includeSoftDeleted = options.includeSoftDeleted ?? false;
 
-  let scoped = query.eq("tenant_id", tenantId);
+  let scoped = query.eq("organization_id", organizationId);
   if (!includeSoftDeleted) {
     scoped = scoped.is("deleted_at", null);
   }
@@ -66,8 +79,8 @@ export function applyModuleMutationScope<TQuery extends ScopedQuery<TQuery>>(
   scope: ModuleScopeContext,
   ownerColumns: string[] = ["owner_id"],
 ): TQuery {
-  const { tenantId, userId } = requireTenantScope(scope);
-  let scoped = query.eq("tenant_id", tenantId);
+  const { organizationId, userId } = requireOrganizationScope(scope);
+  let scoped = query.eq("organization_id", organizationId);
 
   if (!canReadAllTenantRows(scope.role) && isOwnerScopedRole(scope.role) && ownerColumns.length > 0) {
     const ownerFilter = ownerColumns.map((column) => `${column}.eq.${userId}`).join(",");
@@ -84,13 +97,15 @@ export function buildModuleCreatePayload<TPayload extends Record<string, unknown
   scope: ModuleScopeContext,
   options: CreatePayloadOptions = {},
 ): TPayload {
-  const { tenantId, userId } = requireTenantScope(scope);
+  const { organizationId, userId } = requireOrganizationScope(scope);
   const ownerColumn = options.ownerColumn === undefined ? "owner_id" : options.ownerColumn;
   const createdByColumn = options.createdByColumn;
 
   const nextPayload = {
     ...payload,
-    tenant_id: tenantId,
+    organization_id: organizationId,
+    // Keep legacy field synchronized while module code is still transitioning.
+    tenant_id: organizationId,
   } as TPayload;
 
   if (ownerColumn) {

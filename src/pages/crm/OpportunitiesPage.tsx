@@ -66,12 +66,12 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_COLORS: Record<string, string> = {
-  new: "bg-gray-100 text-gray-800",
-  qualified: "bg-blue-100 text-blue-800",
-  proposal: "bg-indigo-100 text-indigo-800",
-  negotiation: "bg-purple-100 text-purple-800",
-  closed_won: "bg-green-100 text-green-800",
-  closed_lost: "bg-red-100 text-red-800",
+  new: "bg-secondary text-secondary-foreground",
+  qualified: "bg-info/15 text-info",
+  proposal: "bg-warning/15 text-warning",
+  negotiation: "bg-primary/15 text-primary",
+  closed_won: "bg-success/15 text-success",
+  closed_lost: "bg-destructive/15 text-destructive",
 };
 
 export default function OpportunitiesPage() {
@@ -164,7 +164,7 @@ export default function OpportunitiesPage() {
       key: "stage",
       header: "Stage",
       cell: (row: OpportunityRow) => (
-        <Badge className={STAGE_COLORS[row.stage] || "bg-gray-100"}>
+        <Badge className={STAGE_COLORS[row.stage] || "bg-secondary text-secondary-foreground"}>
           {STAGE_LABELS[row.stage] || row.stage}
         </Badge>
       ),

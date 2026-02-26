@@ -10,17 +10,24 @@ import { StatsCard } from "@/components/crm/StatsCard";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
-const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--destructive))",
+];
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
-  pending_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  pending_approval: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  approved: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  sent: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  signed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  expired: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+  pending_review: "bg-warning/15 text-warning",
+  pending_approval: "bg-warning/15 text-warning",
+  approved: "bg-info/15 text-info",
+  sent: "bg-primary/15 text-primary",
+  signed: "bg-success/15 text-success",
+  expired: "bg-destructive/15 text-destructive",
+  cancelled: "bg-secondary text-secondary-foreground",
 };
 
 interface RecentContract {
@@ -165,7 +172,7 @@ export default function CLMDashboard() {
                     <XAxis dataKey="name" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                    <Bar dataKey="value" fill="hsl(250, 85%, 60%)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="value" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

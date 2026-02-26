@@ -37,17 +37,24 @@ interface SimpleFinancialRecord {
   amount: number;
 }
 
-const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--destructive))",
+];
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  planned: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  ordered: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", // Added 'ordered'
-  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  received: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200", // Added 'received'
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  pending: "bg-warning/15 text-warning",
+  planned: "bg-info/15 text-info",
+  in_progress: "bg-info/15 text-info",
+  ordered: "bg-primary/15 text-primary",
+  completed: "bg-success/15 text-success",
+  received: "bg-success/15 text-success",
+  cancelled: "bg-destructive/15 text-destructive",
 };
 
 export default function ERPDashboard() {
@@ -230,7 +237,7 @@ export default function ERPDashboard() {
                         
                         <p className="text-sm font-semibold">{formatCurrency(order.total_amount || 0)}</p>
                       </div>
-                      <Badge className={STATUS_COLORS[order.status] || "bg-gray-100 text-gray-800"}>
+                      <Badge className={STATUS_COLORS[order.status] || "bg-secondary text-secondary-foreground"}>
                         {order.status}
                       </Badge>
                     </div>

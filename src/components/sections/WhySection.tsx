@@ -80,7 +80,7 @@ export function WhySection() {
   }, []);
 
   return (
-    <section className="py-24 bg-secondary/30 relative overflow-hidden">
+    <section className="py-24 bg-secondary/0 relative overflow-hidden">
       {/* Animated background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0" style={{

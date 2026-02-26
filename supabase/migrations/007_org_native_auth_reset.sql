@@ -11,6 +11,7 @@ GRANT ALL ON SCHEMA public TO postgres, service_role;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+SET search_path = public, extensions;
 
 -- =============================================================================
 -- ENUMS
@@ -69,7 +70,7 @@ RETURNS text
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT encode(digest(p_token, 'sha256'), 'hex');
+  SELECT encode(extensions.digest(p_token, 'sha256'), 'hex');
 $$;
 
 CREATE OR REPLACE FUNCTION public.sync_scope_ids()

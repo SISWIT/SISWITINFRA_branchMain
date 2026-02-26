@@ -4,6 +4,8 @@ export interface AuditLogInput {
   action: string;
   entityType: string;
   entityId: string;
+  organizationId?: string | null;
+  // Compatibility alias while callers are migrating.
   tenantId?: string | null;
   userId?: string | null;
   oldValues?: Record<string, unknown> | null;
@@ -17,6 +19,7 @@ export interface AuditLogInput {
  */
 export async function writeAuditLog(input: AuditLogInput): Promise<boolean> {
   try {
+    const organizationId = input.organizationId ?? input.tenantId ?? null;
     const unsafeSupabase = supabase as unknown as {
       from: (table: string) => {
         insert: (payload: unknown) => Promise<{ error: { message?: string } | null }>;
@@ -27,7 +30,8 @@ export async function writeAuditLog(input: AuditLogInput): Promise<boolean> {
       action: input.action,
       entity_type: input.entityType,
       entity_id: input.entityId,
-      tenant_id: input.tenantId ?? null,
+      organization_id: organizationId,
+      tenant_id: organizationId,
       user_id: input.userId ?? null,
       old_values: input.oldValues ?? null,
       new_values: input.newValues ?? null,
