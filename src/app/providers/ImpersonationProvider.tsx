@@ -5,9 +5,9 @@ import {
   useMemo,
   useState,
 } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { isPlatformRole } from "@/types/roles";
+import { supabase } from "@/core/api/client";
+import { useAuth } from "@/core/auth/useAuth";
+import { isPlatformRole } from "@/core/types/roles";
 import {
   defaultImpersonationState,
   IMPERSONATION_STORAGE_KEY,
