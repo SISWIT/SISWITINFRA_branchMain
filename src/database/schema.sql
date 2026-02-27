@@ -1240,6 +1240,91 @@ CREATE POLICY "tenant_data_access" ON financial_records
         tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
     );
 
+CREATE POLICY "tenant_data_access" ON product_categories
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON price_books
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON inventory_items
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON inventory_transactions
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON purchase_orders
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON production_orders
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON document_templates
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON auto_documents
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON contract_templates
+    FOR ALL USING (
+        tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true)
+    );
+
+CREATE POLICY "tenant_data_access" ON price_book_entries
+    FOR ALL USING (
+        price_book_id IN (SELECT id FROM price_books WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON quote_line_items
+    FOR ALL USING (
+        quote_id IN (SELECT id FROM quotes WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON contract_versions
+    FOR ALL USING (
+        contract_id IN (SELECT id FROM contracts WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON contract_esignatures
+    FOR ALL USING (
+        contract_id IN (SELECT id FROM contracts WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON purchase_order_items
+    FOR ALL USING (
+        purchase_order_id IN (SELECT id FROM purchase_orders WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON production_order_items
+    FOR ALL USING (
+        production_order_id IN (SELECT id FROM production_orders WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON document_versions
+    FOR ALL USING (
+        document_id IN (SELECT id FROM auto_documents WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
+CREATE POLICY "tenant_data_access" ON document_signatures
+    FOR ALL USING (
+        document_id IN (SELECT id FROM auto_documents WHERE tenant_id IN (SELECT tenant_id FROM tenant_users WHERE user_id = auth.uid() AND is_active = true))
+    );
+
 -- Client Portal Access (read-only for their own data)
 -- ==================
 
