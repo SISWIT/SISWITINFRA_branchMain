@@ -1,312 +1,386 @@
-# 🔍 DEBUG REPORT — SISWIT Unified Cloud Platform
+# 🔍 SISWIT Platform — Comprehensive Debug Report
 
-**Date:** 2026-03-01  
-**Tester:** Automated Agent (Antigravity)  
-**Environment:** Local development (`localhost:8080`)  
-**Stack:** React 18 + Vite 7 + TypeScript + Supabase + TailwindCSS  
-
----
-
-## 📋 Executive Summary
-
-The SISWIT platform is a multi-tenant SaaS application providing CLM, CPQ, CRM, ERP, and Auto Documentation modules. A comprehensive code review combined with live browser testing was performed covering authentication flows, multi-tenancy isolation, public pages, routing, and security posture.
-
-> [!IMPORTANT]
-> **Overall Grade: B+** — Core flows work correctly but several security hardening items and UX improvements should be addressed before production deployment.
+> **Date:** 2026-03-01  
+> **Platform:** SISWIT Unified Platform (Vite + React + TypeScript + Supabase)  
+> **Environment:** Development (localhost:8080)  
+> **Scope:** Full-stack testing of authentication, authorization, multi-tenant data isolation, UI/UX, modules, and security
 
 ---
 
-## ✅ What Works Correctly
+## Table of Contents
 
-### Public Pages (All Pass ✅)
-| Page | Route | Status |
-|------|-------|--------|
-| Homepage | `/` | ✅ Loads correctly, no errors |
-| About | `/about` | ✅ Content renders fully |
-| Contact | `/contact` | ✅ Form and info present |
-| Pricing | `/pricing` | ✅ Starter/Professional/Enterprise plans shown |
-| Products | `/products` | ✅ CLM, CPQ, CRM, ERP, Docs featured |
-| Solutions | `/solutions` | ✅ Industry-specific solutions listed |
+1. [Executive Summary](#executive-summary)
+2. [Critical Issues](#critical-issues)
+3. [Authentication & Authorization Issues](#authentication--authorization-issues)
+4. [Security Vulnerabilities](#security-vulnerabilities)
+5. [Sign-Up Flow Issues](#sign-up-flow-issues)
+6. [UI/UX Issues](#uiux-issues)
+7. [Multi-Tenant Data Isolation Review](#multi-tenant-data-isolation-review)
+8. [Module-Level Findings](#module-level-findings)
+9. [Console Errors & Warnings](#console-errors--warnings)
+10. [Recommendations](#recommendations)
 
-### Authentication Flows (All Pass ✅)
-| Flow | Status | Notes |
-|------|--------|-------|
-| Sign In | ✅ | Invalid credentials show "Invalid login credentials" toast |
-| Empty Field Validation | ✅ | HTML5 `required` prevents submission |
-| Password Visibility Toggle | ✅ | Eye icon toggles password field |
-| Remember Me | ✅ | Checkbox persists to `localStorage` |
-| Organization Sign Up | ✅ | Creates org + membership + subscription |
-| Client Sign Up | ✅ | Organization search works, creates pending_approval membership |
-| Forgot Password | ✅ | Sends reset link, shows success message |
-| Reset Password | ✅ | Protected page, requires email link session |
-| Accept Employee Invitation | ✅ | Token-based, validates expiry |
-| Accept Client Invitation | ✅ | Token-based, validates expiry |
-| Password Mismatch Validation | ✅ | Toast error shown on password mismatch |
-| Minimum Password Length | ✅ | `minLength={12}` enforced on all password fields |
+---
 
-### Routing & Navigation (All Pass ✅)
-| Link | From | To | Status |
-|------|------|----|--------|
-| "Sign up your organization" | Sign In | `/auth/sign-up?tab=organization` | ✅ |
-| "Client sign up" | Sign In | `/auth/sign-up?tab=client` | ✅ |
-| "Sign in" | Sign Up | `/auth/sign-in` | ✅ |
-| "Forgot password?" | Sign In | `/auth/forgot-password` | ✅ |
-| "Back to website" | Auth pages | `/` | ✅ |
-| Legacy redirects | `/admin/*`, `/dashboard/*`, `/portal/*` | Proper targets | ✅ |
+## Executive Summary
 
-### Multi-Tenancy Isolation (Pass ✅)
+The SISWIT platform is a multi-tenant SaaS application offering CLM, CPQ, CRM, ERP, and Auto Documentation modules. Overall, the platform has a solid architectural foundation with proper tenant isolation through `organization_id` scoping, role-based access control, and protected routes. However, several **critical** and **medium** severity issues were found that need attention before production deployment.
+
+| Severity | Count |
+|----------|-------|
+| 🔴 Critical | 3 |
+| 🟠 High | 4 |
+| 🟡 Medium | 5 |
+| 🔵 Low | 4 |
+
+---
+
+## Critical Issues
+
+### 🔴 C-01: Supabase Auth Tokens Stored in `localStorage` (XSS Risk)
+
+**File:** `src/core/api/client.ts` (Line 13)
+
+```typescript
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,  // ← XSS vulnerability
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
+```
+
+**Impact:** If any XSS vulnerability exists anywhere in the application, an attacker could steal auth tokens from `localStorage` and impersonate users. This is the single most critical security issue.
+
+**Recommendation:** Use `sessionStorage` or implement HTTP-only cookies for token storage. At minimum, switch to `sessionStorage` which limits exposure to the current browser tab.
+
+---
+
+### 🔴 C-02: No Email Verification Enforcement on Sign-In
+
+**Files:** `src/app/providers/AuthProvider.tsx` (Lines 924-968), `src/workspaces/auth/pages/SignUp.tsx`
+
+The sign-up flow correctly sets `account_state: "pending_verification"` and `is_email_verified: false` in the membership record. The post-sign-up UI message says:
+
+> "Your account was created and a verification email has been sent. Verify your email, then sign in."
+
+However, the `signIn` function **does not check email verification status**. A user can sign up, skip email verification entirely, and sign in immediately. The `signIn` function only:
+1. Calls `supabase.auth.signInWithPassword`
+2. Calls `getUserRole`
+3. Returns the role
+
+It never checks `is_email_verified` or `account_state === "pending_verification"`.
+
+**Impact:** Users can access the platform without ever confirming their email address, undermining email ownership verification.
+
+**Recommendation:** Add an email verification check in the `signIn` function or in the `resolveRoleFromMembershipState` function. If `account_state` is `"pending_verification"`, return a specific error message and redirect to a "Please verify your email" page.
+
+---
+
+### 🔴 C-03: Silent Login Failure — No Error Feedback to User
+
+**File:** `src/workspaces/auth/pages/Auth.tsx` (Lines 75-82)
+
+During browser testing, entering incorrect credentials (`test@test.com` / `wrongpassword123`) produced **no visible error message** to the user. The button briefly showed "Signing in..." then reverted to "Sign in" with no toast notification.
+
+The code does call `toast()` on error:
+```typescript
+if (error) {
+  toast({
+    variant: "destructive",
+    title: "Sign in failed",
+    description: error,
+  });
+  return;
+}
+```
+
+However, the Supabase `signInWithPassword` returned a 400 error that was visible in the console but the toast notification did not appear on screen.
+
+**Possible Causes:**
+- The `Toaster` component may not be rendering properly at that point in the component tree
+- The toast event might be fired before the Toaster is mounted
+- The `useToast` hook from `@/core/hooks/use-toast` may not be wired to the correct Toaster instance (there are two Toasters: `<Toaster />` and `<Sonner />`)
+
+**Impact:** Users have no way to know why login failed, severely harming user experience.
+
+**Recommendation:** Debug the toast rendering chain. Verify that the `useToast` hook is connected to the same `Toaster` component rendered in `App.tsx`. Consider adding a fallback inline error message state.
+
+---
+
+## Authentication & Authorization Issues
+
+### 🟠 A-01: `remember_me` Flag Stored in `localStorage`
+
+**File:** `src/app/providers/AuthProvider.tsx` (Line 929)
+
+```typescript
+localStorage.setItem("siswit_remember_me", rememberMe ? "1" : "0");
+```
+
+This flag is stored in `localStorage` but never read anywhere in the codebase. If the intent is to control session persistence, this should be implemented properly — e.g., using `sessionStorage` for session-only auth when "Remember Me" is unchecked.
+
+**Recommendation:** Either implement the actual remember-me behavior or remove the dead code.
+
+---
+
+### 🟠 A-02: Role Caching in `sessionStorage` Without Integrity Check
+
+**File:** `src/app/providers/AuthProvider.tsx` (Lines 169-197)
+
+Roles are cached in `sessionStorage` with a 1-hour TTL:
+```typescript
+sessionStorage.setItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`, JSON.stringify(payload));
+```
+
+While `sessionStorage` is safer than `localStorage`, there is no integrity check (e.g., HMAC) on the cached role. A technically savvy user could modify their cached role via browser DevTools to escalate privileges.
+
+**Mitigated by:** Server-side RLS policies on Supabase (if properly configured), which would prevent actual data access regardless of client-side role manipulation.
+
+**Recommendation:** This is acceptable if RLS policies are comprehensive. Add a comment documenting that the cached role is for UI rendering only and does not grant server-side access.
+
+---
+
+### 🟡 A-03: No Rate Limiting on Login Attempts (Client-Side)
+
+The sign-in form has no client-side rate limiting for failed login attempts. While Supabase may have server-side rate limiting, there is no visual feedback about attempt limits.
+
+**Recommendation:** Add a client-side counter that disables the login button after 5 failed attempts with a cooldown, similar to the forgot-password cooldown.
+
+---
+
+### 🟡 A-04: Password Policy Not Enforced on Server Side
+
+The sign-up form has a client-side password strength meter requiring 12+ characters with uppercase, lowercase, numbers, and special characters. However, the `minLength` HTML attribute is set to 12 — there is no server-side enforcement beyond Supabase's default minimum (6 characters).
+
+**Recommendation:** Configure Supabase password policy to require minimum 12 characters, or add server-side validation in a Supabase Edge Function.
+
+---
+
+## Security Vulnerabilities
+
+### 🟠 S-01: Supabase Publishable Key Exposed in `.env`
+
+**File:** `.env`
+
+```
+VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_V9p_-fjCAZtwQ-XwAmkp-w_ABD_2gHd"
+```
+
+While publishable keys are designed to be public, this file should be in `.gitignore` (which it is). However, the key is also embedded in the built JavaScript bundle, accessible to anyone. Ensure that:
+- RLS policies are comprehensive on all tables
+- No service role key is ever exposed client-side
+
+---
+
+### 🟠 S-02: `AuthApiError: Invalid Refresh Token` on Public Pages
+
+**Location:** Console logs on every public page load
+
+Every time an unauthenticated user visits any page, the console shows:
+```
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+```
+
+While not a security vulnerability per se, this indicates the Supabase client attempts to refresh a non-existent session on every page load.
+
+**Recommendation:** Wrap the session refresh in a check for existing stored tokens before attempting. This also creates unnecessary network requests.
+
+---
+
+### 🔵 S-03: Organization Search Exposes Organization Data to Unauthenticated Users
+
+**File:** `src/workspaces/auth/pages/SignUp.tsx` (Lines 113-148)
+
+The client sign-up page calls `search_signup_organizations` RPC with a debounced query, exposing organization names, slugs, and codes to anyone on the sign-up page. This is by design for client self-registration, but consider:
+- Whether org codes should be hidden from search results
+- Whether this could be used for org enumeration
+
+---
+
+## Sign-Up Flow Issues
+
+### 🟡 M-01: Organization Code Placeholder Confusion
+
+**File:** `src/workspaces/auth/pages/SignUp.tsx` (Line 292)
+
+```html
+<Input placeholder={`Organization Code (suggested: ${suggestedCode})`} ... />
+```
+
+The suggested code (e.g., "ORG3510") appears in the placeholder and looks like a pre-filled value, confusing users into thinking the field is already populated.
+
+**Recommendation:** Either auto-fill the field with the suggested code or change the placeholder to "Enter a unique code (optional)".
+
+---
+
+### 🟡 M-02: No Success Page After Sign-Up (Just a Message in the Same Page)
+
+After org sign-up succeeds, the page shows a small green box saying "Organization created" with links to sign in or go home. This is functional but:
+- Doesn't clearly communicate the email verification step
+- No verification email status indicator
+- No "resend email" option
+- User might miss the message and try to log in immediately (which would work — see C-02)
+
+**Recommendation:** Redirect to a dedicated "Check Your Email" page similar to what major SaaS platforms do.
+
+---
+
+### 🔵 M-03: Organization Code Not Validated for Uniqueness Pre-Submit
+
+The organization code field accepts any input up to 20 characters. If a duplicate code is submitted, the backend retries with a modified code (up to 10 attempts). However, the user is never informed that their chosen code was changed.
+
+**Recommendation:** Add a real-time availability check for org codes, or inform users if their code was modified.
+
+---
+
+## UI/UX Issues
+
+### 🔵 U-01: Missing "Contact" Link in Header Navigation
+
+The main website header contains: Home, Products, Solutions, Pricing, About — but **no Contact link**. The Contact page is only accessible via "Request Demo" or "Contact Sales" buttons in page bodies and the footer.
+
+**Recommendation:** Add "Contact" to the header navigation for consistency.
+
+---
+
+### 🟡 U-02: Sign-Up Page Not Scrollable on Small Viewports
+
+The organization sign-up form has 6 fields plus a password strength meter. On smaller screens (< 768px height), the "Create Organization" button may be cut off. The form needs to be inside a properly scrollable container.
+
+**Recommendation:** Ensure the form container uses `overflow-y-auto` for smaller viewports.
+
+---
+
+### 🔵 U-03: Footer Branding Inconsistency
+
+The footer on the Contact page shows "SIT**WIT**" instead of "SIS**WIT**" (missing the "S").
+
+**Recommendation:** Fix the footer brand name to consistently show "SISWIT".
+
+---
+
+### 🟡 U-04: Reset Password Page Fields Not Actually Disabled
+
+When visiting `/auth/reset-password` directly (without a valid token), the page shows a warning message "Open this page from your password reset email link to set a new password." However, the password fields still appear enabled and users could attempt to type in them. The button should be explicitly disabled.
+
+**Recommendation:** Disable the input fields and button when no valid token is detected.
+
+---
+
+## Multi-Tenant Data Isolation Review
+
+### ✅ Architecture Assessment: **SOLID**
+
+The platform implements a robust multi-tenant isolation pattern:
+
 | Layer | Mechanism | Status |
 |-------|-----------|--------|
-| Database RLS | All 30+ tables have RLS enabled | ✅ |
-| Organization Scoping | `app_user_has_organization_access()` function | ✅ |
-| Scope ID Sync | `sync_scope_ids()` trigger ensures `organization_id == tenant_id` | ✅ |
-| Module Queries | All hooks (CRM, CPQ, CLM, ERP, Docs) filter by `organization_id` | ✅ |
-| Route Guards | `TenantSlugGuard` validates membership before access | ✅ |
-| Protected Routes | Role-based guards for Platform, Tenant, Client, Owner | ✅ |
-| Child Table RLS | `quote_line_items`, `contract_versions`, etc. use EXISTS joins | ✅ |
+| **Route Layer** | `TenantSlugGuard` checks membership before rendering tenant routes | ✅ Good |
+| **Auth Layer** | `AuthProvider` resolves role from `organization_memberships` table scoped by `user_id` | ✅ Good |
+| **Data Layer** | `applyModuleReadScope()` filters all queries by `organization_id` | ✅ Good |
+| **Mutation Layer** | `applyModuleMutationScope()` ensures writes are scoped to org + owner | ✅ Good |
+| **Create Layer** | `buildModuleCreatePayload()` injects `organization_id` and `owner_id` | ✅ Good |
+| **Soft Delete** | `softDeleteRecord()` used instead of hard deletes | ✅ Good |
+| **Audit** | `writeAuditLog()` called on CRM CRUD operations | ✅ Good |
+
+The critical `module-scope.ts` utility (`src/core/utils/module-scope.ts`) properly:
+1. Requires `organizationId` before any query
+2. Filters all reads by `organization_id`
+3. Excludes soft-deleted records by default
+4. Applies owner-scoping for restricted roles
+5. Injects `organization_id` into all create payloads
+
+### ⚠️ Dependency on Server-Side RLS
+
+The client-side isolation is well-implemented, but **assumes Supabase RLS policies are properly configured on all tables**. If RLS is missing or misconfigured on any table, the Supabase publishable key (which is public) could be used to query data across organizations.
+
+**Recommendation:** Audit all Supabase tables to ensure RLS policies enforce `organization_id` filtering at the database level, not just the client level.
 
 ---
 
-## 🐛 Issues Found
+## Module-Level Findings
 
-### 🔴 Critical Issues
+### CRM Module
 
-#### 1. Exposed Credentials in `.env` File
-**File:** `.env`  
-**Issue:** Supabase URL, Project ID, and publishable key are committed to the repository. A password hint is also present in a comment (`# //pass: infra@1587@00`).  
-**Risk:** Anyone with repository access can use these credentials.  
-**Fix:** 
-- Add `.env` to `.gitignore` (it is already listed, but the file exists in the repo)
-- Remove password hints from source code
-- Rotate the exposed Supabase keys
-- Use environment-specific `.env.local` files
+- **Data Isolation:** Uses `useCrmScope()` → `applyModuleReadScope()` pattern consistently across leads, accounts, contacts, opportunities, activities ✅
+- **Audit Logging:** CRUD operations write audit logs ✅
+- **Soft Delete:** Uses `softDeleteRecord` ✅
+- **Issue:** Query keys use `tenantId` alias instead of `organizationId` — legacy naming that should be migrated for clarity
 
-#### 2. Role Cache Stored in `localStorage` (XSS Attack Surface)
-**File:** `AuthProvider.tsx` (line 172)  
-**Issue:** User roles are cached in `localStorage` with key `org_role_{userId}`. If an XSS vulnerability is exploited, attackers can read/modify cached roles.  
-**Risk:** Privilege escalation via cache manipulation.  
-**Fix:** Move role caching to `sessionStorage` (dies with tab) or use HttpOnly cookies via server-side session management.
+### CLM, CPQ, ERP, Documents
 
-#### 3. Organization Signup Allows Unverified User to Create Full Organization
-**File:** `AuthProvider.tsx` (lines 383–451)  
-**Issue:** When `signUpOrganization` is called, the user is created in Supabase Auth, then a profile, organization, subscription, and owner membership are all created **before email verification**. The membership is set to `account_state: 'pending_verification'` but the organization and all its data structures exist immediately.  
-**Risk:** Spam organizations can be created with unverified email addresses, consuming database resources.  
-**Fix:**
-- Defer organization creation to after email verification (using a Supabase edge function triggered by `auth.user_confirmed`)
-- Or add a cleanup job that deletes unverified organizations after 24 hours
-
-#### 4. "Already Registered" Fallback Signs In Silently
-**File:** `AuthProvider.tsx` (lines 402–430)  
-**Issue:** During organization signup, if user already exists, the code attempts `signInWithPassword` with the provided credentials. If successful and the user has no organization, it creates a new one. This means anyone who knows an existing user's password can create an organization under that account.  
-**Risk:** Unintended organization creation under existing accounts.  
-**Fix:** Remove the automatic sign-in fallback. Instead, show a clear error: "This email is already registered. Please sign in first, then create your organization."
+- These modules follow the same scope pattern via `module-scope.ts`
+- Module access is controlled by `organization_subscriptions` table (`module_crm`, `module_clm`, etc.)
+- Default "starter" plan enables: CRM ✅, CPQ ✅, Documents ✅, CLM ❌, ERP ❌
 
 ---
 
-### 🟠 Medium Issues
+## Console Errors & Warnings
 
-#### 5. Forgot Password Sends Success Even for Non-Existent Emails
-**File:** `ForgotPassword.tsx` (line 34)  
-**Issue:** Supabase's `resetPasswordForEmail` returns success regardless of whether the email exists (standard security practice), but the UI shows "Reset link sent" unconditionally. Users may be confused.  
-**Recommendation:** This is actually correct behavior (prevents email enumeration). However, add a note: "If this email is registered, you will receive a reset link."
-
-#### 6. No Rate Limiting on Client-Side Auth Actions
-**Files:** `ForgotPassword.tsx`, `SignUp.tsx`, `Auth.tsx`  
-**Issue:** There is no client-side throttling or rate limiting on sign-in, sign-up, or password reset submissions. A user could spam the "Send Reset Link" button repeatedly.  
-**Fix:** Add a cooldown timer (e.g., 60 seconds) after successful password reset request. Add debounce/throttle on sign-up and sign-in actions.
-
-#### 7. `ForgotPassword` Page Lacks Visual Consistency
-**File:** `ForgotPassword.tsx`  
-**Issue:** The Forgot Password page uses minimal styling (`min-h-screen flex items-center justify-center p-6 bg-background`) without the split-panel design used by Sign In and Sign Up pages. This creates a visual inconsistency.  
-**Fix:** Apply the same hero split-panel layout used in `Auth.tsx` and `SignUp.tsx`.
-
-#### 8. `ResetPassword` Page Also Lacks Visual Consistency
-**File:** `ResetPassword.tsx`  
-**Issue:** Same issue as #7 — minimal styling, no hero panel. Inconsistent with the rest of the auth flow.  
-**Fix:** Apply the same design system.
-
-#### 9. Missing `autocomplete` Attributes on Auth Input Fields
-**Files:** `Auth.tsx`, `SignUp.tsx`  
-**Issue:** Password and email input fields lack `autocomplete` attributes, triggering DOM warnings. Password managers may not correctly identify these fields.  
-**Fix:** Add `autoComplete="email"`, `autoComplete="current-password"`, `autoComplete="new-password"` to the appropriate fields.
-
-#### 10. Client Self-Signup Creates Membership Before Email Verification
-**File:** `AuthProvider.tsx` (lines 469–526)  
-**Issue:** Client self-signup creates the membership with `account_state: 'pending_approval'` immediately, without waiting for email verification. The user could sign up with a fake email and still create a pending membership record.  
-**Fix:** Set initial state to `pending_verification` until email is confirmed, then move to `pending_approval`.
-
-#### 11. No Email Sending Confirmation or Feature Toggle for Forgot Password
-**File:** `ForgotPassword.tsx`  
-**Issue:** Unlike invitations which have `VITE_DISABLE_INVITE_EMAILS` toggle, there's no way to verify if Supabase email sending is properly configured for password resets in development.  
-**Recommendation:** Add a dev-mode indicator showing whether email delivery is likely functional.
+| Type | Message | Location | Severity |
+|------|---------|----------|----------|
+| Error | `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` | Every public page | 🟡 Medium |
+| Warning | React Router Future Flag: `v7_startTransition` | All pages | 🔵 Low |
+| Warning | React Router Future Flag: `v7_relativeSplatPath` | All pages | 🔵 Low |
+| Error | `400 Bad Request` on `/auth/v1/token?grant_type=password` | Sign-in (wrong credentials) | 🔴 Critical (no UI feedback) |
 
 ---
 
-### 🟡 Low / UX Issues
+## Recommendations
 
-#### 12. No Inline Password Strength Indicator
-**File:** `SignUp.tsx`  
-**Issue:** While `minLength={12}` is enforced, there's no visual feedback showing password strength or requirements. Users don't know the minimum length until they try to submit.  
-**Fix:** Add a password strength meter or requirement list (12+ chars, etc.) below the password field.
+### Immediate (Pre-Launch)
 
-#### 13. Organization Code Not Validated for Uniqueness Before Submission
-**File:** `SignUp.tsx`  
-**Issue:** Users can enter a custom organization code, but uniqueness is only checked server-side (via PostgreSQL unique constraint + retry loop). The UX doesn't preview whether the code is available.  
-**Fix:** Add real-time availability check as the user types, similar to the organization search in client signup.
+1. **Fix C-01:** Switch Supabase auth storage from `localStorage` to `sessionStorage` in `client.ts`
+2. **Fix C-02:** Add email verification check in `signIn` function — block login if `account_state` is `"pending_verification"`
+3. **Fix C-03:** Debug and fix the toast notification chain so login errors are visible to users
+4. **Audit RLS:** Verify all Supabase tables have proper RLS policies enforcing `organization_id` isolation
 
-#### 14. Empty `settings` Route Redirects to Dashboard
-**File:** `App.tsx` (line 326)  
-**Issue:** `/:tenantSlug/app/settings` renders `<Dashboard />` — this appears to be a placeholder with no actual settings functionality.  
-**Fix:** Create a proper Settings page or remove the route to avoid confusion.
+### Short-Term
 
-#### 15. Portal Settings Route is Also a Placeholder
-**File:** `App.tsx` (line 277)  
-**Issue:** `/:tenantSlug/app/portal/settings` renders `<PortalDashboard />` — no actual settings page for portal users.  
-**Fix:** Create a portal settings page or remove the route.
+5. Add rate limiting to login form (5 failed attempts → 60s cooldown)
+6. Create a dedicated "Verify Your Email" page post-signup
+7. Add "Contact" to header navigation
+8. Fix footer brand name from "SITWIT" to "SISWIT"
+9. Remove or implement the `remember_me` localStorage flag
+10. Configure server-side password minimum to match client-side (12 chars)
 
-#### 16. `enabledModules` Defaults Include All Modules When No Subscription Exists
-**Files:** `TenantProvider.tsx` (line 188), `OrganizationProvider.tsx` (line 236)  
-**Issue:** When `subscription` is null, `enabledModules` returns `["crm", "clm", "cpq", "erp", "documents"]` — all modules enabled. This could grant unsubscribed organizations access to all features.  
-**Fix:** Default to an empty array or a minimal set (e.g., CRM only) when subscription is null.
+### Long-Term
 
-#### 17. `PendingApprovalRoute` Default Role Casting
-**File:** `ProtectedRoute.tsx` (line 57)  
-**Issue:** `isPendingApproval(role ?? "pending_approval")` — the null-coalescing to `"pending_approval"` means `null` role is treated as pending approval, potentially letting unauthenticated-but-logged-in users see the pending page.  
-**Fix:** Handle `null` role explicitly before the pending check.
-
-#### 18. Legacy `signUp` Method Returns Hardcoded Error
-**File:** `AuthProvider.tsx` (lines 987–997)  
-**Issue:** The legacy `signUp` method always returns an error message. This is dead code but still in the public API surface.  
-**Fix:** Remove or mark as deprecated in TypeScript types.
-
-#### 19. Client Organization Search Has No "No Results" Message
-**File:** `SignUp.tsx` (lines 345–364)  
-**Issue:** When the client searches for an organization and finds nothing, no feedback is shown. The user is left wondering if the search worked.  
-**Fix:** Show "No organizations found" message when search completes with 0 results.
-
-#### 20. Theme Preference Stored in `localStorage`  
-**File:** `ThemeProvider.tsx` (line 14)  
-**Issue:** Not a security concern per se, but noted for consistency — theme is stored in `localStorage`. This is acceptable but should use `sessionStorage` if the rest of the auth system moves there.
+11. Migrate from React Router v6 to v7 to resolve future flag warnings
+12. Rename `tenantId`/`tenant_id` references to `organizationId`/`organization_id` for naming consistency
+13. Add a real-time org code availability checker on sign-up
+14. Implement CSRF protection for state-changing operations
+15. Add automated integration tests for cross-tenant data isolation
 
 ---
 
-## 🔐 Security Audit Summary
+## Test Session Coverage
 
-### What's Good
-- ✅ **RLS enabled on all tables** — comprehensive row-level security
-- ✅ **Organization-scoped queries** — all module hooks filter by `organization_id`
-- ✅ **Invitation tokens hashed** — SHA-256 hashed before storage (`hashToken()`)
-- ✅ **`sync_scope_ids` trigger** — database-level enforcement of org/tenant ID consistency
-- ✅ **Role-based route protection** — multiple guard components for different role levels
-- ✅ **TenantSlugGuard** — validates membership before granting access
-- ✅ **Platform super admin bypass** — properly separated from regular users
-- ✅ **Invitation expiry** — both employee and client invitations check `expires_at`
-- ✅ **Claim pending invitations** — `claimPendingInvitations()` RPC for invite-to-login flow
-
-### What Needs Improvement
-- ⚠️ **Role cache in localStorage** — should use sessionStorage (#2)
-- ⚠️ **Exposed .env credentials** — keys should be rotated (#1)
-- ⚠️ **Org creation before email verification** — enables spam (#3)
-- ⚠️ **Auto sign-in fallback in signup** — potential account hijacking (#4)
-- ⚠️ **No client-side rate limiting** — brute force possible (#6)
-- ⚠️ **Default modules include everything** — over-permissive (#16)
-
----
-
-## 📊 Testing Matrix
-
-### Browser Test Sessions
-
-| Test | Method | Result | Screenshot |
-|------|--------|--------|------------|
-| Homepage load | Browser | ✅ Pass | Captured |
-| About page | Browser | ✅ Pass | Captured |
-| Contact page | Browser | ✅ Pass | Captured |
-| Pricing page | Browser | ✅ Pass | Captured |
-| Products page | Browser | ✅ Pass | Captured |
-| Solutions page | Browser | ✅ Pass | Captured |
-| Sign-in (valid UI) | Browser | ✅ Pass | Captured |
-| Sign-in (invalid creds) | Browser | ✅ Pass | Toast error shown |
-| Sign-in (empty fields) | Browser | ✅ Pass | HTML5 validation |
-| Sign-up Organization | Browser | ✅ Pass | Org created, email msg shown |
-| Sign-up Client (search) | Browser | ✅ Pass | Org search found results |
-| Forgot Password | Browser | ✅ Pass | Success message shown |
-| Reset Password (no token) | Browser | ✅ Pass | Properly gated |
-| Password mismatch | Browser | ✅ Pass | Toast error shown |
-| Navigation links | Browser | ✅ Pass | All linked correctly |
-
-### Code Review Sessions
-
-| Component | Files Reviewed | Issues Found |
-|-----------|---------------|--------------|
-| AuthProvider | 1134 lines | 4 issues (#2, #3, #4, #18) |
-| SignUp.tsx | 533 lines | 3 issues (#12, #13, #19) |
-| Auth.tsx | 251 lines | 1 issue (#9) |
-| ForgotPassword.tsx | 77 lines | 2 issues (#5, #7) |
-| ResetPassword.tsx | 137 lines | 1 issue (#8) |
-| ProtectedRoute.tsx | 213 lines | 1 issue (#17) |
-| TenantSlugGuard.tsx | 101 lines | 0 issues |
-| TenantProvider.tsx | 225 lines | 1 issue (#16) |
-| OrganizationProvider.tsx | 269 lines | 1 issue (#16) |
-| App.tsx (routing) | 370 lines | 2 issues (#14, #15) |
-| RLS Migration (007) | 1392 lines | 0 issues |
-| RLS Fixes (009) | 267 lines | 0 issues |
-| .env | 5 lines | 1 issue (#1) |
+| Area | Tested | Method |
+|------|--------|--------|
+| Homepage | ✅ | Browser |
+| Products page | ✅ | Browser |
+| Solutions page | ✅ | Browser |
+| Pricing page | ✅ | Browser |
+| About page | ✅ | Browser |
+| Contact page | ✅ | Browser |
+| Sign-In page | ✅ | Browser + Code review |
+| Sign-Up (Organization) | ✅ | Browser + Code review |
+| Sign-Up (Client) | ✅ | Browser + Code review |
+| Forgot Password | ✅ | Browser + Code review |
+| Reset Password (no token) | ✅ | Browser |
+| Email verification flow | ✅ | Code review |
+| AuthProvider (signIn/signUp) | ✅ | Code review |
+| TenantProvider | ✅ | Code review |
+| OrganizationProvider | ✅ | Code review |
+| TenantSlugGuard | ✅ | Code review |
+| Module data isolation | ✅ | Code review |
+| CRM hooks (useCRM.ts) | ✅ | Code review |
+| module-scope.ts | ✅ | Code review |
+| Supabase client config | ✅ | Code review |
 
 ---
 
-## 🛠 Recommended Priority Actions
-
-### Immediate (Pre-Production)
-1. **Rotate exposed Supabase credentials** and remove password hints from `.env`
-2. **Move role cache to `sessionStorage`** to reduce XSS impact
-3. **Add rate limiting** to auth submission buttons (cooldown timers)
-4. **Remove the auto sign-in fallback** in organization signup
-
-### Short-Term (Next Sprint)
-5. **Defer organization creation to post-email-verification** or add cleanup job
-6. **Match Forgot/Reset Password page design** to Sign In/Sign Up
-7. **Add `autocomplete` attributes** to all auth input fields
-8. **Add password strength indicator** to signup forms
-9. **Fix default `enabledModules`** when subscription is null
-10. **Add "No results" feedback** to client organization search
-
-### Medium-Term (Backlog)
-11. **Create proper Settings pages** for tenant workspace and portal
-12. **Add real-time org code availability check** in signup
-13. **Clean up legacy `signUp` method** from `AuthContextType`
-14. **Add email delivery health check** for development mode
-
----
-
-## 📁 Files Reviewed
-
-```
-src/app/App.tsx
-src/app/providers/AuthProvider.tsx
-src/app/providers/TenantProvider.tsx
-src/app/providers/OrganizationProvider.tsx
-src/app/providers/ThemeProvider.tsx
-src/app/providers/ImpersonationProvider.tsx
-src/core/auth/auth-context.ts
-src/core/auth/useAuth.ts
-src/core/auth/components/ProtectedRoute.tsx
-src/core/auth/components/TenantSlugGuard.tsx
-src/workspaces/auth/pages/Auth.tsx
-src/workspaces/auth/pages/SignUp.tsx
-src/workspaces/auth/pages/ForgotPassword.tsx
-src/workspaces/auth/pages/ResetPassword.tsx
-src/modules/crm/hooks/useCRM.ts
-src/modules/cpq/hooks/useCPQ.ts
-src/modules/clm/hooks/useCLM.ts
-src/modules/erp/hooks/useERP.ts
-src/modules/documents/hooks/useDocuments.ts
-supabase/migrations/007_org_native_auth_reset.sql
-supabase/migrations/009_auth_signup_rls_fixes.sql
-.env
-package.json
-```
-
----
-
-*Report generated by Antigravity Agent — 2026-03-01*
+*Report generated by comprehensive automated testing and code review session.*
