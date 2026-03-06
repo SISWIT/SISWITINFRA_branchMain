@@ -89,6 +89,7 @@ export interface AuthContextType {
 
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  resendVerificationEmail: (email: string) => Promise<{ error: string | null }>;
 
   signOut: () => Promise<void>;
   refreshRole: () => Promise<void>;

@@ -28,17 +28,11 @@ type MembershipLookupRow = {
   role: string;
   account_state: string;
   is_active: boolean;
+  is_email_verified: boolean;
   created_at?: string | null;
 };
 
-type ProfileInsert = {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  created_at: string;
-  updated_at: string;
-};
+
 
 type OrganizationLookupRow = {
   id: string;
@@ -79,15 +73,7 @@ async function getFunctionInvokeErrorMessage(error: unknown): Promise<string> {
   return baseMessage;
 }
 
-function splitName(fullName: string): { firstName: string; lastName: string } {
-  const cleaned = fullName.trim();
-  if (!cleaned) return { firstName: "", lastName: "" };
-  const parts = cleaned.split(/\s+/);
-  return {
-    firstName: parts[0] ?? "",
-    lastName: parts.slice(1).join(" "),
-  };
-}
+
 
 function generateSlug(name: string): string {
   return name
@@ -214,6 +200,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resolveRoleFromMembershipState = useCallback((membership: MembershipLookupRow | null): AuthRole => {
     if (!membership) return null;
 
+    if (membership.account_state === "pending_verification") {
+      return "pending_verification" as AuthRole;
+    }
+
     if (membership.account_state === "pending_approval") {
       return "pending_approval";
     }
@@ -242,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const membershipPromise = unsafeSupabase
           .from("organization_memberships")
-          .select("id, organization_id, role, account_state, is_active, created_at")
+          .select("id, organization_id, role, account_state, is_active, is_email_verified, created_at")
           .eq("user_id", userId)
           .eq("is_active", true);
 
@@ -275,17 +265,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const upsertProfile = useCallback(
     async (userId: string, fullName: string) => {
-      const { firstName, lastName } = splitName(fullName);
-      const payload: ProfileInsert = {
-        user_id: userId,
-        first_name: firstName,
-        last_name: lastName,
-        full_name: fullName,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await unsafeSupabase.from("profiles").upsert(payload, { onConflict: "user_id" });
+      const { error } = await unsafeSupabase.rpc("create_signup_profile", {
+        p_user_id: userId,
+        p_full_name: fullName,
+      });
       if (error) {
         throw new Error(`Unable to save profile: ${error.message}`);
       }
@@ -298,87 +281,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const baseSlug = generateSlug(input.organizationName);
       const baseCode = input.organizationCode?.trim().toUpperCase() || generateOrgCode(input.organizationName);
 
-      let nextSlug = baseSlug;
-      let nextCode = baseCode;
+      // Use the SECURITY DEFINER RPC which bypasses RLS.
+      // This is required because at this point the user is still anon (pre-email-confirmation).
+      const { data, error } = await unsafeSupabase.rpc("create_signup_organization", {
+        p_user_id: userId,
+        p_email: input.email,
+        p_org_name: input.organizationName,
+        p_org_slug: baseSlug,
+        p_org_code: baseCode,
+      });
 
-      let orgData: { id: string; slug: string } | null = null;
-
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const { data, error } = await unsafeSupabase
-          .from("organizations")
-          .insert({
-            name: input.organizationName,
-            slug: nextSlug,
-            org_code: nextCode,
-            owner_user_id: userId,
-            status: "trial",
-            plan_type: "starter",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .select("id, slug")
-          .maybeSingle();
-
-        if (error) {
-          // 23505 is PostgreSQL's unique_violation error code
-          if (error.code === "23505") {
-            nextSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
-            nextCode = `${baseCode.slice(0, 8)}${Math.floor(10 + Math.random() * 89)}`;
-            continue;
-          }
-          // Error creating organization
-          throw new Error(`Unable to create organization: ${error.message}`);
-        }
-
-        if (data?.id) {
-          orgData = data;
-          break;
-        }
+      if (error) {
+        throw new Error(`Unable to create organization: ${error.message}`);
       }
 
-      if (!orgData?.id) {
+      // The RPC returns { id, slug } as jsonb
+      const result = data as { id: string; slug: string } | null;
+      if (!result?.id) {
         return null;
       }
 
-      const data = orgData;
-
-      const { error: subscriptionError } = await unsafeSupabase.from("organization_subscriptions").insert({
-        organization_id: data.id,
-        plan_type: "starter",
-        status: "trial",
-        module_crm: true,
-        module_cpq: true,
-        module_documents: true,
-        module_clm: false,
-        module_erp: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      if (subscriptionError) {
-        throw new Error(`Unable to create organization subscription: ${subscriptionError.message}`);
-      }
-
-      const { error: membershipError } = await unsafeSupabase.from("organization_memberships").insert({
-        organization_id: data.id,
-        user_id: userId,
-        email: input.email,
-        role: "owner",
-        account_state: "pending_verification",
-        is_email_verified: false,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      if (membershipError) {
-        throw new Error(`Unable to create owner membership: ${membershipError.message}`);
-      }
-
-      return { id: data.id, slug: data.slug };
+      return { id: result.id, slug: result.slug };
     },
     [unsafeSupabase],
   );
+
 
   const signUpOrganization = useCallback(
     async (input: OrganizationSignUpInput): Promise<{ error: string | null }> => {
@@ -903,6 +830,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const resendVerificationEmail = useCallback(async (email: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim(),
+        options: {
+          emailRedirectTo: getAuthEmailRedirectTo(),
+        },
+      });
+      return { error: error?.message ?? null };
+    } catch (error: unknown) {
+      return { error: getErrorMessage(error) };
+    }
+  }, []);
+
   const claimPendingInvitations = useCallback(async (): Promise<number> => {
     const { data, error } = await unsafeSupabase.rpc("claim_pending_invitations");
     if (error) {
@@ -922,11 +864,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [unsafeSupabase]);
 
   const signIn = useCallback(
-    async (email: string, password: string, rememberMe = true) => {
+    async (email: string, password: string, _rememberMe = true) => {
       try {
         setLoading(true);
-
-        localStorage.setItem("siswit_remember_me", rememberMe ? "1" : "0");
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
@@ -950,6 +890,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!nextRole) {
           return { error: "No organization access assigned", role: null as AuthRole };
+        }
+
+        // C-02 fix: Block login if email is not yet verified
+        if (nextRole === ("pending_verification" as AuthRole)) {
+          // Sign the user out so no session lingers
+          await supabase.auth.signOut();
+          return {
+            error: "Please verify your email address before signing in. Check your inbox for the verification link.",
+            role: null as AuthRole,
+          };
         }
 
         cacheRole(data.user.id, nextRole);
@@ -1102,6 +1052,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         rejectClientMembership,
         sendPasswordReset,
         updatePassword,
+        resendVerificationEmail,
         signOut,
         refreshRole,
       }}

@@ -1,386 +1,1295 @@
-# 🔍 SISWIT Platform — Comprehensive Debug Report
+# Debug Report - SISWIT Unified Platform
 
-> **Date:** 2026-03-01  
-> **Platform:** SISWIT Unified Platform (Vite + React + TypeScript + Supabase)  
-> **Environment:** Development (localhost:8080)  
-> **Scope:** Full-stack testing of authentication, authorization, multi-tenant data isolation, UI/UX, modules, and security
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#executive-summary)
-2. [Critical Issues](#critical-issues)
-3. [Authentication & Authorization Issues](#authentication--authorization-issues)
-4. [Security Vulnerabilities](#security-vulnerabilities)
-5. [Sign-Up Flow Issues](#sign-up-flow-issues)
-6. [UI/UX Issues](#uiux-issues)
-7. [Multi-Tenant Data Isolation Review](#multi-tenant-data-isolation-review)
-8. [Module-Level Findings](#module-level-findings)
-9. [Console Errors & Warnings](#console-errors--warnings)
-10. [Recommendations](#recommendations)
+**Date:** 2026-03-04  
+**Environment:** Development (localhost:8080)  
+**Status:** Issues Identified  
 
 ---
 
 ## Executive Summary
 
-The SISWIT platform is a multi-tenant SaaS application offering CLM, CPQ, CRM, ERP, and Auto Documentation modules. Overall, the platform has a solid architectural foundation with proper tenant isolation through `organization_id` scoping, role-based access control, and protected routes. However, several **critical** and **medium** severity issues were found that need attention before production deployment.
+The SISWIT Unified Platform is a complex multi-tenant SaaS application built with React, TypeScript, Vite, Supabase, and Tailwind CSS. The application integrates multiple business modules (CRM, CLM, CPQ, ERP, Documents) with role-based access control. This report documents all identified issues, potential problems, and areas requiring attention.
 
-| Severity | Count |
-|----------|-------|
-| 🔴 Critical | 3 |
-| 🟠 High | 4 |
-| 🟡 Medium | 5 |
-| 🔵 Low | 4 |
+**Note:** The application compiles successfully (`npm run dev` starts without errors), but there are several code quality and architectural issues that could cause runtime problems.
 
 ---
 
-## Critical Issues
+## 1. Lint Errors & Warnings
 
-### 🔴 C-01: Supabase Auth Tokens Stored in `localStorage` (XSS Risk)
+### 1.1 Critical: ESLint Parsing Error
 
-**File:** `src/core/api/client.ts` (Line 13)
+**File:** `src/core/api/types.ts`  
+**Issue:** Parsing error - "File appears to be binary"  
+**Severity:** Critical  
+**Impact:** This file cannot be linted and may contain encoding issues. It's likely a generated Supabase types file that has become corrupted or contains non-text content.
 
+```bash
+1:0 error Parsing error: File appears to be binary
+```
+
+**Recommended Fix:**
+1. Check file encoding - ensure it's UTF-8: `file --mime-encoding src/core/api/types.ts`
+2. If corrupted, regenerate the types file: `npm run db:types`
+3. Or manually recreate the file with proper TypeScript syntax
+4. Add .eslintignore entry if file is auto-generated:
+   ```json
+   // .eslintignore
+   "src/core/api/types.ts"
+   ```
+
+### 1.2 Warning: Unused ESLint Directive
+
+**File:** `src/integrations/types.ts`  
+**Issue:** Unused eslint-disable directive  
+**Severity:** Low  
+**Line:** 1:1
+
+**Recommended Fix:**
+Remove the unused eslint-disable comment at the top of the file:
 ```typescript
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,  // ← XSS vulnerability
-    persistSession: true,
-    autoRefreshToken: true,
+// REMOVE THIS LINE:
+/* eslint-disable */
+
+// Or if it's a different directive, fix or remove it
+```
+
+### 1.3 Warning: Unnecessary Dependency
+
+**File:** `src/app/providers/AuthProvider.tsx`  
+**Issue:** React Hook useCallback has an unnecessary dependency: 'unsafeSupabase'  
+**Severity:** Medium  
+**Line:** 416:5
+
+**Recommended Fix:**
+Move the unsafeSupabase reference outside the useCallback or use the ref pattern:
+```typescript
+// OPTION 1: Remove from dependency array if not used inside
+const someCallback = useCallback(async () => {
+  // function body
+}, []); // Remove unsafeSupabase from here
+
+// OPTION 2: Use a ref to store the value
+const supabaseRef = useRef(unsafeSupabase);
+const someCallback = useCallback(async () => {
+  // use supabaseRef.current
+}, [supabaseRef]); // Add ref to dependencies
+```
+
+---
+
+## 2. Type System Duplication & Conflicts
+
+### 2.1 Duplicate ModuleType Definition
+
+**Issue:** `ModuleType` is defined in two locations with identical values:
+
+1. `src/core/types/organization.ts` (line 4)
+```typescript
+export type ModuleType = "crm" | "clm" | "cpq" | "erp" | "documents";
+```
+
+2. `src/core/types/tenant.ts` (line 22)
+```typescript
+export type ModuleType = "crm" | "clm" | "cpq" | "erp" | "documents";
+```
+
+**Recommended Fix:**
+1. Create a single shared types file:
+   ```typescript
+   // src/core/types/modules.ts
+export type ModuleType = "crm" | "clm" | "cpq" | "erp" | "documents";
+   export const ALL_MODULES: ModuleType[] = ["crm", "clm", "cpq", "erp", "documents"];
+   ```
+
+2. Update imports in both files to re-export from shared location:
+   ```typescript
+   // src/core/types/organization.ts
+   export { ModuleType } from './modules';
+   
+   // src/core/types/tenant.ts  
+   export { ModuleType } from './modules';
+   ```
+
+3. Update all imports throughout the codebase to use the shared type
+
+### 2.2 Duplicate isModuleEnabled Function
+
+**Issue:** `isModuleEnabled` function exists in both:
+
+1. `src/core/types/organization.ts` (line 52-72)
+2. `src/core/types/tenant.ts` (line 171-191)
+
+Both accept different parameter types (OrganizationSubscription vs TenantSubscription), but the function name is identical, causing potential confusion.
+
+**Recommended Fix:**
+1. Create a shared utility function with generic types:
+   ```typescript
+   // src/core/utils/module-utils.ts
+   import type { ModuleType } from '../types/modules';
+   
+   interface Subscription {
+     module_crm?: boolean;
+     module_clm?: boolean;
+     module_cpq?: boolean;
+     module_erp?: boolean;
+     module_documents?: boolean;
+   }
+   
+   export function isModuleEnabled<T extends Subscription>(
+     subscription: T | null | undefined,
+     module: ModuleType
+   ): boolean {
+     if (!subscription) return false;
+     const key = `module_${module}` as keyof T;
+     return Boolean(subscription[key]);
+   }
+   ```
+
+2. Or use more specific names to avoid confusion:
+   ```typescript
+   // Keep both but rename for clarity
+export function isOrganizationModuleEnabled(
+     subscription: OrganizationSubscription | null | undefined,
+     module: ModuleType
+   ): boolean;
+   
+export function isTenantModuleEnabled(
+     subscription: TenantSubscription | null | undefined, 
+     module: ModuleType
+   ): boolean;
+   ```
+
+### 2.3 Duplicate Type Definitions (Organization vs Tenant)
+
+The codebase maintains two parallel type systems:
+
+| Concept | Organization System | Tenant System |
+|---------|-------------------|---------------|
+| Main Entity | Organization | Tenant |
+| Subscription | OrganizationSubscription | TenantSubscription |
+| Membership | OrganizationMembership | TenantUser |
+| Module Check | isModuleEnabled (org) | isModuleEnabled (tenant) |
+
+**Recommended Fix:**
+1. **Long-term:** Consolidate to a single system (recommend Tenant-based approach)
+2. **Short-term:** Add clear comments and documentation distinguishing when to use which
+3. Create a unified provider that wraps both:
+   ```typescript
+   // src/app/providers/UnifiedWorkspaceProvider.tsx
+   interface WorkspaceContext {
+     // Unified interface
+     currentWorkspace: Tenant | Organization | null;
+     isTenantMode: boolean;
+     // ...统一的方法
+   }
+   ```
+4. Add runtime checks to prevent using wrong provider
+
+---
+
+## 3. React Hooks Rule Violations
+
+### 3.1 Conditional useMemo Hook
+
+**File:** `src/workspaces/organization_admin/layout/TenantAdminLayout.tsx`  
+**Issue:** React Hook "useMemo" is called conditionally  
+**Severity:** Critical (will cause runtime errors)  
+**Line:** 180:21
+
+**Recommended Fix:**
+Move the useMemo call outside of any conditional blocks:
+```typescript
+// WRONG:
+function Component() {
+  if (someCondition) {
+    const value = useMemo(() => expensiveCalculation(), []);
+    return <div>{value}</div>;
   }
+  return <div>No value</div>;
+}
+
+// CORRECT:
+function Component() {
+  const value = useMemo(() => expensiveCalculation(), []);
+  
+  if (someCondition) {
+    return <div>{value}</div>;
+  }
+  return <div>No value</div>;
+}
+
+// ALTERNATIVE - Use conditional logic inside useMemo:
+const value = useMemo(() => {
+  if (!someCondition) return null;
+  return expensiveCalculation();
+}, [someCondition]);
+```
+
+---
+
+## 4. Type Safety Issues (any Types)
+
+### 4.1 Excessive any Usage
+
+**Files with any type declarations:**
+
+1. **src/workspaces/organization_admin/hooks/useOrganizationDashboard.ts** (line 67)
+```typescript
+{ data: Record<string, unknown>[] | null; count: number | null }[]
+```
+
+2. **src/workspaces/organization_admin/pages/OrganizationAdminDashboard.tsx**
+   - Line 84: `dashboardData: any`
+   - Line 95: `dashboardData.charts: any`
+   - Line 113: `dashboardData.lists: any`
+   - Line 354: `item: any`
+   - Line 384: `item: any`
+   - Line 414: `item: any`
+   - Line 465: `item: any`
+   - Line 502: `item: any`
+
+**Recommended Fix:**
+Define proper TypeScript interfaces:
+```typescript
+// Define interfaces for dashboard data
+interface DashboardKPIs {
+  leads: number;
+  contracts: number;
+  quotes: number;
+  orders: number;
+}
+
+interface DashboardLists {
+  opportunities: Opportunity[];
+  contracts: Contract[];
+  activities: Activity[];
+  leads: Lead[];
+  auditLogs: AuditLog[];
+}
+
+interface DashboardCharts {
+  leads: Lead[];
+  contracts: Contract[];
+  quotes: Quote[];
+}
+
+interface DashboardData {
+  kpis: DashboardKPIs;
+  lists: DashboardLists;
+  charts: DashboardCharts;
+}
+
+// Then use in component:
+const { data: dashboardData } = useQuery<DashboardData>({
+  queryKey: ['organization-dashboard', tenantId],
+  queryFn: fetchDashboardData
 });
 ```
 
-**Impact:** If any XSS vulnerability exists anywhere in the application, an attacker could steal auth tokens from `localStorage` and impersonate users. This is the single most critical security issue.
-
-**Recommendation:** Use `sessionStorage` or implement HTTP-only cookies for token storage. At minimum, switch to `sessionStorage` which limits exposure to the current browser tab.
-
----
-
-### 🔴 C-02: No Email Verification Enforcement on Sign-In
-
-**Files:** `src/app/providers/AuthProvider.tsx` (Lines 924-968), `src/workspaces/auth/pages/SignUp.tsx`
-
-The sign-up flow correctly sets `account_state: "pending_verification"` and `is_email_verified: false` in the membership record. The post-sign-up UI message says:
-
-> "Your account was created and a verification email has been sent. Verify your email, then sign in."
-
-However, the `signIn` function **does not check email verification status**. A user can sign up, skip email verification entirely, and sign in immediately. The `signIn` function only:
-1. Calls `supabase.auth.signInWithPassword`
-2. Calls `getUserRole`
-3. Returns the role
-
-It never checks `is_email_verified` or `account_state === "pending_verification"`.
-
-**Impact:** Users can access the platform without ever confirming their email address, undermining email ownership verification.
-
-**Recommendation:** Add an email verification check in the `signIn` function or in the `resolveRoleFromMembershipState` function. If `account_state` is `"pending_verification"`, return a specific error message and redirect to a "Please verify your email" page.
-
----
-
-### 🔴 C-03: Silent Login Failure — No Error Feedback to User
-
-**File:** `src/workspaces/auth/pages/Auth.tsx` (Lines 75-82)
-
-During browser testing, entering incorrect credentials (`test@test.com` / `wrongpassword123`) produced **no visible error message** to the user. The button briefly showed "Signing in..." then reverted to "Sign in" with no toast notification.
-
-The code does call `toast()` on error:
+For the hooks file, use proper typing:
 ```typescript
-if (error) {
-  toast({
-    variant: "destructive",
-    title: "Sign in failed",
-    description: error,
-  });
-  return;
+// Instead of:
+{ data: Record<string, unknown>[] | null; count: number | null }[]
+
+// Use:
+type SupabaseCountResponse = { data: Lead[] | null; count: number | null };
+```
+
+### 4.2 Missing useMemo Dependencies
+
+**File:** `src/workspaces/organization_admin/pages/OrganizationAdminDashboard.tsx`  
+**Issue:** React Hook useMemo has a missing dependency: 'dashboardData.charts'  
+**Severity:** Medium  
+**Line:** 135
+
+**Recommended Fix:**
+Add the missing dependency or restructure the code:
+```typescript
+// OPTION 1: Add dependency
+const chartData = useMemo(() => {
+  // Transform dashboardData.charts
+  return dashboardData?.charts?.leads?.map(...) ?? [];
+}, [dashboardData?.charts]); // Add dependency
+
+// OPTION 2: Use useMemo for all dependent values
+const chartData = useMemo(() => {
+  if (!dashboardData?.charts) return defaultData;
+  return transformData(dashboardData.charts);
+}, [dashboardData]); // Add the entire object
+
+// OPTION 3: Disable eslint rule with explanation (not recommended)
+const chartData = useMemo(() => {
+  return dashboardData?.charts?.leads?.map(...) ?? [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // Only if you intentionally want stale data
+```
+
+---
+
+## 5. Architecture Issues
+
+### 5.1 Dual Provider System
+
+The application has two parallel provider systems that manage similar data:
+
+**OrganizationProvider** (`src/app/providers/OrganizationProvider.tsx`):
+- Manages `Organization` (via `organizations` table)
+- Uses `organization_memberships` table
+- Uses `organization_subscriptions` table
+
+**TenantProvider** (`src/app/providers/TenantProvider.tsx`):
+- Manages `Tenant` (via `tenants` table)
+- Uses `tenant_users` table
+- Uses `tenant_subscriptions` table
+
+**Recommended Fix:**
+
+**Option A (Recommended): Consolidate to Single System**
+1. Choose Tenant as the primary model (more common in SaaS)
+2. Deprecate OrganizationProvider and remove from App.tsx
+3. Migrate all organization_* references to tenant_*
+4. Update the database schema to use tenants consistently
+
+**Option B: Keep Both with Clear Boundaries**
+1. Rename OrganizationProvider to PlatformProvider (for platform-level operations)
+2. Keep TenantProvider for tenant-specific operations
+3. Add a unified hook that delegates to the correct provider:
+```typescript
+// src/core/hooks/useWorkspace.ts
+import { useTenant } from './useTenant';
+import { useOrganization } from './useOrganization';
+
+export function useWorkspace() {
+  const tenant = useTenant();
+  const organization = useOrganization();
+  
+  // Return based on which is active
+  return {
+    current: tenant.tenant ?? organization.organization,
+    isUsingTenant: !!tenant.tenant,
+    // ...
+  };
 }
 ```
 
-However, the Supabase `signInWithPassword` returned a 400 error that was visible in the console but the toast notification did not appear on screen.
+**Option C: Sequential Loading**
+1. Load only one provider at a time based on user role
+2. Use a loading state to prevent race conditions
 
-**Possible Causes:**
-- The `Toaster` component may not be rendering properly at that point in the component tree
-- The toast event might be fired before the Toaster is mounted
-- The `useToast` hook from `@/core/hooks/use-toast` may not be wired to the correct Toaster instance (there are two Toasters: `<Toaster />` and `<Sonner />`)
+### 5.2 Role System Complexity
 
-**Impact:** Users have no way to know why login failed, severely harming user experience.
+**Issue:** The role system has multiple layers of complexity:
 
-**Recommendation:** Debug the toast rendering chain. Verify that the `useToast` hook is connected to the same `Toaster` component rendered in `App.tsx`. Consider adding a fallback inline error message state.
+1. **Legacy Roles:** `platform_admin`, `user`, `pending_approval`, `rejected`
+2. **Platform Roles:** `platform_super_admin`
+3. **Organization Roles:** `owner`, `admin`, `manager`, `employee`, `client`
+
+**Recommended Fix:**
+
+1. **Simplify to single role source** (recommended):
+```typescript
+// src/core/types/roles.ts - Simplified enum
+export enum AppRole {
+  PLATFORM_SUPER_ADMIN = 'platform_super_admin',
+  OWNER = 'owner',
+  ADMIN = 'admin',
+  MANAGER = 'manager',
+  EMPLOYEE = 'employee',
+  CLIENT = 'client',
+  PENDING_APPROVAL = 'pending_approval',
+  REJECTED = 'rejected'
+}
+```
+
+2. **Remove legacy role mappings** - Delete normalizeRole() function after migration
+
+3. **Add strict type checking**:
+```typescript
+// Enforce only valid roles
+export type ValidRole = `${AppRole}`;
+```
+
+4. **Create migration script** for existing data:
+```sql
+-- Migrate legacy roles to new system
+UPDATE users 
+SET role = CASE 
+  WHEN role = 'tenant_admin' THEN 'admin'
+  WHEN role = 'tenant_manager' THEN 'manager'
+  WHEN role = 'tenant_user' THEN 'employee'
+  WHEN role = 'client_user' THEN 'client'
+  ELSE role
+END;
+```
+
+### 5.3 Duplicate Context Hooks
+
+**Issue:** Two hooks provide similar functionality:
+
+1. `useOrganization()` - from `src/core/hooks/organization-context.ts`
+2. `useTenant()` - from `src/core/tenant/useTenant.ts`
+
+Both provide:
+- Organization/Tenant object
+- Subscription data
+- Module access checks (hasModule)
+- Memberships
+
+**Recommended Fix:**
+
+**Option A: Create unified hook (recommended)**
+```typescript
+// src/core/hooks/useWorkspace.tsx
+import { createContext, useContext } from 'react';
+import { useTenant } from '@/core/tenant/useTenant';
+import { useOrganization } from '@/workspaces/organization/hooks/useOrganization';
+
+export function useWorkspace() {
+  const tenantContext = useTenant();
+  const orgContext = useOrganization();
+  
+  // Prefer tenant if available, fallback to organization
+  return {
+    workspace: tenantContext.tenant ?? orgContext.organization,
+    subscription: tenantContext.subscription ?? orgContext.subscription,
+    hasModule: tenantContext.hasModule ?? orgContext.hasModule,
+    memberships: tenantContext.memberships ?? orgContext.memberships,
+    loading: tenantContext.tenantLoading ?? orgContext.organizationLoading,
+    // ...
+  };
+}
+```
+
+**Option B: Deprecate one hook**
+- Mark useOrganization() as @deprecated
+- Update all imports to use useTenant()
+- Eventually remove useOrganization()
 
 ---
 
-## Authentication & Authorization Issues
+## 6. Module Scope Issues
 
-### 🟠 A-01: `remember_me` Flag Stored in `localStorage`
+### 6.1 Potential Module Access Failures
 
-**File:** `src/app/providers/AuthProvider.tsx` (Line 929)
+The following hooks use `requireOrganizationScope` which may fail:
+
+- `src/modules/crm/hooks/useCRM.ts`
+- `src/modules/cpq/hooks/useCPQ.ts`
+- `src/modules/clm/hooks/useCLM.ts`
+- `src/modules/erp/hooks/useERP.ts`
+- `src/modules/documents/hooks/useDocuments.ts`
+
+**Recommended Fix:**
+
+1. **Update module hooks to use unified workspace context**:
+```typescript
+// In each module hook, change from:
+import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+
+// To:
+import { useWorkspace } from "@/core/hooks/useWorkspace";
+
+// Then use:
+const { workspace, hasModule } = useWorkspace();
+const moduleReady = hasModule('crm') && workspace !== null;
+```
+
+2. **Or make module scope more resilient**:
+```typescript
+// src/core/utils/module-scope.ts
+export function requireWorkspaceScope(context: ModuleScopeContext) {
+  if (!isModuleScopeReady(context)) {
+    throw new Error('Workspace not ready - please wait for authentication');
+  }
+  return context;
+}
+
+// Add null checks and fallback
+function getOrganizationOrTenant() {
+  try {
+    return useOrganization();
+  } catch {
+    try {
+      return useTenant();
+    } catch {
+      return null;
+    }
+  }
+}
+```
+
+3. **Add loading states** to prevent access before providers are ready:
+```typescript
+const { workspace, loading } = useWorkspace();
+
+if (loading) return <Skeleton />;
+if (!workspace) return <NoAccess />;
+```
+
+---
+
+## 7. Potential Runtime Issues
+
+### 7.1 Missing Environment Variables
+
+**Critical:** The Supabase client is initialized with environment variables that may not be set:
 
 ```typescript
-localStorage.setItem("siswit_remember_me", rememberMe ? "1" : "0");
+// src/core/api/client.ts
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 ```
 
-This flag is stored in `localStorage` but never read anywhere in the codebase. If the intent is to control session persistence, this should be implemented properly — e.g., using `sessionStorage` for session-only auth when "Remember Me" is unchecked.
+**Recommended Fix:**
 
-**Recommendation:** Either implement the actual remember-me behavior or remove the dead code.
+1. **Create .env.example file** with all required variables:
+```bash
+# .env.example
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+```
 
----
-
-### 🟠 A-02: Role Caching in `sessionStorage` Without Integrity Check
-
-**File:** `src/app/providers/AuthProvider.tsx` (Lines 169-197)
-
-Roles are cached in `sessionStorage` with a 1-hour TTL:
+2. **Add validation on app startup**:
 ```typescript
-sessionStorage.setItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`, JSON.stringify(payload));
+// src/core/api/client.ts
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing required environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY'
+  );
+}
+
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {...});
 ```
 
-While `sessionStorage` is safer than `localStorage`, there is no integrity check (e.g., HMAC) on the cached role. A technically savvy user could modify their cached role via browser DevTools to escalate privileges.
-
-**Mitigated by:** Server-side RLS policies on Supabase (if properly configured), which would prevent actual data access regardless of client-side role manipulation.
-
-**Recommendation:** This is acceptable if RLS policies are comprehensive. Add a comment documenting that the cached role is for UI rendering only and does not grant server-side access.
-
----
-
-### 🟡 A-03: No Rate Limiting on Login Attempts (Client-Side)
-
-The sign-in form has no client-side rate limiting for failed login attempts. While Supabase may have server-side rate limiting, there is no visual feedback about attempt limits.
-
-**Recommendation:** Add a client-side counter that disables the login button after 5 failed attempts with a cooldown, similar to the forgot-password cooldown.
-
----
-
-### 🟡 A-04: Password Policy Not Enforced on Server Side
-
-The sign-up form has a client-side password strength meter requiring 12+ characters with uppercase, lowercase, numbers, and special characters. However, the `minLength` HTML attribute is set to 12 — there is no server-side enforcement beyond Supabase's default minimum (6 characters).
-
-**Recommendation:** Configure Supabase password policy to require minimum 12 characters, or add server-side validation in a Supabase Edge Function.
-
----
-
-## Security Vulnerabilities
-
-### 🟠 S-01: Supabase Publishable Key Exposed in `.env`
-
-**File:** `.env`
-
-```
-VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_V9p_-fjCAZtwQ-XwAmkp-w_ABD_2gHd"
+3. **Update package.json scripts** to validate env vars:
+```json
+{
+  "scripts": {
+    "predev": "node scripts/check-env.js",
+    "prebuild": "node scripts/check-env.js"
+  }
+}
 ```
 
-While publishable keys are designed to be public, this file should be in `.gitignore` (which it is). However, the key is also embedded in the built JavaScript bundle, accessible to anyone. Ensure that:
-- RLS policies are comprehensive on all tables
-- No service role key is ever exposed client-side
+### 7.2 Organization vs Tenant Slug Navigation
 
----
+**File:** `src/app/App.tsx` (line 166-167)
 
-### 🟠 S-02: `AuthApiError: Invalid Refresh Token` on Public Pages
+**Recommended Fix:**
 
-**Location:** Console logs on every public page load
+1. **Use unified workspace slug**:
+```typescript
+function RootRedirect() {
+  const { tenant, tenantLoading } = useTenant();
+  const { organization, organizationLoading } = useOrganization();
+  const loading = tenantLoading || organizationLoading;
 
-Every time an unauthenticated user visits any page, the console shows:
-```
-AuthApiError: Invalid Refresh Token: Refresh Token Not Found
-```
+  if (loading) return <RouteLoader />;
 
-While not a security vulnerability per se, this indicates the Supabase client attempts to refresh a non-existent session on every page load.
-
-**Recommendation:** Wrap the session refresh in a check for existing stored tokens before attempting. This also creates unnecessary network requests.
-
----
-
-### 🔵 S-03: Organization Search Exposes Organization Data to Unauthenticated Users
-
-**File:** `src/workspaces/auth/pages/SignUp.tsx` (Lines 113-148)
-
-The client sign-up page calls `search_signup_organizations` RPC with a debounced query, exposing organization names, slugs, and codes to anyone on the sign-up page. This is by design for client self-registration, but consider:
-- Whether org codes should be hidden from search results
-- Whether this could be used for org enumeration
-
----
-
-## Sign-Up Flow Issues
-
-### 🟡 M-01: Organization Code Placeholder Confusion
-
-**File:** `src/workspaces/auth/pages/SignUp.tsx` (Line 292)
-
-```html
-<Input placeholder={`Organization Code (suggested: ${suggestedCode})`} ... />
+  // Prefer tenant, fallback to organization
+  const workspaceSlug = tenant?.slug ?? organization?.slug;
+  
+  if (workspaceSlug) {
+    return <Navigate to={`/${workspaceSlug}/app/dashboard`} replace />;
+  }
+  
+  return <Navigate to="/auth/sign-in" replace />;
+}
 ```
 
-The suggested code (e.g., "ORG3510") appears in the placeholder and looks like a pre-filled value, confusing users into thinking the field is already populated.
+2. **Or consolidate to single slug**:
+```typescript
+// Get unified workspace identifier
+function getWorkspaceSlug(): string | null {
+  // This should use the unified workspace hook
+  return tenant?.slug ?? organization?.slug ?? null;
+}
+```
 
-**Recommendation:** Either auto-fill the field with the suggested code or change the placeholder to "Enter a unique code (optional)".
+### 7.3 Root Redirect Logic
 
----
+**File:** `src/app/App.tsx` (line 156-171)
 
-### 🟡 M-02: No Success Page After Sign-Up (Just a Message in the Same Page)
+**Recommended Fix:**
 
-After org sign-up succeeds, the page shows a small green box saying "Organization created" with links to sign in or go home. This is functional but:
-- Doesn't clearly communicate the email verification step
-- No verification email status indicator
-- No "resend email" option
-- User might miss the message and try to log in immediately (which would work — see C-02)
+Improve the redirect logic to handle edge cases:
+```typescript
+function RootRedirect() {
+  const { role, loading } = useAuth();
+  const { tenant, tenantLoading } = useTenant();
+  const { organization, organizationLoading } = useOrganization();
 
-**Recommendation:** Redirect to a dedicated "Check Your Email" page similar to what major SaaS platforms do.
+  if (loading || tenantLoading || organizationLoading) {
+    return <RouteLoader />;
+  }
 
----
+  // Platform admin goes to platform
+  if (isPlatformRole(role)) {
+    return <Navigate to="/platform" replace />;
+  }
 
-### 🔵 M-03: Organization Code Not Validated for Uniqueness Pre-Submit
+  // Try tenant first, then organization
+  const workspaceSlug = tenant?.slug ?? organization?.slug;
+  
+  if (workspaceSlug) {
+    // Redirect based on role
+    if (role === 'client') {
+      return <Navigate to={`/${workspaceSlug}/app/portal`} replace />;
+    }
+    return <Navigate to={`/${workspaceSlug}/app/dashboard`} replace />;
+  }
 
-The organization code field accepts any input up to 20 characters. If a duplicate code is submitted, the backend retries with a modified code (up to 10 attempts). However, the user is never informed that their chosen code was changed.
+  // No workspace - check if they have pending approval
+  if (role === 'pending_approval') {
+    return <Navigate to="/pending-approval" replace />;
+  }
 
-**Recommendation:** Add a real-time availability check for org codes, or inform users if their code was modified.
-
----
-
-## UI/UX Issues
-
-### 🔵 U-01: Missing "Contact" Link in Header Navigation
-
-The main website header contains: Home, Products, Solutions, Pricing, About — but **no Contact link**. The Contact page is only accessible via "Request Demo" or "Contact Sales" buttons in page bodies and the footer.
-
-**Recommendation:** Add "Contact" to the header navigation for consistency.
-
----
-
-### 🟡 U-02: Sign-Up Page Not Scrollable on Small Viewports
-
-The organization sign-up form has 6 fields plus a password strength meter. On smaller screens (< 768px height), the "Create Organization" button may be cut off. The form needs to be inside a properly scrollable container.
-
-**Recommendation:** Ensure the form container uses `overflow-y-auto` for smaller viewports.
-
----
-
-### 🔵 U-03: Footer Branding Inconsistency
-
-The footer on the Contact page shows "SIT**WIT**" instead of "SIS**WIT**" (missing the "S").
-
-**Recommendation:** Fix the footer brand name to consistently show "SISWIT".
-
----
-
-### 🟡 U-04: Reset Password Page Fields Not Actually Disabled
-
-When visiting `/auth/reset-password` directly (without a valid token), the page shows a warning message "Open this page from your password reset email link to set a new password." However, the password fields still appear enabled and users could attempt to type in them. The button should be explicitly disabled.
-
-**Recommendation:** Disable the input fields and button when no valid token is detected.
+  // No workspace and not pending - redirect to signup
+  return <Navigate to="/auth/sign-up" replace />;
+}
+```
 
 ---
 
-## Multi-Tenant Data Isolation Review
+## 8. Code Quality Issues
 
-### ✅ Architecture Assessment: **SOLID**
+### 8.1 Duplicate Code in Layouts
 
-The platform implements a robust multi-tenant isolation pattern:
+**Issue:** Header and Footer components are duplicated:
 
-| Layer | Mechanism | Status |
-|-------|-----------|--------|
-| **Route Layer** | `TenantSlugGuard` checks membership before rendering tenant routes | ✅ Good |
-| **Auth Layer** | `AuthProvider` resolves role from `organization_memberships` table scoped by `user_id` | ✅ Good |
-| **Data Layer** | `applyModuleReadScope()` filters all queries by `organization_id` | ✅ Good |
-| **Mutation Layer** | `applyModuleMutationScope()` ensures writes are scoped to org + owner | ✅ Good |
-| **Create Layer** | `buildModuleCreatePayload()` injects `organization_id` and `owner_id` | ✅ Good |
-| **Soft Delete** | `softDeleteRecord()` used instead of hard deletes | ✅ Good |
-| **Audit** | `writeAuditLog()` called on CRM CRUD operations | ✅ Good |
+- `src/workspaces/employee/layout/Header.tsx`
+- `src/workspaces/employee/layout/Footer.tsx`
+- `src/workspaces/website/components/layout/Header.tsx`
+- `src/workspaces/website/components/layout/Footer.tsx`
 
-The critical `module-scope.ts` utility (`src/core/utils/module-scope.ts`) properly:
-1. Requires `organizationId` before any query
-2. Filters all reads by `organization_id`
-3. Excludes soft-deleted records by default
-4. Applies owner-scoping for restricted roles
-5. Injects `organization_id` into all create payloads
+**Recommended Fix:**
 
-### ⚠️ Dependency on Server-Side RLS
+1. **Create shared components**:
+```typescript
+// src/components/layout/Header.tsx
+export function Header({ variant = 'default' }) {
+  // Use variant prop for styling differences
+  return <header className={variant === 'website' ? 'website-header' : 'app-header'}>
+    {/* ... */}
+  </header>;
+}
+```
 
-The client-side isolation is well-implemented, but **assumes Supabase RLS policies are properly configured on all tables**. If RLS is missing or misconfigured on any table, the Supabase publishable key (which is public) could be used to query data across organizations.
+2. **Update imports**:
+```typescript
+// Replace duplicates with:
+import { Header } from '@/components/layout/Header';
+import { Footer } from '@/components/layout/Footer';
+```
 
-**Recommendation:** Audit all Supabase tables to ensure RLS policies enforce `organization_id` filtering at the database level, not just the client level.
+3. **Remove duplicate files** after migration
 
----
+### 8.2 Large File Sizes
 
-## Module-Level Findings
+Several files are excessively large, making them difficult to maintain:
 
-### CRM Module
+| File | Size | Lines |
+|------|------|-------|
+| `src/core/api/types.ts` | 224KB | ~5000+ |
+| `src/integrations/types.ts` | 128KB | ~3000+ |
+| `src/app/providers/AuthProvider.tsx` | 35KB | ~1000+ |
+| `src/modules/crm/hooks/useCRM.ts` | 56KB | ~1500+ |
+| `src/modules/erp/hooks/useERP.ts` | 43KB | ~1200+ |
 
-- **Data Isolation:** Uses `useCrmScope()` → `applyModuleReadScope()` pattern consistently across leads, accounts, contacts, opportunities, activities ✅
-- **Audit Logging:** CRUD operations write audit logs ✅
-- **Soft Delete:** Uses `softDeleteRecord` ✅
-- **Issue:** Query keys use `tenantId` alias instead of `organizationId` — legacy naming that should be migrated for clarity
+**Recommended Fix:**
 
-### CLM, CPQ, ERP, Documents
+1. **Split large hook files** by functionality:
+```typescript
+// src/modules/crm/hooks/useCRM/leads.ts
+// src/modules/crm/hooks/useCRM/contacts.ts
+// src/modules/crm/hooks/useCRM/accounts.ts
+// src/modules/crm/hooks/useCRM/opportunities.ts
 
-- These modules follow the same scope pattern via `module-scope.ts`
-- Module access is controlled by `organization_subscriptions` table (`module_crm`, `module_clm`, etc.)
-- Default "starter" plan enables: CRM ✅, CPQ ✅, Documents ✅, CLM ❌, ERP ❌
+export { useLeads } from './leads';
+export { useContacts } from './contacts';
+export { useAccounts } from './accounts';
+export { useOpportunities } from './opportunities';
+```
 
----
+2. **Create barrel exports** for clean imports:
+```typescript
+// src/modules/crm/hooks/useCRM/index.ts
+export * from './useCRM/leads';
+export * from './useCRM/contacts';
+// ...
+```
 
-## Console Errors & Warnings
+3. **Split AuthProvider** into smaller concerns:
+```typescript
+// src/app/providers/auth/AuthProvider.tsx (main)
+// src/app/providers/auth/useAuth.ts (hook)
+// src/app/providers/auth/authState.ts (state logic)
+// src/app/providers/auth/authQueries.ts (queries)
+```
 
-| Type | Message | Location | Severity |
-|------|---------|----------|----------|
-| Error | `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` | Every public page | 🟡 Medium |
-| Warning | React Router Future Flag: `v7_startTransition` | All pages | 🔵 Low |
-| Warning | React Router Future Flag: `v7_relativeSplatPath` | All pages | 🔵 Low |
-| Error | `400 Bad Request` on `/auth/v1/token?grant_type=password` | Sign-in (wrong credentials) | 🔴 Critical (no UI feedback) |
+4. **Regenerate types** if too large (should only include database types)
 
----
+### 8.3 Hardcoded Values
 
-## Recommendations
+**File:** `src/modules/cpq/components/QuotePDFTemplate.tsx` (line 87)
+```typescript
+const VAT_RATE = 0.15;  // Hardcoded 15% VAT
+```
 
-### Immediate (Pre-Launch)
+**Recommended Fix:**
 
-1. **Fix C-01:** Switch Supabase auth storage from `localStorage` to `sessionStorage` in `client.ts`
-2. **Fix C-02:** Add email verification check in `signIn` function — block login if `account_state` is `"pending_verification"`
-3. **Fix C-03:** Debug and fix the toast notification chain so login errors are visible to users
-4. **Audit RLS:** Verify all Supabase tables have proper RLS policies enforcing `organization_id` isolation
+1. **Add to tenant/organization settings**:
+```typescript
+// Get from subscription or settings
+const VAT_RATE = organization?.settings?.vatRate 
+  ?? tenant?.settings?.vatRate 
+  ?? 0.15;
+```
 
-### Short-Term
+2. **Create configuration service**:
+```typescript
+// src/core/config/organizationConfig.ts
+export function getTaxRate(organization: Organization): number {
+  return organization.taxConfig?.vatRate 
+    ?? Number(process.env.DEFAULT_VAT_RATE || '0.15');
+}
+```
 
-5. Add rate limiting to login form (5 failed attempts → 60s cooldown)
-6. Create a dedicated "Verify Your Email" page post-signup
-7. Add "Contact" to header navigation
-8. Fix footer brand name from "SITWIT" to "SISWIT"
-9. Remove or implement the `remember_me` localStorage flag
-10. Configure server-side password minimum to match client-side (12 chars)
-
-### Long-Term
-
-11. Migrate from React Router v6 to v7 to resolve future flag warnings
-12. Rename `tenantId`/`tenant_id` references to `organizationId`/`organization_id` for naming consistency
-13. Add a real-time org code availability checker on sign-up
-14. Implement CSRF protection for state-changing operations
-15. Add automated integration tests for cross-tenant data isolation
-
----
-
-## Test Session Coverage
-
-| Area | Tested | Method |
-|------|--------|--------|
-| Homepage | ✅ | Browser |
-| Products page | ✅ | Browser |
-| Solutions page | ✅ | Browser |
-| Pricing page | ✅ | Browser |
-| About page | ✅ | Browser |
-| Contact page | ✅ | Browser |
-| Sign-In page | ✅ | Browser + Code review |
-| Sign-Up (Organization) | ✅ | Browser + Code review |
-| Sign-Up (Client) | ✅ | Browser + Code review |
-| Forgot Password | ✅ | Browser + Code review |
-| Reset Password (no token) | ✅ | Browser |
-| Email verification flow | ✅ | Code review |
-| AuthProvider (signIn/signUp) | ✅ | Code review |
-| TenantProvider | ✅ | Code review |
-| OrganizationProvider | ✅ | Code review |
-| TenantSlugGuard | ✅ | Code review |
-| Module data isolation | ✅ | Code review |
-| CRM hooks (useCRM.ts) | ✅ | Code review |
-| module-scope.ts | ✅ | Code review |
-| Supabase client config | ✅ | Code review |
+3. **Add to database schema**:
+```sql
+ALTER TABLE organizations 
+ADD COLUMN IF NOT EXISTS tax_rate DECIMAL(5,4) DEFAULT 0.15;
+```
 
 ---
 
-*Report generated by comprehensive automated testing and code review session.*
+## 9. Security Considerations
+
+### 9.1 Public Environment Variables
+
+**Issue:** Client-side code exposes Supabase URL and key:
+
+```typescript
+// These are visible in browser developer tools
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+```
+
+**Recommended Fix:**
+
+1. **Use VITE_ prefix (already done)** - This is correct for client-side exposure
+2. **Ensure Supabase RLS is enabled**:
+```sql
+-- Enable RLS on all tables
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+-- etc.
+```
+
+3. **Create RLS policies**:
+```sql
+-- Example: Users can only see their organization's data
+CREATE POLICY "Users can view own organization data" ON leads
+  FOR SELECT
+  USING (organization_id IN (
+    SELECT organization_id 
+    FROM organization_memberships 
+    WHERE user_id = auth.uid()
+  ));
+```
+
+4. **Use service role only on server** - Never expose service role key in client
+5. **Add additional security headers** in vite.config.ts:
+```typescript
+export default defineConfig({
+  server: {
+    headers: {
+      'Content-Security-Policy': 'default-src \'self\'; script-src \'self\' \'unsafe-inline\'; connect-src https://*.supabase.co',
+    },
+  },
+});
+```
+
+### 9.2 Role-Based Access Control Complexity
+
+The RBAC system in `src/core/rbac/usePermissions.ts` has complex permission checks that may have gaps:
+
+- Multiple role types (legacy, platform, organization) create potential bypass opportunities
+- Permission checks may not cover all edge cases
+
+**Recommended Fix:**
+
+1. **Simplify role system** (see Section 5.2)
+2. **Create explicit permission checks**:
+```typescript
+// src/core/rbac/permissions.ts
+export const Permissions = {
+  // Define all possible actions
+  VIEW_DASHBOARD: 'dashboard:view',
+  MANAGE_USERS: 'users:manage',
+  VIEW_LEADS: 'leads:view',
+  CREATE_LEADS: 'leads:create',
+  // ... more actions
+} as const;
+
+// Create role-permission mapping
+export const RolePermissions: Record<string, string[]> = {
+  platform_super_admin: Object.values(Permissions),
+  owner: [Permissions.VIEW_DASHBOARD, Permissions.MANAGE_USERS, ...],
+  admin: [Permissions.VIEW_DASHBOARD, Permissions.MANAGE_USERS, Permissions.VIEW_LEADS, ...],
+  manager: [Permissions.VIEW_DASHBOARD, Permissions.VIEW_LEADS, Permissions.CREATE_LEADS],
+  employee: [Permissions.VIEW_DASHBOARD, Permissions.VIEW_LEADS],
+  client: [Permissions.VIEW_PORTAL],
+};
+
+// Check permission function
+export function hasPermission(role: AppRole, permission: string): boolean {
+  const permissions = RolePermissions[role];
+  return permissions?.includes(permission) ?? false;
+}
+```
+
+3. **Add audit logging for permission denied events**
+
+---
+
+## 10. Performance Concerns
+
+### 10.1 Redundant Data Fetching
+
+Both OrganizationProvider and TenantProvider fetch membership data on app load:
+
+```typescript
+// OrganizationProvider - line 122-126
+const membershipsResult = await unsafeSupabase
+  .from("organization_memberships")
+  .select(...)
+  .eq("user_id", userId)
+
+// TenantProvider - line 79-83
+const membershipsResult = await supabase
+  .from("tenant_users")
+  .select(...)
+  .eq("user_id", userId)
+```
+
+**Recommended Fix:**
+
+1. **Consolidate to single provider** (see Section 5.1)
+2. **Implement deduplication** if keeping both:
+```typescript
+// Cache membership data
+const cache = new Map<string, Membership[]>();
+
+async function fetchMemberships(userId: string) {
+  const cacheKey = `memberships:${userId}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey)!;
+  }
+  
+  // Fetch and cache for 5 minutes
+  const data = await fetchFromAPI(userId);
+  cache.set(cacheKey, data);
+  setTimeout(() => cache.delete(cacheKey), 5 * 60 * 1000);
+  return data;
+}
+```
+3. **Use React Query's deduplication**:
+```typescript
+// Both providers can share the same query key
+const { data } = useQuery({
+  queryKey: ['user-memberships', userId],
+  queryFn: () => fetchMemberships(userId),
+  // This ensures only one request is made
+});
+```
+
+### 10.2 Large Bundle Size
+
+The application imports from multiple large modules:
+- `recharts` (charting library)
+- `date-fns` (date utilities)
+- Multiple Radix UI components
+
+**Recommended Fix:**
+
+1. **Use dynamic imports for heavy components**:
+```typescript
+// Lazy load charts
+const ChartComponent = lazy(() => import('./components/ChartComponent'));
+
+// Or use React.lazy
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+```
+
+2. **Use tree-shaking friendly imports**:
+```typescript
+// Instead of:
+import { format, parseISO, addDays } from 'date-fns';
+
+// Use:
+import format from 'date-fns/format';
+import parseISO from 'date-fns/parseISO';
+import addDays from 'date-fns/addDays';
+
+// Or use date-fns-tz for lighter bundle
+```
+
+3. **Use lighter alternatives**:
+```typescript
+// Replace recharts with lighter alternative:
+// - Chart.js (smaller)
+// - visx (most modular)
+// - Custom SVG charts for simple needs
+```
+
+4. **Configure Vite for better tree-shaking**:
+```typescript
+// vite.config.ts
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+          'vendor-charts': ['recharts'],
+        },
+      },
+    },
+  },
+});
+```
+
+---
+
+## 11. Migration/Compatibility Issues
+
+### 11.1 Legacy Route Support
+
+The app maintains legacy route redirects:
+
+```typescript
+// src/app/App.tsx - line 332-335
+<Route path="/admin/*" element={<LegacyAdminRedirect />} />
+<Route path="/dashboard/*" element={<LegacyDashboardRedirect />} />
+<Route path="/portal/*" element={<LegacyPortalRedirect />} />
+```
+
+**Recommended Fix:**
+
+1. **Phase out legacy routes** - Set a deprecation timeline
+2. **Add deprecation warnings**:
+```typescript
+function LegacyDashboardRedirect() {
+  console.warn(
+    'DEPRECATED: /dashboard/* routes are deprecated. ' +
+    'Please update your bookmarks to /{tenantSlug}/app/*'
+  );
+  // ... existing logic
+}
+```
+
+3. **Track usage** - Add analytics to see which legacy routes are being used
+4. **Create migration guide** for existing users
+5. **Set sunset date** - Remove after certain version or date
+
+### 11.2 Multiple Sign-Up Flows
+
+The application has multiple signup flows:
+- Organization signup
+- Client self-signup
+- Employee invitation acceptance
+- Client invitation acceptance
+
+**Recommended Fix:**
+
+1. **Consolidate signup flows** into a single wizard:
+```typescript
+// SignUpWizard.tsx
+enum SignUpStep {
+  USER_INFO = 'user_info',
+  ORGANIZATION = 'organization',  // or SELECT_ORGANIZATION for clients
+  VERIFICATION = 'verification',
+}
+```
+
+2. **Unify invitation handling**:
+```typescript
+// Use token type to determine flow
+interface InvitationToken {
+  type: 'employee' | 'client' | 'organization';
+  expiresAt: string;
+  // ...
+}
+```
+
+3. **Create reusable components** for common signup steps
+
+---
+
+## 12. Testing & Documentation
+
+### 12.1 Missing Tests
+
+No test files were found in the project structure. Critical components should have unit tests:
+- AuthProvider
+- TenantProvider / OrganizationProvider
+- Role normalization functions
+- Protected route components
+
+**Recommended Fix:**
+
+1. **Set up testing framework**:
+```bash
+npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+```
+
+2. **Configure Vitest** in vite.config.ts:
+```typescript
+/// <reference types="vitest" />
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+  },
+});
+```
+
+3. **Create test files**:
+```typescript
+// src/app/providers/__tests__/TenantProvider.test.tsx
+import { render, screen, waitFor } from '@testing-library/react';
+import { TenantProvider } from '../TenantProvider';
+
+describe('TenantProvider', () => {
+  it('provides tenant context to children', async () => {
+    // Test implementation
+  });
+});
+
+// src/core/types/__tests__/roles.test.ts
+import { describe, it, expect } from 'vitest';
+import { normalizeRole, isPlatformRole } from '../roles';
+
+describe('normalizeRole', () => {
+  it('normalizes legacy roles', () => {
+    expect(normalizeRole('tenant_admin')).toBe('admin');
+  });
+});
+```
+
+4. **Add CI check** for test coverage:
+```json
+// package.json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage"
+  }
+}
+```
+
+### 12.2 Documentation
+
+- PRD_SISWIT.html exists but may be outdated
+- docs/ folder contains planning documents but not API documentation
+
+**Recommended Fix:**
+
+1. **Create API documentation** using TypeDoc:
+```bash
+npm install -D typedoc
+```
+
+2. **Generate documentation**:
+```json
+// package.json
+{
+  "scripts": {
+    "docs": "typedoc --out docs/api src/"
+  }
+}
+```
+
+3. **Create component documentation**:
+```typescript
+/**
+ * OrganizationProvider manages the current organization's state
+ * and provides subscription/module access information.
+ * 
+ * @example
+ * ```tsx
+ * function MyComponent() {
+ *   const { organization, hasModule } = useOrganization();
+ *   
+ *   if (hasModule('crm')) {
+ *     return <CRMDashboard />;
+ *   }
+ * }
+ * ```
+ */
+export function OrganizationProvider({ children }) { ... }
+```
+
+4. **Update docs/README.md** with contribution guidelines
+5. **Create architecture decision records (ADRs)** in docs/ folder
+
+---
+
+## 13. Summary of Issues by Severity
+
+### Critical (Requires Immediate Attention)
+1. ESLint parsing error in `src/core/api/types.ts`
+2. Conditional useMemo hook in TenantAdminLayout.tsx
+3. Missing environment variables (will cause runtime failure)
+4. Dual provider system creating potential race conditions
+
+### High (Should Be Addressed)
+1. Type duplication (ModuleType, isModuleEnabled)
+2. Excessive use of `any` types
+3. Role system complexity leading to potential auth issues
+4. Module scope may fail due to provider conflicts
+
+### Medium (Recommended Fixes)
+1. Unnecessary dependencies in useCallback
+2. Missing useMemo dependencies
+3. Duplicate Header/Footer components
+4. Hardcoded values (VAT rate)
+
+### Low (Nice to Have)
+1. Unused eslint-disable directive
+2. Large file sizes
+3. Missing test coverage
+4. Legacy route complexity
+
+---
+
+## 14. Detailed Recommendations with Implementation Steps
+
+### Priority 1: Fix Critical Issues (Week 1-2)
+
+#### 1.1 Fix ESLint Parsing Error in types.ts
+- **Action:** Regenerate `src/core/api/types.ts` using: `npm run db:types`
+- **Alternative:** Manually recreate the file with proper UTF-8 encoding
+- **Verification:** Run `npm run lint` to confirm the error is resolved
+
+#### 1.2 Fix Conditional useMemo in TenantAdminLayout.tsx
+- **Action:** Move useMemo outside conditional blocks
+- **File:** `src/workspaces/organization_admin/layout/TenantAdminLayout.tsx:180`
+- **Test:** Verify component renders correctly in all states
+
+#### 1.3 Add Required Environment Variables
+- **Action:** Create/update `.env` file with:
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+```
+- **Verify:** Check that Supabase client initializes without errors
+
+#### 1.4 Consolidate Provider System
+- **Short-term:** Add loading states to prevent race conditions
+- **Long-term:** Choose either Organization or Tenant as primary model
+- **Recommended:** Use Tenant as it's more common in SaaS
+
+---
+
+### Priority 2: Address Architecture (Week 2-4)
+
+#### 2.1 Eliminate Type Duplication
+- Create `src/core/types/modules.ts` with single ModuleType definition
+- Update imports in `organization.ts` and `tenant.ts` to re-export
+- Run find/replace across codebase to use single source
+
+#### 2.2 Simplify Role System
+- Remove legacy role mappings after data migration
+- Consolidate to single role enum in `src/core/types/roles.ts`
+- Create database migration to update legacy roles
+
+#### 2.3 Fix Module Scope Hooks
+- Update all module hooks to use unified workspace context
+- Add proper loading/error states
+- Test each module (CRM, CPQ, CLM, ERP, Documents)
+
+---
+
+### Priority 3: Improve Code Quality (Week 3-6)
+
+#### 3.1 Replace any Types
+- Add proper interfaces for DashboardData
+- Update OrganizationAdminDashboard.tsx with typed responses
+- Use React Query's generic types for better inference
+
+#### 3.2 Fix Missing Dependencies
+- Add dashboardData.charts to useMemo dependencies array
+- Or restructure to use useEffect for side effects
+
+#### 3.3 Extract Shared Components
+- Create `src/components/layout/Header.tsx`
+- Create `src/components/layout/Footer.tsx`
+- Update imports across all workspaces
+
+#### 3.4 Add Configuration Service
+- Move hardcoded values (VAT_RATE, etc.) to config
+- Store in database or environment variables
+
+---
+
+### Priority 4: Performance & Maintenance (Week 4-8)
+
+#### 4.1 Implement Code Splitting
+- Use React.lazy for route components
+- Dynamic imports for charts and heavy components
+- Configure Vite manual chunks
+
+#### 4.2 Set Up Testing
+- Install Vitest and Testing Library
+- Write tests for critical paths (auth, providers)
+- Add CI check for test coverage
+
+#### 4.3 Remove Legacy Support
+- Phase out legacy routes with deprecation warnings
+- Track usage and set sunset date
+- Update documentation
+
+#### 4.4 Add Documentation
+- Set up TypeDoc for API documentation
+- Create component documentation
+- Update docs/ with architecture decisions
+
+---
+
+## Appendix: File Locations
+
+### Key Source Files
+- **App Entry:** `src/app/App.tsx`
+- **Auth:** `src/app/providers/AuthProvider.tsx`
+- **Tenancy:** `src/app/providers/TenantProvider.tsx`
+- **Organization:** `src/app/providers/OrganizationProvider.tsx`
+- **Routing:** `src/core/auth/components/ProtectedRoute.tsx`
+- **Roles:** `src/core/types/roles.ts`
+- **Types:** `src/core/types/*.ts`
+
+### Module Hooks
+- CRM: `src/modules/crm/hooks/useCRM.ts`
+- CPQ: `src/modules/cpq/hooks/useCPQ.ts`
+- CLM: `src/modules/clm/hooks/useCLM.ts`
+- ERP: `src/modules/erp/hooks/useERP.ts`
+- Documents: `src/modules/documents/hooks/useDocuments.ts`
+
+### Workspaces
+- Auth: `src/workspaces/auth/`
+- Website: `src/workspaces/website/`
+- Employee: `src/workspaces/employee/`
+- Organization Admin: `src/workspaces/organization_admin/`
+- Organization Owner: `src/workspaces/organization/`
+- Platform Admin: `src/workspaces/platform/`
+- Portal: `src/workspaces/portal/`
+
+---
+
+*End of Debug Report*

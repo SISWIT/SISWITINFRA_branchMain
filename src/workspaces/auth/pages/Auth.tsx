@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Checkbox } from "@/ui/shadcn/checkbox";
@@ -18,7 +18,7 @@ import {
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, user, role, loading } = useAuth();
+  const { signIn, resendVerificationEmail, user, role, loading } = useAuth();
   const { organization } = useOrganization();
 
   const [email, setEmail] = useState("");
@@ -26,6 +26,10 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [isVerificationError, setIsVerificationError] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
     if (!user || !role) return;
@@ -64,15 +68,60 @@ const Auth = () => {
     }
   }, [navigate, organization?.slug, role, user]);
 
+  // Clear inline error when user starts typing
+  useEffect(() => {
+    if (inlineError) {
+      setInlineError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, password]);
+
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const onResendVerification = useCallback(async () => {
+    if (resendCooldown > 0 || resendingEmail || !email.trim()) return;
+    setResendingEmail(true);
+    const { error } = await resendVerificationEmail(email.trim());
+    setResendingEmail(false);
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Resend failed",
+        description: error,
+      });
+      return;
+    }
+    setResendCooldown(60);
+    toast({
+      title: "Email sent",
+      description: "A new verification email has been sent. Check your inbox and spam folder.",
+    });
+  }, [email, resendCooldown, resendingEmail, resendVerificationEmail, toast]);
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
+    setInlineError(null);
+    setIsVerificationError(false);
 
     const { error, role: resolvedRole } = await signIn(email.trim(), password, rememberMe);
 
     setSubmitting(false);
 
     if (error) {
+      // Set inline error as primary feedback (always visible)
+      setInlineError(error);
+      // Detect verification-related errors to show resend button
+      const lowerError = error.toLowerCase();
+      if (lowerError.includes("verify") || lowerError.includes("verification") || lowerError.includes("confirm")) {
+        setIsVerificationError(true);
+      }
+      // Also fire toast as secondary notification
       toast({
         variant: "destructive",
         title: "Sign in failed",
@@ -208,6 +257,44 @@ const Auth = () => {
                       Forgot password?
                     </Link>
                   </div>
+
+                  {/* C-03 fix: Inline error banner — always visible as primary feedback */}
+                  {inlineError && (
+                    <div
+                      id="sign-in-error"
+                      role="alert"
+                      className="flex flex-col gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{inlineError}</span>
+                      </div>
+                      {isVerificationError && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={resendingEmail || resendCooldown > 0}
+                          onClick={onResendVerification}
+                          className="w-fit self-start border-destructive/30 text-destructive hover:bg-destructive/10 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
+                        >
+                          {resendingEmail ? (
+                            <>
+                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                              Sending...
+                            </>
+                          ) : resendCooldown > 0 ? (
+                            `Resend in ${resendCooldown}s`
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-3.5 w-3.5" />
+                              Resend verification email
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   <Button
                     type="submit"

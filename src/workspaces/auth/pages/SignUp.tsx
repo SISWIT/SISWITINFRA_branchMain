@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Mail, Search } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/shadcn/tabs";
@@ -61,7 +61,7 @@ function PasswordStrength({ password }: { password: string }) {
 }
 
 export default function SignUp() {
-  const { signUpOrganization, signUpClientSelf, loading } = useAuth();
+  const { signUpOrganization, signUpClientSelf, resendVerificationEmail, loading } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -89,6 +89,10 @@ export default function SignUp() {
   const [clientSubmitting, setClientSubmitting] = useState(false);
   const [clientSubmitted, setClientSubmitted] = useState(false);
   const [organizationSearchDone, setOrganizationSearchDone] = useState(false);
+
+  // Resend verification email state
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const suggestedCode = useMemo(() => makeCode(organizationName || "ORG"), [organizationName]);
 
@@ -159,6 +163,33 @@ export default function SignUp() {
     const next = new URLSearchParams(searchParams);
     next.set("tab", value);
     setSearchParams(next, { replace: true });
+  };
+
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const onResendVerification = async (emailAddress: string) => {
+    if (resendCooldown > 0 || resendingEmail) return;
+    setResendingEmail(true);
+    const { error } = await resendVerificationEmail(emailAddress);
+    setResendingEmail(false);
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Resend failed",
+        description: error,
+      });
+      return;
+    }
+    setResendCooldown(60);
+    toast({
+      title: "Email sent",
+      description: "A new verification email has been sent. Check your inbox and spam folder.",
+    });
   };
 
   const onOrganizationSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -267,9 +298,31 @@ export default function SignUp() {
           <p className="mt-2 text-sm text-muted-foreground">
             Your account was created and a verification email has been sent. Verify your email, then sign in.
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Didn&apos;t receive the email? Check your spam folder, or click below to resend.
+          </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Button asChild>
               <Link to="/auth/sign-in">Go to sign in</Link>
+            </Button>
+            <Button
+              variant="outline"
+              disabled={resendingEmail || resendCooldown > 0}
+              onClick={() => onResendVerification(organizationEmail)}
+            >
+              {resendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : resendCooldown > 0 ? (
+                `Resend in ${resendCooldown}s`
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Resend verification email
+                </>
+              )}
             </Button>
             <Button variant="outline" asChild>
               <Link to="/">Back to home</Link>
@@ -360,9 +413,31 @@ export default function SignUp() {
           <p className="mt-2 text-sm text-muted-foreground">
             Verify your email address and wait for organization approval before portal access.
           </p>
-          <div className="mt-4">
+          <p className="mt-2 text-xs text-muted-foreground">
+            Didn&apos;t receive the email? Check your spam folder, or click below to resend.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
             <Button asChild>
               <Link to="/auth/sign-in">Go to sign in</Link>
+            </Button>
+            <Button
+              variant="outline"
+              disabled={resendingEmail || resendCooldown > 0}
+              onClick={() => onResendVerification(clientEmail)}
+            >
+              {resendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : resendCooldown > 0 ? (
+                `Resend in ${resendCooldown}s`
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Resend verification email
+                </>
+              )}
             </Button>
           </div>
         </div>
