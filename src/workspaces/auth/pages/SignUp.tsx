@@ -50,11 +50,11 @@ function PasswordStrength({ password }: { password: string }) {
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
       <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-        <li className={hasLength ? "text-green-600 dark:text-green-400" : ""}>• 12+ characters</li>
-        <li className={hasUpper ? "text-green-600 dark:text-green-400" : ""}>• Uppercase letter</li>
-        <li className={hasLower ? "text-green-600 dark:text-green-400" : ""}>• Lowercase letter</li>
-        <li className={hasNumber ? "text-green-600 dark:text-green-400" : ""}>• Number</li>
-        <li className={hasSpecial ? "text-green-600 dark:text-green-400" : ""}>• Special character</li>
+        <li className={hasLength ? "text-green-600 dark:text-green-400" : ""}>- 12+ characters</li>
+        <li className={hasUpper ? "text-green-600 dark:text-green-400" : ""}>- Uppercase letter</li>
+        <li className={hasLower ? "text-green-600 dark:text-green-400" : ""}>- Lowercase letter</li>
+        <li className={hasNumber ? "text-green-600 dark:text-green-400" : ""}>- Number</li>
+        <li className={hasSpecial ? "text-green-600 dark:text-green-400" : ""}>- Special character</li>
       </ul>
     </div>
   );
@@ -100,6 +100,7 @@ export default function SignUp() {
     if (activeTab !== "client") {
       setOrganizationSearchResults([]);
       setOrganizationSearchLoading(false);
+      setOrganizationSearchDone(false);
       return;
     }
 
@@ -113,6 +114,7 @@ export default function SignUp() {
 
     let cancelled = false;
     setOrganizationSearchLoading(true);
+    setOrganizationSearchDone(false);
 
     const timer = setTimeout(async () => {
       try {
@@ -125,6 +127,7 @@ export default function SignUp() {
 
         if (error || !Array.isArray(data)) {
           setOrganizationSearchResults([]);
+          setOrganizationSearchDone(true);
           return;
         }
 
@@ -141,9 +144,11 @@ export default function SignUp() {
         );
 
         setOrganizationSearchResults(rows);
+        setOrganizationSearchDone(true);
       } catch {
         if (!cancelled) {
           setOrganizationSearchResults([]);
+          setOrganizationSearchDone(true);
         }
       } finally {
         if (!cancelled) {
@@ -277,6 +282,7 @@ export default function SignUp() {
     setSelectedOrganization(organization);
     setOrganizationLookup(organization.slug);
     setOrganizationSearchResults([]);
+    setOrganizationSearchDone(false);
   };
 
   const onLookupChange = (value: string) => {
@@ -654,4 +660,5 @@ export default function SignUp() {
     </div>
   );
 }
+
 

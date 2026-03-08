@@ -894,12 +894,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // C-02 fix: Block login if email is not yet verified
         if (nextRole === ("pending_verification" as AuthRole)) {
-          // Sign the user out so no session lingers
-          await supabase.auth.signOut();
-          return {
-            error: "Please verify your email address before signing in. Check your inbox for the verification link.",
-            role: null as AuthRole,
-          };
+          // Check if Supabase Auth has already confirmed the email
+          const emailConfirmed = !!data.user.email_confirmed_at;
+          if (emailConfirmed) {
+            // Auto-activate the membership since email is verified at auth level
+            const { error: activateError } = await unsafeSupabase
+              .from("organization_memberships")
+              .update({
+                account_state: "active",
+                is_email_verified: true,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", data.user.id)
+              .eq("account_state", "pending_verification");
+
+            if (!activateError) {
+              // Re-fetch the role now that membership is active
+              nextRole = await getUserRole(data.user.id);
+            }
+          }
+
+          // If still pending (email not confirmed or activation failed), block login
+          if (nextRole === ("pending_verification" as AuthRole)) {
+            await supabase.auth.signOut();
+            return {
+              error: "Please verify your email address before signing in. Check your inbox for the verification link.",
+              role: null as AuthRole,
+            };
+          }
         }
 
         cacheRole(data.user.id, nextRole);
@@ -914,7 +936,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [cacheRole, claimPendingInvitations, getUserRole],
+    [cacheRole, claimPendingInvitations, getUserRole, unsafeSupabase],
   );
 
   /** @deprecated Use signUpOrganization, signUpClientSelf, or invitation acceptance instead. */
