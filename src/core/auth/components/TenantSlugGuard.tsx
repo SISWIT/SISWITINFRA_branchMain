@@ -52,7 +52,10 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
               reason: "Platform admin tenant preview",
             });
           }
-        })();
+        })().catch((err) => {
+          // W-04: Log error instead of silently swallowing
+          console.error("Impersonation lookup failed:", err);
+        });
       }
       return;
     }

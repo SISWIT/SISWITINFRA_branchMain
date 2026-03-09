@@ -28,7 +28,7 @@ function isMissingTableError(error: unknown): boolean {
   return (error as { code?: string }).code === "42P01";
 }
 
-function useDocumentsRealtime(userId?: string, scope = "global") {
+function useDocumentsRealtime(userId?: string, scope = "global", organizationId?: string | null) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -36,16 +36,20 @@ function useDocumentsRealtime(userId?: string, scope = "global") {
       return;
     }
 
+    const orgFilter = organizationId
+      ? `organization_id=eq.${organizationId}`
+      : undefined;
+
     const channel = supabase
       .channel(`documents-realtime-${userId}-${scope}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "auto_documents" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "auto_documents", filter: orgFilter }, () => {
         queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
         queryClient.invalidateQueries({ queryKey: ["auto_document"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "document_templates" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_templates", filter: orgFilter }, () => {
         queryClient.invalidateQueries({ queryKey: ["document_templates"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "document_esignatures" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "document_esignatures", filter: orgFilter }, () => {
         queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
         queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
       })
@@ -54,7 +58,7 @@ function useDocumentsRealtime(userId?: string, scope = "global") {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, scope, userId]);
+  }, [queryClient, scope, userId, organizationId]);
 }
 
 async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise<void> {
@@ -103,7 +107,7 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise
 export function useDocumentTemplates() {
   const { user, role } = useAuth();
   const { organization } = useOrganization();
-  useDocumentsRealtime(user?.id, "templates");
+  useDocumentsRealtime(user?.id, "templates", organization?.id);
 
   return useQuery({
     queryKey: ["document_templates", user?.id, organization?.id],
@@ -203,10 +207,15 @@ export function useUpdateDocumentTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<DocumentTemplate> & { id: string }) => {
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
+
       const { data, error } = await supabase
         .from("document_templates")
         .update(updates)
         .eq("id", id)
+        .eq("organization_id", organization.id)
         .select()
         .single();
 
@@ -246,6 +255,7 @@ export function useDeleteDocumentTemplate() {
         table: "document_templates",
         id,
         userId: user?.id ?? null,
+        organizationId: organization?.id || "",
       });
       if (!ok) {
         throw new Error("Failed to soft-delete template");
@@ -273,7 +283,7 @@ export function useDeleteDocumentTemplate() {
 export function useAutoDocuments() {
   const { user, role } = useAuth();
   const { organization } = useOrganization();
-  useDocumentsRealtime(user?.id, "documents");
+  useDocumentsRealtime(user?.id, "documents", organization?.id);
 
   return useQuery({
     queryKey: ["auto_documents", user?.id, organization?.id],
@@ -424,10 +434,15 @@ export function useUpdateAutoDocument() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AutoDocument> & { id: string }) => {
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
+
       const { data, error } = await supabase
         .from("auto_documents")
         .update(updates)
         .eq("id", id)
+        .eq("organization_id", organization.id)
         .select()
         .single();
 
@@ -468,6 +483,7 @@ export function useDeleteAutoDocument() {
         table: "auto_documents",
         id,
         userId: user?.id ?? null,
+        organizationId: organization?.id || "",
       });
       if (!ok) {
         throw new Error("Failed to soft-delete document");
@@ -493,11 +509,12 @@ export function useDeleteAutoDocument() {
 
 // ===== DOCUMENT E-SIGNATURES =====
 export function useDocumentESignatures(documentId?: string) {
-  const { user } = useAuth();
-  useDocumentsRealtime(user?.id, `esignatures-${documentId || "all"}`);
+  const { user, role } = useAuth();
+  const { organization } = useOrganization();
+  useDocumentsRealtime(user?.id, `esignatures-${documentId || "all"}`, organization?.id);
 
   return useQuery({
-    queryKey: ["document_esignatures", documentId || "all", user?.id],
+    queryKey: ["document_esignatures", documentId || "all", user?.id, organization?.id],
     enabled: !!user,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -507,11 +524,18 @@ export function useDocumentESignatures(documentId?: string) {
 
       let query = supabase
         .from("document_esignatures")
-        .select("*, document:auto_documents(id,name,type,status,created_at,updated_at)")
+        .select("*, document:auto_documents!inner(id,name,type,status,created_at,updated_at,organization_id)")
         .order("created_at", { ascending: false });
 
       if (documentId) {
         query = query.eq("document_id", documentId);
+      }
+
+      if (!isPlatformRole(role)) {
+        if (!organization?.id) {
+          throw new Error("Organization context is required");
+        }
+        query = query.eq("document.organization_id", organization.id);
       }
 
       const { data, error } = await query;
@@ -741,14 +765,26 @@ export function useSendDocumentReminder() {
 
 // ===== DOCUMENT VERSIONS =====
 export function useDocumentVersions(documentId: string) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const { organization } = useOrganization();
 
   return useQuery({
-    queryKey: ["document_versions", documentId, user?.id],
+    queryKey: ["document_versions", documentId, user?.id, organization?.id],
     enabled: !!documentId && !!user,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
+      }
+
+      // Verify the user can access the parent document before reading versions.
+      let docCheckQuery = supabase.from("auto_documents").select("id").eq("id", documentId);
+      if (!isPlatformRole(role)) {
+        docCheckQuery = docCheckQuery.eq("organization_id", organization?.id ?? "");
+      }
+      const { data: docCheck } = await docCheckQuery.maybeSingle();
+
+      if (!docCheck) {
+        throw new Error("Document not found or not accessible");
       }
 
       const { data, error } = await supabase
@@ -840,9 +876,22 @@ export function useDocumentPermissions(documentId: string) {
 export function useShareDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (permission: Omit<Partial<DocumentPermission>, "id" | "created_at">) => {
+      // S-07: Verify the user's org has access to the document before sharing
+      const { data: doc } = await supabase
+        .from("auto_documents")
+        .select("id")
+        .eq("id", permission.document_id || "")
+        .eq("organization_id", organization?.id ?? "")
+        .maybeSingle();
+
+      if (!doc) {
+        throw new Error("Document not found or not accessible");
+      }
+
       const { data, error } = await supabase
         .from("document_permissions")
         .insert({
@@ -850,6 +899,7 @@ export function useShareDocument() {
           user_id: permission.user_id || "",
           permission_type: permission.permission_type || "view",
           shared_by: user?.id,
+          organization_id: organization?.id,
         })
         .select()
         .single();
@@ -872,9 +922,22 @@ export function useShareDocument() {
 
 export function useRemoveDocumentPermission() {
   const queryClient = useQueryClient();
+  const { organization } = useOrganization();
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // S-06: Verify permission belongs to current tenant before deleting
+      const { data: perm } = await supabase
+        .from("document_permissions")
+        .select("id, organization_id")
+        .eq("id", id)
+        .eq("organization_id", organization?.id ?? "")
+        .maybeSingle();
+
+      if (!perm) {
+        throw new Error("Permission not found or not accessible");
+      }
+
       const { error } = await supabase.from("document_permissions").delete().eq("id", id);
 
       if (error) {

@@ -18,8 +18,13 @@ export default function OrganizationApprovalsPage() {
   const [workingMembershipId, setWorkingMembershipId] = useState<string | null>(null);
 
   const handleApprove = async (membershipId: string) => {
+    if (!organization?.id) {
+      toast({ variant: "destructive", title: "Approval failed", description: "Organization context is required." });
+      return;
+    }
+
     setWorkingMembershipId(membershipId);
-    const { error } = await approveClientMembership(membershipId);
+    const { error } = await approveClientMembership(membershipId, organization.id);
     setWorkingMembershipId(null);
 
     if (error) {
@@ -32,8 +37,13 @@ export default function OrganizationApprovalsPage() {
   };
 
   const handleReject = async (membershipId: string) => {
+    if (!organization?.id) {
+      toast({ variant: "destructive", title: "Rejection failed", description: "Organization context is required." });
+      return;
+    }
+
     setWorkingMembershipId(membershipId);
-    const { error } = await rejectClientMembership(membershipId);
+    const { error } = await rejectClientMembership(membershipId, organization.id);
     setWorkingMembershipId(null);
 
     if (error) {

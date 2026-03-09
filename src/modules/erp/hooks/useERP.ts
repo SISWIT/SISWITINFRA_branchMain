@@ -827,6 +827,7 @@ export function useDeletePurchaseOrderItem() {
         .from("purchase_order_items")
         .select("id, purchase_order_id")
         .eq("id", id)
+        .eq("organization_id", tenantId || "") // S-10: scope to current org
         .maybeSingle();
 
       if (itemResult.error || !itemResult.data) {

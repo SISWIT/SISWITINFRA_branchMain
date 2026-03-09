@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/ui/shadcn/tooltip";
@@ -32,7 +32,7 @@ import {
 } from "@/core/utils/routes";
 import { isPlatformRole, isTenantUserRole } from "@/core/types/roles";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient(); // W-05: exported for cache clearing on logout
 
 const Auth = lazy(() => import("../workspaces/auth/pages/Auth"));
 const SignUp = lazy(() => import("../workspaces/auth/pages/SignUp"));
@@ -151,6 +151,16 @@ function LegacyAdminRedirect() {
   const location = useLocation();
   const rest = location.pathname.replace(/^\/admin\/?/, "");
   return <Navigate to={platformPath(rest)} replace />;
+}
+
+// W-06: Guard /:tenantSlug against reserved root segments
+function TenantSlugRedirect() {
+  const { tenantSlug } = useParams();
+  const reservedSegments = ["auth", "platform", "admin", "dashboard", "portal", "api"];
+  if (!tenantSlug || reservedSegments.includes(tenantSlug.toLowerCase())) {
+    return <NotFound />;
+  }
+  return <Navigate to="app/dashboard" replace />;
 }
 
 function RootRedirect() {
@@ -326,8 +336,8 @@ function AppRoutes() {
           <Route path="settings" element={<Navigate to="dashboard" replace />} />
         </Route>
 
-        {/* Root organization slug convenience */}
-        <Route path="/:tenantSlug" element={<Navigate to="app/dashboard" replace />} />
+        {/* Root organization slug convenience — W-06: guard against reserved segments */}
+        <Route path="/:tenantSlug" element={<TenantSlugRedirect />} />
 
         {/* Legacy redirect layer */}
         <Route path="/admin/*" element={<LegacyAdminRedirect />} />

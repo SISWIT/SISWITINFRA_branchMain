@@ -94,6 +94,22 @@ Deno.serve(async (req) => {
       return jsonResponse(403, { error: "Only organization owner/admin can send invitations." });
     }
 
+    // Rate limit: max 50 client invitations per org per hour
+    const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+    const { count, error: rateLimitError } = await adminClient
+      .from("client_invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", payload.organizationId)
+      .gte("created_at", oneHourAgo);
+
+    if (rateLimitError) {
+      return jsonResponse(500, { error: rateLimitError.message });
+    }
+
+    if ((count ?? 0) >= 50) {
+      return jsonResponse(429, { error: "Too many invitations sent. Please try again later." });
+    }
+
     const redirectTo = resolveRedirectTo(payload);
 
     const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(payload.recipientEmail.trim(), {

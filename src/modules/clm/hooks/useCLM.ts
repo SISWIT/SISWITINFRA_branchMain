@@ -216,6 +216,7 @@ export function useDeleteContractTemplate() {
         table: "contract_templates",
         id,
         userId,
+        organizationId: tenantId || "",
       });
 
       if (!deleted) throw new Error("Failed to delete template");
@@ -416,6 +417,7 @@ export function useDeleteContract() {
         table: "contracts",
         id,
         userId,
+        organizationId: tenantId || "",
       });
 
       if (!deleted) throw new Error("Failed to delete contract");
@@ -525,10 +527,21 @@ export function useCreateESignature() {
 
 export function useUpdateESignature() {
   const queryClient = useQueryClient();
-  const { tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useClmScope();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<ESignature> & { id: string }) => {
+    mutationFn: async ({ id, contract_id, ...updates }: Partial<ESignature> & { id: string; contract_id?: string }) => {
+      let contractId = contract_id ?? null;
+      if (!contractId) {
+        const lookup = await supabase.from("contract_esignatures").select("contract_id").eq("id", id).maybeSingle();
+        if (lookup.error || !lookup.data?.contract_id) {
+          throw new Error("E-signature not found or not accessible");
+        }
+        contractId = lookup.data.contract_id;
+      }
+
+      await ensureContractAccessible(contractId, scope);
+
       const payload: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
@@ -536,7 +549,12 @@ export function useUpdateESignature() {
       if (updates.status) payload.status = updates.status;
       if (updates.signed_at) payload.signed_at = updates.signed_at;
 
-      const { data, error } = await supabase.from("contract_esignatures").update(payload).eq("id", id).select().single();
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("contract_esignatures").update(payload).eq("id", id),
+        scope,
+        [],
+      );
+      const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
       void writeAuditLog({
@@ -651,6 +669,7 @@ export function useDeleteContractScan() {
         table: "contract_scans",
         id,
         userId,
+        organizationId: tenantId || "",
       });
 
       if (!deleted) throw new Error("Failed to delete contract scan");

@@ -20,18 +20,29 @@ function RouteLoader() {
   );
 }
 
+function useGuardedAuth() {
+  const { user, role: authRole, accountState, loading } = useAuth();
+  const role = authRole ?? null;
+  const isActiveAccount = accountState === "active";
+  return { user, role, isActiveAccount, loading };
+}
+
 /**
  * Platform Admin Route - Only for SaaS owner
  */
 export function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, role, isActiveAccount, loading } = useGuardedAuth();
 
   if (loading) {
     return <RouteLoader />;
   }
 
-  if (!user || !isPlatformRole(role ?? "pending_approval")) {
-    return <Navigate to="/unauthorized" replace />;
+  if (!user || !role || !isActiveAccount) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
+
+  if (!isPlatformRole(role)) {
+    return <Navigate to="/auth/sign-in" replace />;
   }
 
   return <>{children}</>;
@@ -80,18 +91,18 @@ export function PendingApprovalRoute({ children }: { children: React.ReactNode }
  * Tenant Admin Route - For tenant admins and users
  */
 export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, role, isActiveAccount, loading } = useGuardedAuth();
 
   if (loading) {
     return <RouteLoader />;
   }
 
-  if (!user) {
+  if (!user || !role || !isActiveAccount) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
-  // Platform admin can also access
-  if (isPlatformRole(role ?? "pending_approval")) {
+  // S-12: Platform admins must use impersonation to access tenant routes
+  if (isPlatformRole(role)) {
     return <>{children}</>;
   }
 
@@ -99,7 +110,7 @@ export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isPendingApproval(role ?? "pending_approval")) {
+  if (isPendingApproval(role)) {
     return <Navigate to="/pending-approval" replace />;
   }
 
@@ -110,13 +121,13 @@ export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
  * Client/User Route - For external customers (portal access)
  */
 export function ClientRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, role, isActiveAccount, loading } = useGuardedAuth();
 
   if (loading) {
     return <RouteLoader />;
   }
 
-  if (!user) {
+  if (!user || !role || !isActiveAccount) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
@@ -124,7 +135,7 @@ export function ClientRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isPendingApproval(role ?? "pending_approval")) {
+  if (isPendingApproval(role)) {
     return <Navigate to="/pending-approval" replace />;
   }
 
@@ -139,13 +150,13 @@ export function ClientRoute({ children }: { children: React.ReactNode }) {
  * Organization Owner Route - owner/admin controls
  */
 export function OrganizationOwnerRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, role, isActiveAccount, loading } = useGuardedAuth();
 
   if (loading) {
     return <RouteLoader />;
   }
 
-  if (!user) {
+  if (!user || !role || !isActiveAccount) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
@@ -190,21 +201,21 @@ export function CustomerRoute({ children }: { children: React.ReactNode }) {
  * Admin Route - Either platform admin or tenant admin
  */
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading } = useAuth();
+  const { user, role, isActiveAccount, loading } = useGuardedAuth();
 
   if (loading) {
     return <RouteLoader />;
   }
 
-  if (!user) {
+  if (!user || !role || !isActiveAccount) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
-  if (isPlatformRole(role ?? "pending_approval") || isTenantAdminRole(role)) {
+  if (isPlatformRole(role) || isTenantAdminRole(role)) {
     return <>{children}</>;
   }
 
-  if (isPendingApproval(role ?? "pending_approval")) {
+  if (isPendingApproval(role)) {
     return <Navigate to="/pending-approval" replace />;
   }
 

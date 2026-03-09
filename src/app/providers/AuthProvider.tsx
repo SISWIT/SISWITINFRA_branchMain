@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, User, SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/core/api/client";
 import {
@@ -93,17 +93,16 @@ function generateOrgCode(name: string): string {
   return `${prefix}${suffix}`;
 }
 
+// W-01: Timer cleaned up via .finally() to prevent memory leak
 async function withTimeout<T>(promise: Promise<T> | PromiseLike<T>, timeoutMs: number): Promise<T> {
   const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 5000;
+  let timerId: ReturnType<typeof setTimeout>;
   return Promise.race<T>([
     promise,
     new Promise<T>((_, reject) => {
-      const timer = setTimeout(() => {
-        clearTimeout(timer);
-        reject(new Error("Timeout"));
-      }, timeout);
+      timerId = setTimeout(() => reject(new Error("Timeout")), timeout);
     }),
-  ]);
+  ]).finally(() => clearTimeout(timerId));
 }
 
 async function hashToken(token: string): Promise<string> {
@@ -144,7 +143,8 @@ function membershipPriority(role: string): number {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const unsafeSupabase = supabase as unknown as SupabaseClient;
+  // W-02: Stabilize reference to prevent infinite re-render risk
+  const unsafeSupabase = useMemo(() => supabase as unknown as SupabaseClient, []);
 
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -166,18 +166,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cached = sessionStorage.getItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
       if (!cached) return null;
 
-      let parsedRole = cached;
-      if (cached.startsWith("{")) {
-        const payload = JSON.parse(cached);
-        const age = Date.now() - (payload.timestamp || 0);
-        if (age > 60 * 60 * 1000) {
-          sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-          return null;
-        }
-        parsedRole = payload.role;
+      // W-03: Only accept JSON format, reject raw strings to prevent corrupted cache
+      if (!cached.startsWith("{")) {
+        sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
+        return null;
       }
-      return normalizeRole(parsedRole);
+
+      const payload = JSON.parse(cached);
+      const age = Date.now() - (payload.timestamp || 0);
+      if (age > 60 * 60 * 1000) {
+        sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
+        return null;
+      }
+      return normalizeRole(payload.role);
     } catch {
+      sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
       return null;
     }
   }, []);
@@ -864,7 +867,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [unsafeSupabase]);
 
   const signIn = useCallback(
-    async (email: string, password: string, _rememberMe = true) => {
+    async (email: string, password: string) => { // W-10: removed unused _rememberMe
       try {
         setLoading(true);
 
@@ -897,11 +900,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Check if Supabase Auth has already confirmed the email
           const emailConfirmed = !!data.user.email_confirmed_at;
           if (emailConfirmed) {
-            // Auto-activate the membership since email is verified at auth level
+            // S-09: Determine target state based on role - clients need admin approval
+            const { data: membership } = await unsafeSupabase
+              .from("organization_memberships")
+              .select("role")
+              .eq("user_id", data.user.id)
+              .eq("account_state", "pending_verification")
+              .maybeSingle();
+
+            const targetState = membership?.role === "client" ? "pending_approval" : "active";
+
             const { error: activateError } = await unsafeSupabase
               .from("organization_memberships")
               .update({
-                account_state: "active",
+                account_state: targetState,
                 is_email_verified: true,
                 updated_at: new Date().toISOString(),
               })
@@ -909,7 +921,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .eq("account_state", "pending_verification");
 
             if (!activateError) {
-              // Re-fetch the role now that membership is active
+              // Re-fetch the role now that membership is updated
               nextRole = await getUserRole(data.user.id);
             }
           }
@@ -956,6 +968,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // W-05: Clear React Query cache to prevent stale data across sessions
+      const { queryClient } = await import("@/app/App");
+      queryClient.clear();
       await supabase.auth.signOut();
     } finally {
       setUser(null);

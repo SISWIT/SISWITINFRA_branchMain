@@ -1,5 +1,28 @@
+// S-11: Support multiple CORS origins from environment variable
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? Deno.env.get("ALLOWED_ORIGIN") ?? "https://app.siswitinfra.com")
+  .split(",")
+  .map((o: string) => o.trim());
+
+function getOriginHeader(request?: Request): string {
+  const requestOrigin = request?.headers?.get("origin") ?? "";
+  if (ALLOWED_ORIGINS.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+  // Fallback to first allowed origin for non-browser calls
+  return ALLOWED_ORIGINS[0];
+}
+
+export function getCorsHeaders(request?: Request) {
+  return {
+    "Access-Control-Allow-Origin": getOriginHeader(request),
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+// Backward-compatible default headers (uses first origin)
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0],
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };

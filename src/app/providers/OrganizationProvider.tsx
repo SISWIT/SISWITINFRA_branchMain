@@ -71,7 +71,8 @@ function mapMembership(row: Record<string, unknown>): OrganizationMembership {
 }
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
-  const unsafeSupabase = supabase as unknown as SupabaseClient;
+  // W-08: Stabilize reference to prevent unstable dependencies
+  const unsafeSupabase = useMemo(() => supabase as unknown as SupabaseClient, []);
   const { user, role, loading: authLoading } = useAuth();
   const { state: impersonation } = useImpersonation();
 

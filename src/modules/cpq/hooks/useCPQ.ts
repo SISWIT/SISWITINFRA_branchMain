@@ -194,6 +194,7 @@ export function useDeleteProduct() {
         table: "products",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete product");
 
@@ -431,6 +432,7 @@ export function useDeleteQuote() {
         table: "quotes",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete quote");
 
@@ -589,6 +591,7 @@ export function useDeleteQuoteItem() {
         table: "quote_items",
         id,
         userId,
+        organizationId: tenantId || "",
       });
 
       if (!deleted) throw new Error("Failed to delete quote item");

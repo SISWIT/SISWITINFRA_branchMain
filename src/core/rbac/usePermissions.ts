@@ -8,8 +8,8 @@
  * - Feature access
  */
 
-import { useAuth } from "./useAuth";
-import { useOrganization } from "./useOrganization";
+import { useAuth } from "@/core/auth/useAuth";
+import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { AppRole, isPlatformRole } from "@/core/types/roles";
 import { ModuleType } from "@/core/types/organization";
 
@@ -229,8 +229,9 @@ export function useCRUD<T extends { organization_id?: string; tenant_id?: string
     if (isPlatformAdmin) return true;
     if (userRole === "admin" || userRole === "manager") return true;
     if ((userRole === "employee" || userRole === "user") && record) {
-      // Users can only update their own records (would need owner check)
-      return true;
+      // S-08: Check record ownership for non-admin roles
+      const ownable = record as Record<string, unknown>;
+      return ownable.owner_id === user.id || ownable.created_by === user.id;
     }
     return false;
   };

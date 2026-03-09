@@ -54,6 +54,7 @@ export interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AuthRole;
+  accountState: string | null;
   loading: boolean;
   isLoggingOut: boolean;
 
@@ -84,8 +85,8 @@ export interface AuthContextType {
     input: InviteClientInput,
   ) => Promise<{ error: string | null; invitationUrl?: string; emailError?: string | null }>;
 
-  approveClientMembership: (membershipId: string) => Promise<{ error: string | null }>;
-  rejectClientMembership: (membershipId: string) => Promise<{ error: string | null }>;
+  approveClientMembership: (membershipId: string, organizationId: string) => Promise<{ error: string | null }>;
+  rejectClientMembership: (membershipId: string, organizationId: string) => Promise<{ error: string | null }>;
 
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;

@@ -500,6 +500,7 @@ export function useDeleteLead() {
         table: "leads",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete lead");
 
@@ -667,6 +668,7 @@ export function useDeleteAccount() {
         table: "accounts",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete account");
 
@@ -838,6 +840,7 @@ export function useDeleteContact() {
         table: "contacts",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete contact");
 
@@ -1020,6 +1023,7 @@ export function useDeleteOpportunity() {
         table: "opportunities",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete opportunity");
 
@@ -1197,6 +1201,7 @@ export function useDeleteActivity() {
         table: "activities",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete activity");
 
@@ -1519,6 +1524,7 @@ export function useDeleteQuoteItem() {
         table: "quote_items",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete quote item");
 
