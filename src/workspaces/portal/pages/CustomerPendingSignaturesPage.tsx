@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Send, Search, Eye, Loader2, PenTool } from "lucide-react";
+import { Send, Loader2, PenTool } from "lucide-react";
 import { Card, CardContent } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Badge } from "@/ui/shadcn/badge";
@@ -28,7 +28,7 @@ export default function CustomerPendingSignaturesPage() {
   useEffect(() => {
     const fetchSignatures = async () => {
       if (!user?.email) return;
-      
+
       setIsLoading(true);
       const { data, error } = await supabase
         .from("contract_esignatures")

@@ -58,8 +58,8 @@ type QuoteRow = Database["public"]["Tables"]["quotes"]["Row"];
 type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
 type QuoteUpdate = Database["public"]["Tables"]["quotes"]["Update"];
 
-type QuoteItemRow = Database["public"]["Tables"]["quote_items"]["Row"];
-type QuoteItemInsert = Database["public"]["Tables"]["quote_items"]["Insert"];
+type QuoteItemRow = Database["public"]["Tables"]["quote_line_items"]["Row"];
+type QuoteItemInsert = Database["public"]["Tables"]["quote_line_items"]["Insert"];
 
 interface DashboardStats {
   totalLeads: number;
@@ -146,8 +146,8 @@ function asQuoteStatus(value: string | null | undefined): QuoteStatus {
 function mapLead(row: LeadRow): Lead {
   return {
     id: row.id,
-    first_name: row.first_name,
-    last_name: row.last_name,
+    first_name: row.first_name ?? "",
+    last_name: row.last_name ?? "",
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     company: row.company ?? undefined,
@@ -224,7 +224,6 @@ function mapOpportunity(row: OpportunityRow): Opportunity {
     expected_revenue: row.expected_revenue ?? undefined,
     close_date: row.close_date ?? undefined,
     lead_source: asLeadSource(row.lead_source),
-    description: row.next_step ?? undefined,
     next_step: row.next_step ?? undefined,
     is_closed: row.is_closed ?? undefined,
     is_won: row.is_won ?? undefined,
@@ -248,7 +247,7 @@ function mapActivity(row: ActivityRow): Activity {
   return {
     id: row.id,
     type: asActivityType(row.type),
-    subject: row.subject,
+    subject: row.subject ?? "",
     description: row.description ?? undefined,
     due_date: row.due_date ?? undefined,
     completed_at: row.completed_at ?? undefined,
@@ -266,7 +265,7 @@ function mapProduct(row: ProductRow): Product {
   return {
     id: row.id,
     name: row.name,
-    sku: row.sku,
+    sku: row.sku ?? undefined,
     description: row.description ?? undefined,
     category: row.family ?? undefined,
     unit_price: row.list_price ?? 0,
@@ -286,13 +285,9 @@ function mapQuote(row: QuoteRow): Quote {
     status: asQuoteStatus(row.status),
     subtotal: row.subtotal ?? undefined,
     discount_percent: row.discount_percent ?? undefined,
-    discount_amount: row.discount_amount ?? undefined,
     tax_percent: row.tax_percent ?? undefined,
     tax_amount: row.tax_amount ?? undefined,
     total: row.total_amount ?? undefined,
-    valid_until: row.expiration_date ?? undefined,
-    terms: row.payment_terms ?? undefined,
-    notes: row.notes ?? undefined,
     approved_by: row.approved_by ?? undefined,
     approved_at: row.approved_at ?? undefined,
     owner_id: row.owner_id ?? undefined,
@@ -306,10 +301,10 @@ function mapQuoteItem(row: QuoteItemRow): QuoteItem {
     id: row.id,
     quote_id: row.quote_id,
     product_id: row.product_id ?? undefined,
-    product_name: row.product_name,
+    product_name: row.product_name ?? "",
     description: row.description ?? undefined,
-    quantity: row.quantity,
-    unit_price: row.unit_price,
+    quantity: row.quantity ?? 0,
+    unit_price: row.unit_price ?? 0,
     discount_percent: row.discount_percent ?? undefined,
     total: row.total ?? undefined,
     sort_order: row.sort_order ?? undefined,
@@ -1255,9 +1250,9 @@ export function useCreateProduct() {
         {
           name: product.name || "",
           description: product.description ?? null,
-          family: product.category ?? null,
-          list_price: product.unit_price ?? 0,
-          cost_price: product.unit_price ?? 0,
+          category: product.category ?? null,
+          price: product.unit_price ?? 0,
+          cost: product.cost_price ?? 0,
           sku: product.sku || `SKU-${Date.now()}`,
           is_active: product.is_active ?? true,
         },
@@ -1328,7 +1323,7 @@ export function useQuote(id: string) {
 
       const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const { data: items, error: itemsError } = await supabase
-        .from("quote_items")
+        .from("quote_line_items")
         .select("*")
         .eq("quote_id", id)
         .eq("organization_id", requiredOrganizationId)
@@ -1359,14 +1354,12 @@ export function useCreateQuote() {
           status: quote.status ?? "draft",
           subtotal: quote.subtotal ?? 0,
           discount_percent: quote.discount_percent ?? 0,
-          discount_amount: quote.discount_amount ?? 0,
           tax_percent: quote.tax_percent ?? 0,
           tax_amount: quote.tax_amount ?? 0,
           total_amount: quote.total ?? 0,
           expiration_date: quote.valid_until ?? null,
           payment_terms: quote.terms ?? null,
           notes: quote.notes ?? null,
-          quote_date: new Date().toISOString(),
         },
         scope,
       );
@@ -1412,9 +1405,7 @@ export function useUpdateQuote() {
       if (updates.status !== undefined) payload.status = updates.status;
       if (updates.subtotal !== undefined) payload.subtotal = updates.subtotal ?? null;
       if (updates.discount_percent !== undefined) payload.discount_percent = updates.discount_percent ?? null;
-      if (updates.discount_amount !== undefined) payload.discount_amount = updates.discount_amount ?? null;
       if (updates.tax_percent !== undefined) payload.tax_percent = updates.tax_percent ?? null;
-      if (updates.tax_amount !== undefined) payload.tax_amount = updates.tax_amount ?? null;
       if (updates.total !== undefined) payload.total_amount = updates.total ?? null;
       if (updates.valid_until !== undefined) payload.expiration_date = updates.valid_until ?? null;
       if (updates.terms !== undefined) payload.payment_terms = updates.terms ?? null;
@@ -1471,11 +1462,11 @@ export function useCreateQuoteItem() {
         quantity: item.quantity ?? 1,
         unit_price: item.unit_price ?? 0,
         discount_percent: item.discount_percent ?? 0,
-        total: item.total ?? 0,
+        line_total: item.total ?? 0,
         sort_order: item.sort_order ?? 0,
       };
 
-      const { data, error } = await supabase.from("quote_items").insert(payload).select().single();
+      const { data, error } = await supabase.from("quote_line_items").insert(payload).select().single();
       if (error) throw error;
 
       void writeAuditLog({
@@ -1508,7 +1499,7 @@ export function useDeleteQuoteItem() {
     mutationFn: async (id: string) => {
       const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const itemResult = await supabase
-        .from("quote_items")
+        .from("quote_line_items")
         .select("id, quote_id, organization_id")
         .eq("id", id)
         .eq("organization_id", requiredOrganizationId)

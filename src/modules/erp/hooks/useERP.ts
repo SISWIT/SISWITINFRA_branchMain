@@ -98,7 +98,7 @@ function mapInventoryItem(row: InventoryWithProduct): InventoryItem {
     quantity_available: row.quantity_available ?? undefined,
     reorder_level: row.reorder_point ?? undefined,
     reorder_quantity: row.reorder_quantity ?? undefined,
-    unit_cost: row.average_cost ?? product?.cost_price ?? undefined,
+    unit_cost: row.average_cost ?? product?.cost ?? undefined,
     warehouse_location: row.warehouse_location ?? undefined,
     status,
     created_at: row.created_at ?? new Date().toISOString(),
@@ -109,7 +109,7 @@ function mapInventoryItem(row: InventoryWithProduct): InventoryItem {
 function mapPurchaseOrder(row: PurchaseOrderWithSupplier): PurchaseOrder {
   return {
     id: row.id,
-    po_number: row.po_number,
+    po_number: row.po_number ?? undefined,
     supplier_id: row.supplier_id ?? "",
     status: (row.status ?? "draft") as PurchaseOrder["status"],
     order_date: row.order_date ?? undefined,
@@ -131,7 +131,7 @@ function mapPurchaseOrder(row: PurchaseOrderWithSupplier): PurchaseOrder {
 function mapPurchaseOrderItem(row: PurchaseOrderItemRow): PurchaseOrderItem {
   return {
     id: row.id,
-    purchase_order_id: row.purchase_order_id,
+    purchase_order_id: row.purchase_order_id ?? "",
     inventory_item_id: row.product_id ?? undefined,
     item_name: row.product_name ?? "Item",
     description: row.description ?? undefined,
@@ -147,7 +147,7 @@ function mapProductionOrder(row: ProductionOrderWithProduct): ProductionOrder {
 
   return {
     id: row.id,
-    production_order_number: row.order_number,
+    production_order_number: row.order_number ?? undefined,
     inventory_item_id: row.product_id ?? undefined,
     status: (row.status ?? "planned") as ProductionOrder["status"],
     quantity_ordered: row.quantity_to_produce ?? undefined,
@@ -161,15 +161,15 @@ function mapProductionOrder(row: ProductionOrderWithProduct): ProductionOrder {
     updated_at: row.updated_at ?? new Date().toISOString(),
     inventory_item: product
       ? {
-          id: product.id,
-          sku: product.sku,
-          name: product.name,
-          quantity_on_hand: product.quantity_on_hand ?? undefined,
-          quantity_reserved: product.quantity_reserved ?? undefined,
-          quantity_available: product.quantity_available ?? undefined,
-          created_at: product.created_at ?? new Date().toISOString(),
-          updated_at: product.updated_at ?? new Date().toISOString(),
-        }
+        id: product.id,
+        sku: product.sku ?? "",
+        name: product.name,
+        quantity_on_hand: product.quantity_on_hand ?? undefined,
+        quantity_reserved: product.quantity_reserved ?? undefined,
+        quantity_available: product.quantity_available ?? undefined,
+        created_at: product.created_at ?? new Date().toISOString(),
+        updated_at: product.updated_at ?? new Date().toISOString(),
+      }
       : undefined,
   };
 }
@@ -364,6 +364,7 @@ export function useDeleteSupplier() {
         table: "suppliers",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete supplier");
 
@@ -425,7 +426,7 @@ export function useCreateInventoryItem() {
             description: item.description ?? null,
             family: item.category ?? null,
             list_price: item.unit_cost ?? 0,
-            cost_price: item.unit_cost ?? 0,
+            cost: item.unit_cost ?? 0,
             is_active: true,
           },
           scope,
@@ -445,7 +446,7 @@ export function useCreateInventoryItem() {
         product_id: productId,
         quantity_on_hand: quantityOnHand,
         quantity_reserved: quantityReserved,
-        quantity_available: item.quantity_available ?? quantityOnHand - quantityReserved,
+        quantity_available: quantityOnHand - quantityReserved,
         reorder_point: item.reorder_level ?? null,
         reorder_quantity: item.reorder_quantity ?? null,
         average_cost: item.unit_cost ?? null,
@@ -544,6 +545,7 @@ export function useDeleteInventoryItem() {
         table: "inventory_items",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete inventory item");
 
@@ -743,6 +745,7 @@ export function useDeletePurchaseOrder() {
         table: "purchase_orders",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete purchase order");
 
@@ -834,12 +837,13 @@ export function useDeletePurchaseOrderItem() {
         throw new Error("Purchase order item not found");
       }
 
-      await ensurePurchaseOrderAccessible(itemResult.data.purchase_order_id, scope);
+      await ensurePurchaseOrderAccessible(itemResult.data.purchase_order_id ?? "", scope);
 
       const deleted = await softDeleteRecord({
         table: "purchase_order_items",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete purchase order item");
 
@@ -999,6 +1003,7 @@ export function useDeleteProductionOrder() {
         table: "production_orders",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete production order");
 
@@ -1156,6 +1161,7 @@ export function useDeleteFinancialRecord() {
         table: "financial_records",
         id,
         userId,
+        organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete financial record");
 

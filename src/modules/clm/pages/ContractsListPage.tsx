@@ -90,129 +90,129 @@ export default function ContractsListPage() {
 
   return (
     <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Contracts</h1>
-            <p className="text-muted-foreground">Manage contract lifecycle from creation to signature</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/dashboard/clm/scan"><Upload className="h-4 w-4 mr-2" />Scan Contract</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/dashboard/clm/contracts/new"><Plus className="h-4 w-4 mr-2" />Create Contract</Link>
-            </Button>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Contracts</h1>
+          <p className="text-muted-foreground">Manage contract lifecycle from creation to signature</p>
         </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search contracts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant={selectedStatus === null ? "default" : "outline"} size="sm" onClick={() => setSelectedStatus(null)}>All</Button>
-            {["draft", "pending_review", "approved", "sent", "signed", "expired"].map((status) => {
-              const config = STATUS_CONFIG[status];
-              return (
-                <Button key={status} variant={selectedStatus === status ? "default" : "outline"} size="sm" onClick={() => setSelectedStatus(status)}>
-                  {config.label}
-                </Button>
-              );
-            })}
-          </div>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/dashboard/clm/scan"><Upload className="h-4 w-4 mr-2" />Scan Contract</Link>
+          </Button>
+          <Button asChild>
+            <Link to="/dashboard/clm/contracts/new"><Plus className="h-4 w-4 mr-2" />Create Contract</Link>
+          </Button>
         </div>
-
-        {/* Contracts Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contract #</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>End Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={8} className="h-16 animate-pulse bg-muted/20" />
-                    </TableRow>
-                  ))
-                ) : filteredContracts?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No contracts found</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredContracts?.map((contract) => {
-                    const statusConfig = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
-                    const StatusIcon = statusConfig.icon;
-                    return (
-                      <TableRow key={contract.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
-                        <TableCell className="font-medium">{contract.contract_number || "—"}</TableCell>
-                        <TableCell>{contract.name}</TableCell>
-                        <TableCell>{contract.accounts?.name || "—"}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(contract.value || 0)}</TableCell>
-                        <TableCell>{contract.start_date ? format(new Date(contract.start_date), "MMM d, yyyy") : "—"}</TableCell>
-                        <TableCell>{contract.end_date ? format(new Date(contract.end_date), "MMM d, yyyy") : "—"}</TableCell>
-                        <TableCell>
-                          <Badge className={statusConfig.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {statusConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">Actions</Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
-                                <Eye className="h-4 w-4 mr-2" />View
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/edit`)}>
-                                <Edit className="h-4 w-4 mr-2" />Edit
-                              </DropdownMenuItem>
-                              {contract.status === "approved" && (
-                                <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/sign`)}>
-                                  <PenTool className="h-4 w-4 mr-2" />Send for Signature
-                                </DropdownMenuItem>
-                              )}
-                              {contract.status === "draft" && (
-                                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "pending_review" })}>
-                                  <Send className="h-4 w-4 mr-2" />Submit for Review
-                                </DropdownMenuItem>
-                              )}
-                              {contract.status === "pending_review" && (
-                                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "approved" })}>
-                                  <CheckCircle className="h-4 w-4 mr-2" />Approve
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(contract.id)}>
-                                <Trash2 className="h-4 w-4 mr-2" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search contracts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant={selectedStatus === null ? "default" : "outline"} size="sm" onClick={() => setSelectedStatus(null)}>All</Button>
+          {["draft", "pending_review", "approved", "sent", "signed", "expired"].map((status) => {
+            const config = STATUS_CONFIG[status];
+            return (
+              <Button key={status} variant={selectedStatus === status ? "default" : "outline"} size="sm" onClick={() => setSelectedStatus(status)}>
+                {config.label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Contracts Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Contract #</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={8} className="h-16 animate-pulse bg-muted/20" />
+                  </TableRow>
+                ))
+              ) : filteredContracts?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No contracts found</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredContracts?.map((contract) => {
+                  const statusConfig = STATUS_CONFIG[contract.status || "draft"] || STATUS_CONFIG.draft;
+                  const StatusIcon = statusConfig.icon;
+                  return (
+                    <TableRow key={contract.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
+                      <TableCell className="font-medium">{contract.contract_number || "—"}</TableCell>
+                      <TableCell>{contract.name}</TableCell>
+                      <TableCell>{contract.accounts?.name || "—"}</TableCell>
+                      <TableCell className="font-semibold">{formatCurrency(contract.value || 0)}</TableCell>
+                      <TableCell>{contract.start_date ? format(new Date(contract.start_date), "MMM d, yyyy") : "—"}</TableCell>
+                      <TableCell>{contract.end_date ? format(new Date(contract.end_date), "MMM d, yyyy") : "—"}</TableCell>
+                      <TableCell>
+                        <Badge className={statusConfig.color}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {statusConfig.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">Actions</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
+                              <Eye className="h-4 w-4 mr-2" />View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/edit`)}>
+                              <Edit className="h-4 w-4 mr-2" />Edit
+                            </DropdownMenuItem>
+                            {contract.status === "approved" && (
+                              <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/sign`)}>
+                                <PenTool className="h-4 w-4 mr-2" />Send for Signature
+                              </DropdownMenuItem>
+                            )}
+                            {contract.status === "draft" && (
+                              <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "pending_review" })}>
+                                <Send className="h-4 w-4 mr-2" />Submit for Review
+                              </DropdownMenuItem>
+                            )}
+                            {contract.status === "pending_review" && (
+                              <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "approved" })}>
+                                <CheckCircle className="h-4 w-4 mr-2" />Approve
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(contract.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

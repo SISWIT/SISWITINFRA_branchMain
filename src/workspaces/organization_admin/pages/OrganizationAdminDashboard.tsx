@@ -46,27 +46,7 @@ interface KPIItem {
   emphasis?: boolean;
 }
 
-interface DashboardItem {
-  id?: string;
-  name?: string;
-  created_at?: string;
-  status?: string;
-  first_name?: string;
-  last_name?: string;
-  email?: string;
-  company?: string;
-  action?: string;
-  entity_type?: string;
-  user_id?: string;
-  amount?: number;
-  close_date?: string;
-  total_value?: number;
-  end_date?: string;
-  start_time?: string;
-  type?: string;
-  subject?: string;
-  stage?: string;
-}
+
 
 const applicantTabs = ["All Leads", "New", "Contacted", "Qualified", "Lost"];
 
@@ -103,7 +83,7 @@ export default function OrganizationAdminDashboard() {
     const sevenDaysAgo = subDays(new Date(), 7);
 
     // Count Leads
-    dashboardData.charts.leads?.forEach((lead: DashboardItem) => {
+    dashboardData.charts.leads?.forEach((lead: any) => {
       if (!lead.created_at) return;
       const d = new Date(lead.created_at);
       if (isAfter(d, sevenDaysAgo)) {
@@ -114,7 +94,7 @@ export default function OrganizationAdminDashboard() {
     });
 
     // Count Contracts
-    dashboardData.charts.contracts?.forEach((contract: DashboardItem) => {
+    dashboardData.charts.contracts?.forEach((contract: any) => {
       if (!contract.created_at) return;
       const d = new Date(contract.created_at);
       if (isAfter(d, sevenDaysAgo)) {
@@ -132,7 +112,7 @@ export default function OrganizationAdminDashboard() {
     const statuses: Record<string, number> = {};
     if (!dashboardData?.charts) return [{ name: "No Leads", value: 1, color: "hsl(var(--muted))" }];
 
-    dashboardData.charts.leads?.forEach((lead: DashboardItem) => {
+    dashboardData.charts.leads?.forEach((lead: any) => {
       const st = lead.status || "New";
       statuses[st] = (statuses[st] || 0) + 1;
     });
@@ -373,7 +353,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {lists.opportunities.length > 0 ? lists.opportunities.map((opp: DashboardItem) => (
+            {lists.opportunities.length > 0 ? lists.opportunities.map((opp: any) => (
               <article key={opp.id} className="rounded-xl border border-border/70 bg-background/80 p-3">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <h3 className="text-base font-semibold leading-tight truncate" title={opp.name}>{opp.name}</h3>
@@ -403,7 +383,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {lists.contracts.length > 0 ? lists.contracts.map((contract: DashboardItem) => (
+            {lists.contracts.length > 0 ? lists.contracts.map((contract: any) => (
               <article key={contract.id} className="space-y-2.5 rounded-xl border border-border/70 bg-background/70 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="overflow-hidden">
@@ -433,7 +413,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            {lists.activities.length > 0 ? lists.activities.map((activity: DashboardItem, index: number) => {
+            {lists.activities.length > 0 ? lists.activities.map((activity: any, index: number) => {
               const dateStr = activity.start_time ? format(new Date(activity.start_time), "h:mm a") : "Time TBD";
               // Rotate through tones
               const tones = ["bg-chart-2/20", "bg-primary/15", "bg-chart-3/20", "bg-chart-4/20"];
@@ -484,7 +464,7 @@ export default function OrganizationAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lists.leads.map((lead: DashboardItem) => (
+                  {lists.leads.map((lead: any) => (
                     <TableRow key={lead.id}>
                       <TableCell>
                         <div className="max-w-[150px] truncate">
@@ -521,7 +501,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 overflow-y-auto">
-            {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: DashboardItem) => (
+            {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: any) => (
               <article key={log.id} className="rounded-xl border border-border/70 bg-background/75 p-3">
                 <p className="text-sm leading-relaxed">
                   <span className="font-medium">{log.user_id ? "A user" : "System"}</span> {log.action} <span className="font-medium">{log.entity_type}</span>

@@ -63,7 +63,7 @@ export default function ContractBuilderPage() {
         name: `Contract for ${quote.accounts?.name || "Customer"}`,
         account_id: quote.account_id || "",
         contact_id: quote.contact_id || "",
-        value: quote.total || 0,
+        value: quote.total_amount || 0,
       }));
     }
   }, [quote]);
@@ -121,7 +121,7 @@ export default function ContractBuilderPage() {
       setContractData((prev) => ({
         ...prev,
         template_id: templateId,
-        content: template.content,
+        content: template.content || "",
       }));
     }
   };
@@ -162,188 +162,188 @@ export default function ContractBuilderPage() {
 
   return (
     <div className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Create Contract</h1>
-              <p className="text-muted-foreground">
-                {quoteId ? "Converting approved quote to contract" : "Create a new contract from template"}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
-              <Save className="h-4 w-4 mr-2" />Save Draft
-            </Button>
-            <Button onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
-              <Send className="h-4 w-4 mr-2" />Submit for Review
-            </Button>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Create Contract</h1>
+            <p className="text-muted-foreground">
+              {quoteId ? "Converting approved quote to contract" : "Create a new contract from template"}
+            </p>
           </div>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
+            <Save className="h-4 w-4 mr-2" />Save Draft
+          </Button>
+          <Button onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
+            <Send className="h-4 w-4 mr-2" />Submit for Review
+          </Button>
+        </div>
+      </div>
 
-        {/* Quote Info Banner */}
-        {quote && (
-          <Card className="bg-info/10 border-info/30">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <FileText className="h-8 w-8 text-info" />
-                  <div>
-                    <p className="font-medium">Converting from Quote: {quote.quote_number}</p>
-                    <p className="text-sm text-muted-foreground">{quote.accounts?.name} • {quote.opportunities?.name}</p>
-                  </div>
+      {/* Quote Info Banner */}
+      {quote && (
+        <Card className="bg-info/10 border-info/30">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <FileText className="h-8 w-8 text-info" />
+                <div>
+                  <p className="font-medium">Converting from Quote: {quote.quote_number}</p>
+                  <p className="text-sm text-muted-foreground">{quote.accounts?.name} • {quote.opportunities?.name}</p>
                 </div>
-                <Badge variant="outline" className="text-lg">{formatCurrency(quote.total || 0)}</Badge>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <Badge variant="outline" className="text-lg">{formatCurrency(quote.total_amount || 0)}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Contract Details */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Basic Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Details</CardTitle>
-                <CardDescription>Basic information about the contract</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left Column - Contract Details */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Basic Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Contract Details</CardTitle>
+              <CardDescription>Basic information about the contract</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Contract Name *</Label>
+                <Input value={contractData.name} onChange={(e) => setContractData({ ...contractData, name: e.target.value })} placeholder="e.g., Annual SaaS License Agreement" />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Contract Name *</Label>
-                  <Input value={contractData.name} onChange={(e) => setContractData({ ...contractData, name: e.target.value })} placeholder="e.g., Annual SaaS License Agreement" />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Account</Label>
-                    <Select value={contractData.account_id} onValueChange={(v) => setContractData({ ...contractData, account_id: v, contact_id: "" })}>
-                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                      <SelectContent>
-                        {accounts?.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Contact</Label>
-                    <Select value={contractData.contact_id} onValueChange={(v) => setContractData({ ...contractData, contact_id: v })} disabled={!contractData.account_id}>
-                      <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
-                      <SelectContent>
-                        {contacts?.map((c) => <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Contract Value</Label>
-                    <Input type="number" value={contractData.value} onChange={(e) => setContractData({ ...contractData, value: parseFloat(e.target.value) || 0 })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Start Date</Label>
-                    <Input type="date" value={contractData.start_date} onChange={(e) => setContractData({ ...contractData, start_date: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" value={contractData.end_date} onChange={(e) => setContractData({ ...contractData, end_date: e.target.value })} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Template Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Template</CardTitle>
-                <CardDescription>Select a template or write custom content</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Template</Label>
-                  <Select value={contractData.template_id} onValueChange={applyTemplate}>
-                    <SelectTrigger><SelectValue placeholder="Select a template (optional)" /></SelectTrigger>
+                  <Label>Account</Label>
+                  <Select value={contractData.account_id} onValueChange={(v) => setContractData({ ...contractData, account_id: v, contact_id: "" })}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                     <SelectContent>
-                      {templates?.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{t.name}</span>
-                            <Badge variant="outline">{t.type}</Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {accounts?.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
-                  <Label>Contract Content</Label>
-                  <Textarea value={contractData.content} onChange={(e) => setContractData({ ...contractData, content: e.target.value })} placeholder="Enter contract terms and conditions..." rows={15} className="font-mono text-sm" />
+                  <Label>Contact</Label>
+                  <Select value={contractData.contact_id} onValueChange={(v) => setContractData({ ...contractData, contact_id: v })} disabled={!contractData.account_id}>
+                    <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
+                    <SelectContent>
+                      {contacts?.map((c) => <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* Right Column - Summary */}
-          <div>
-            <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle>Contract Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Building className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Account</p>
-                      <p className="font-medium">{accounts?.find((a) => a.id === contractData.account_id)?.name || "Not selected"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contact</p>
-                      <p className="font-medium">
-                        {contacts?.find((c) => c.id === contractData.contact_id)
-                          ? `${contacts.find((c) => c.id === contractData.contact_id)?.first_name} ${contacts.find((c) => c.id === contractData.contact_id)?.last_name}`
-                          : "Not selected"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Value</p>
-                      <p className="font-medium text-lg">{formatCurrency(contractData.value)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Duration</p>
-                      <p className="font-medium">{contractData.start_date && contractData.end_date ? `${contractData.start_date} to ${contractData.end_date}` : "Not set"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Button className="w-full" onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
-                    <Send className="h-4 w-4 mr-2" />Submit for Review
-                  </Button>
-                  <Button variant="outline" className="w-full" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
-                    <Save className="h-4 w-4 mr-2" />Save as Draft
-                  </Button>
+                  <Label>Contract Value</Label>
+                  <Input type="number" value={contractData.value} onChange={(e) => setContractData({ ...contractData, value: parseFloat(e.target.value) || 0 })} />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input type="date" value={contractData.start_date} onChange={(e) => setContractData({ ...contractData, start_date: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input type="date" value={contractData.end_date} onChange={(e) => setContractData({ ...contractData, end_date: e.target.value })} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Template Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Contract Template</CardTitle>
+              <CardDescription>Select a template or write custom content</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Template</Label>
+                <Select value={contractData.template_id} onValueChange={applyTemplate}>
+                  <SelectTrigger><SelectValue placeholder="Select a template (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {templates?.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{t.name}</span>
+                          <Badge variant="outline">{t.type}</Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Contract Content</Label>
+                <Textarea value={contractData.content} onChange={(e) => setContractData({ ...contractData, content: e.target.value })} placeholder="Enter contract terms and conditions..." rows={15} className="font-mono text-sm" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Summary */}
+        <div>
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle>Contract Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Building className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Account</p>
+                    <p className="font-medium">{accounts?.find((a) => a.id === contractData.account_id)?.name || "Not selected"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Contact</p>
+                    <p className="font-medium">
+                      {contacts?.find((c) => c.id === contractData.contact_id)
+                        ? `${contacts.find((c) => c.id === contractData.contact_id)?.first_name} ${contacts.find((c) => c.id === contractData.contact_id)?.last_name}`
+                        : "Not selected"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Value</p>
+                    <p className="font-medium text-lg">{formatCurrency(contractData.value)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Duration</p>
+                    <p className="font-medium">{contractData.start_date && contractData.end_date ? `${contractData.start_date} to ${contractData.end_date}` : "Not set"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Button className="w-full" onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
+                  <Send className="h-4 w-4 mr-2" />Submit for Review
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
+                  <Save className="h-4 w-4 mr-2" />Save as Draft
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+    </div>
   );
 }

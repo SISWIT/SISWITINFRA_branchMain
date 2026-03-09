@@ -175,7 +175,7 @@ export default function QuoteDetailPage() {
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">{formatCurrency(item.unit_price)}</TableCell>
                       <TableCell className="text-right text-destructive">-{item.discount_percent}%</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(item.total || 0)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -251,10 +251,10 @@ export default function QuoteDetailPage() {
 
       {/* Hidden Print Template */}
       <div className="hidden">
-        <QuotePDFTemplate 
-          ref={componentRef} 
-          quote={quote} 
-          items={quoteItems || []} 
+        <QuotePDFTemplate
+          ref={componentRef}
+          quote={quote}
+          items={quoteItems || []}
         />
       </div>
     </div>

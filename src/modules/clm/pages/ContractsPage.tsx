@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { 
-  useContracts, 
-  useCreateContract, 
-  useUpdateContract, 
-  useDeleteContract,
-  useContractTemplates
+import {
+  useContracts,
+  useCreateContract,
+  useUpdateContract,
+  useDeleteContract
 } from "@/modules/clm/hooks/useCLM";
 import { useAccounts } from "@/modules/crm/hooks/useCRM";
 import { DataTable } from "@/modules/crm/components/DataTable";
@@ -26,12 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/shadcn/select";
-import { 
-  MoreHorizontal, 
-  Pencil, 
-  Trash2, 
-  FileSignature, 
-  Calendar, 
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  FileSignature,
+  Calendar,
   DollarSign
 } from "lucide-react";
 import {
@@ -43,7 +42,7 @@ import {
 import { format } from "date-fns";
 import { Badge } from "@/ui/shadcn/badge";
 
-export type ContractStatus = 
+export type ContractStatus =
   | "draft"
   | "pending_review"
   | "pending_approval"
@@ -61,7 +60,7 @@ export interface ContractRow {
   start_date: string | null;
   end_date: string | null;
   account_id: string | null;
-  account?: { name: string } | null; 
+  account?: { name: string } | null;
   content: string | null;
   created_at: string;
 }
@@ -96,7 +95,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function ContractsPage() {
   const { data: contracts = [], isLoading } = useContracts();
   const { data: accounts = [] } = useAccounts();
-  
+
   const createContract = useCreateContract();
   const updateContract = useUpdateContract();
   const deleteContract = useDeleteContract();
@@ -145,10 +144,10 @@ export default function ContractsPage() {
   const handleSubmit = async () => {
     const payload = {
       ...formData,
-      value: parseFloat(formData.value) || null,
-      start_date: formData.start_date || null,
-      end_date: formData.end_date || null,
-      account_id: formData.account_id || null, 
+      value: parseFloat(formData.value) || undefined,
+      start_date: formData.start_date || undefined,
+      end_date: formData.end_date || undefined,
+      account_id: formData.account_id || undefined,
     };
 
     if (editingContract) {
@@ -208,7 +207,7 @@ export default function ContractsPage() {
       cell: (row: ContractRow) => {
         const start = row.start_date ? format(new Date(row.start_date), "MMM d, yyyy") : "?";
         const end = row.end_date ? format(new Date(row.end_date), "MMM d, yyyy") : "?";
-        
+
         if (!row.start_date && !row.end_date) return <span className="text-muted-foreground">-</span>;
 
         return (
@@ -251,127 +250,127 @@ export default function ContractsPage() {
 
   return (
     <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Contracts</h1>
-          <p className="text-muted-foreground">Manage legal agreements</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Contracts</h1>
+        <p className="text-muted-foreground">Manage legal agreements</p>
+      </div>
 
-        <DataTable
-          data={contracts as unknown as ContractRow[]}
-          columns={columns}
-          loading={isLoading}
-          onAdd={openCreateDialog}
-          addLabel="New Contract"
-          searchPlaceholder="Search contracts..."
-        />
+      <DataTable
+        data={contracts as unknown as ContractRow[]}
+        columns={columns}
+        loading={isLoading}
+        onAdd={openCreateDialog}
+        addLabel="New Contract"
+        searchPlaceholder="Search contracts..."
+      />
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingContract ? "Edit Contract" : "New Contract"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingContract ? "Edit Contract" : "New Contract"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Contract Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. MSA - Acme Corp"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Account (Client)</Label>
+              <Select
+                value={formData.account_id}
+                onValueChange={(v) => setFormData({ ...formData, account_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a client..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(accounts as AccountOption[]).map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Contract Name</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. MSA - Acme Corp"
-                />
+                <Label>Value ($)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    className="pl-9"
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
-
               <div className="grid gap-2">
-                <Label>Account (Client)</Label>
+                <Label>Status</Label>
                 <Select
-                  value={formData.account_id}
-                  onValueChange={(v) => setFormData({ ...formData, account_id: v })}
+                  value={formData.status}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as ContractStatus })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a client..." />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(accounts as AccountOption[]).map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        {acc.name}
+                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key as ContractStatus}>
+                        {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Value ($)</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="number"
-                      className="pl-9"
-                      value={formData.value}
-                      onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) => setFormData({ ...formData, status: v as ContractStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key as ContractStatus}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Details / Content</Label>
-                <Textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="Paste terms or notes here..."
-                  className="h-20"
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} disabled={createContract.isPending || updateContract.isPending}>
-                {editingContract ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+
+            <div className="grid gap-2">
+              <Label>Details / Content</Label>
+              <Textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                placeholder="Paste terms or notes here..."
+                className="h-20"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={createContract.isPending || updateContract.isPending}>
+              {editingContract ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

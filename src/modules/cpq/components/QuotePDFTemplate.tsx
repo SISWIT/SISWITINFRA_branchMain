@@ -146,7 +146,7 @@ export const QuotePDFTemplate = React.forwardRef<
                   {item.discount_percent ? `-${item.discount_percent}%` : "—"}
                 </td>
                 <td className="px-4 py-4 text-right align-top font-semibold">
-                  {formatCurrency(item.total)}
+                  {formatCurrency(item.total || 0)}
                 </td>
               </tr>
             ))}

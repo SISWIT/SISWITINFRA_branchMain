@@ -149,39 +149,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AuthRole>(null);
+  const [accountState, setAccountState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const cacheRole = useCallback((userId: string, userRole: AuthRole) => {
+  const cacheAccess = useCallback((userId: string, userRole: AuthRole, accState: string | null) => {
     if (userRole) {
-      const payload = { role: userRole, timestamp: Date.now() };
+      const payload = { role: userRole, accountState: accState, timestamp: Date.now() };
       sessionStorage.setItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`, JSON.stringify(payload));
       return;
     }
     sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
   }, []);
 
-  const getCachedRole = useCallback((userId: string): AuthRole => {
+  const getCachedAccess = useCallback((userId: string): { role: AuthRole; accountState: string | null } => {
     try {
       const cached = sessionStorage.getItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-      if (!cached) return null;
+      if (!cached) return { role: null, accountState: null };
 
       // W-03: Only accept JSON format, reject raw strings to prevent corrupted cache
       if (!cached.startsWith("{")) {
         sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-        return null;
+        return { role: null, accountState: null };
       }
 
       const payload = JSON.parse(cached);
       const age = Date.now() - (payload.timestamp || 0);
       if (age > 60 * 60 * 1000) {
         sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-        return null;
+        return { role: null, accountState: null };
       }
-      return normalizeRole(payload.role);
+      return { role: normalizeRole(payload.role), accountState: payload.accountState ?? null };
     } catch {
       sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-      return null;
+      return { role: null, accountState: null };
     }
   }, []);
 
@@ -218,8 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return normalizeRole(membership.role);
   }, []);
 
-  const getUserRole = useCallback(
-    async (userId: string): Promise<AuthRole> => {
+  const getUserAccess = useCallback(
+    async (userId: string): Promise<{ role: AuthRole; accountState: string | null }> => {
       try {
         const superAdminPromise = unsafeSupabase
           .from("platform_super_admins")
@@ -230,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const superAdminResult = await withTimeout(superAdminPromise, AUTH_ROLE_LOOKUP_TIMEOUT_MS);
 
         if (superAdminResult?.data && superAdminResult.data.is_active !== false) {
-          return PlatformRole.PLATFORM_SUPER_ADMIN;
+          return { role: PlatformRole.PLATFORM_SUPER_ADMIN, accountState: "active" };
         }
 
         const membershipPromise = unsafeSupabase
@@ -244,27 +245,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const chosenMembership = pickMembership(memberships);
         if (!chosenMembership) {
-          return getCachedRole(userId);
+          return getCachedAccess(userId);
         }
 
-        return resolveRoleFromMembershipState(chosenMembership);
+        return {
+          role: resolveRoleFromMembershipState(chosenMembership),
+          accountState: chosenMembership.account_state || null,
+        };
       } catch {
-        return getCachedRole(userId);
+        return getCachedAccess(userId);
       }
     },
-    [getCachedRole, pickMembership, resolveRoleFromMembershipState, unsafeSupabase],
+    [getCachedAccess, pickMembership, resolveRoleFromMembershipState, unsafeSupabase],
   );
 
   const refreshRole = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const nextRole = await getUserRole(user.id);
-      setRole(nextRole);
-      cacheRole(user.id, nextRole);
+      const access = await getUserAccess(user.id);
+      setRole(access.role);
+      setAccountState(access.accountState);
+      cacheAccess(user.id, access.role, access.accountState);
     } catch (error) {
       // Non-blocking refresh, add error to telemetry/logs if needed in future
     }
-  }, [cacheRole, getUserRole, user?.id]);
+  }, [cacheAccess, getUserAccess, user?.id]);
 
   const upsertProfile = useCallback(
     async (userId: string, fullName: string) => {
@@ -880,23 +885,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: "User not found", role: null as AuthRole };
         }
 
-        let nextRole = await getUserRole(data.user.id);
-        if (!nextRole) {
+        let access = await getUserAccess(data.user.id);
+        if (!access.role) {
           try {
             await claimPendingInvitations();
           } catch {
             // Non-blocking: keep original fallback behavior below.
           }
 
-          nextRole = await getUserRole(data.user.id);
+          access = await getUserAccess(data.user.id);
         }
 
-        if (!nextRole) {
+        if (!access.role) {
           return { error: "No organization access assigned", role: null as AuthRole };
         }
 
         // C-02 fix: Block login if email is not yet verified
-        if (nextRole === ("pending_verification" as AuthRole)) {
+        if (access.role === ("pending_verification" as AuthRole)) {
           // Check if Supabase Auth has already confirmed the email
           const emailConfirmed = !!data.user.email_confirmed_at;
           if (emailConfirmed) {
@@ -922,12 +927,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (!activateError) {
               // Re-fetch the role now that membership is updated
-              nextRole = await getUserRole(data.user.id);
+              access = await getUserAccess(data.user.id);
             }
           }
 
           // If still pending (email not confirmed or activation failed), block login
-          if (nextRole === ("pending_verification" as AuthRole)) {
+          if (access.role === ("pending_verification" as AuthRole)) {
             await supabase.auth.signOut();
             return {
               error: "Please verify your email address before signing in. Check your inbox for the verification link.",
@@ -936,19 +941,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        cacheRole(data.user.id, nextRole);
-        setRole(nextRole);
+        cacheAccess(data.user.id, access.role, access.accountState);
+        setRole(access.role);
+        setAccountState(access.accountState);
         setUser(data.user);
         setSession(data.session);
 
-        return { error: null, role: nextRole };
+        return { error: null, role: access.role };
       } catch (error: unknown) {
         return { error: getErrorMessage(error), role: null as AuthRole };
       } finally {
         setLoading(false);
       }
     },
-    [cacheRole, claimPendingInvitations, getUserRole, unsafeSupabase],
+    [cacheAccess, claimPendingInvitations, getUserAccess, unsafeSupabase],
   );
 
   /** @deprecated Use signUpOrganization, signUpClientSelf, or invitation acceptance instead. */
@@ -976,6 +982,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setRole(null);
+      setAccountState(null);
       setIsLoggingOut(false);
     }
   }, [user?.id]);
@@ -997,30 +1004,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setSession(null);
           setRole(null);
+          setAccountState(null);
           return;
         }
 
         setUser(nextSession.user);
         setSession(nextSession);
 
-        let nextRole = await getUserRole(nextSession.user.id);
-        if (!nextRole) {
+        let access = await getUserAccess(nextSession.user.id);
+        if (!access.role) {
           try {
             await claimPendingInvitations();
-            nextRole = await getUserRole(nextSession.user.id);
+            access = await getUserAccess(nextSession.user.id);
           } catch {
             // Keep best-effort role discovery only.
           }
         }
         if (!mounted) return;
 
-        setRole(nextRole);
-        cacheRole(nextSession.user.id, nextRole);
+        setRole(access.role);
+        setAccountState(access.accountState);
+        cacheAccess(nextSession.user.id, access.role, access.accountState);
       } catch {
         if (mounted) {
           setUser(null);
           setSession(null);
           setRole(null);
+          setAccountState(null);
         }
       } finally {
         if (mounted) {
@@ -1040,6 +1050,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setSession(null);
         setRole(null);
+        setAccountState(null);
         setLoading(false);
         return;
       }
@@ -1047,19 +1058,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextSession.user);
       setSession(nextSession);
 
-      let nextRole = await getUserRole(nextSession.user.id);
-      if (!nextRole) {
+      let access = await getUserAccess(nextSession.user.id);
+      if (!access.role) {
         try {
           await claimPendingInvitations();
-          nextRole = await getUserRole(nextSession.user.id);
+          access = await getUserAccess(nextSession.user.id);
         } catch {
           // Keep best-effort role discovery only.
         }
       }
       if (!mounted) return;
 
-      setRole(nextRole);
-      cacheRole(nextSession.user.id, nextRole);
+      setRole(access.role);
+      setAccountState(access.accountState);
+      cacheAccess(nextSession.user.id, access.role, access.accountState);
       setLoading(false);
     });
 
@@ -1067,7 +1079,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [cacheRole, claimPendingInvitations, getUserRole]);
+  }, [cacheAccess, claimPendingInvitations, getUserAccess]);
 
   return (
     <AuthContext.Provider
@@ -1075,6 +1087,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         role,
+        accountState,
         loading,
         isLoggingOut,
         signIn,

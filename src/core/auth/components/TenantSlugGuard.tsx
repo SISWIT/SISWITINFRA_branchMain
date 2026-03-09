@@ -48,7 +48,7 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
           if (tenantResult.data?.id) {
             await startImpersonation({
               tenantId: tenantResult.data.id,
-              tenantSlug: tenantResult.data.slug,
+              tenantSlug: tenantResult.data.slug ?? tenantSlug,
               reason: "Platform admin tenant preview",
             });
           }

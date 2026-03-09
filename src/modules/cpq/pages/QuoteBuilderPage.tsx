@@ -82,8 +82,8 @@ export default function QuoteBuilderPage() {
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        discount_percent: item.discount_percent,
-        total: item.total,
+        discount_percent: item.discount_percent || 0,
+        total: item.total || 0,
       })));
     }
   }, [isEditMode, existingItems, isLoadingItems]);
@@ -104,7 +104,7 @@ export default function QuoteBuilderPage() {
   });
 
   const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", quoteData.account_id, user?.id], 
+    queryKey: ["contacts-list", quoteData.account_id, user?.id],
     queryFn: async () => {
       if (!quoteData.account_id || !user?.id) return [];
       const { data, error } = await supabase
@@ -137,8 +137,8 @@ export default function QuoteBuilderPage() {
   const totalItemDiscounts = items.reduce((sum, item) => {
     return sum + (item.quantity * item.unit_price * (item.discount_percent / 100));
   }, 0);
-  
-  const subtotal = grossTotal - totalItemDiscounts; 
+
+  const subtotal = grossTotal - totalItemDiscounts;
   const quoteDiscountAmount = subtotal * (quoteData.discount_percent / 100);
   const afterQuoteDiscount = subtotal - quoteDiscountAmount;
   const taxAmount = afterQuoteDiscount * (quoteData.tax_percent / 100);
@@ -227,19 +227,19 @@ export default function QuoteBuilderPage() {
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Button 
-            variant="outline" 
-            className="flex-1 sm:flex-none" 
-            onClick={() => handleSaveQuote("draft")} 
+          <Button
+            variant="outline"
+            className="flex-1 sm:flex-none"
+            onClick={() => handleSaveQuote("draft")}
             disabled={createQuoteMutation.isPending || updateQuoteMutation.isPending}
           >
             <Save className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">{isEditMode ? "Save Changes" : "Save Draft"}</span>
             <span className="sm:hidden">Draft</span>
           </Button>
-          <Button 
-            className="flex-1 sm:flex-none" 
-            onClick={() => handleSaveQuote("pending_approval")} 
+          <Button
+            className="flex-1 sm:flex-none"
+            onClick={() => handleSaveQuote("pending_approval")}
             disabled={(createQuoteMutation.isPending || updateQuoteMutation.isPending) || (!isEditMode && items.length === 0)}
           >
             <Send className="h-4 w-4 mr-2" />

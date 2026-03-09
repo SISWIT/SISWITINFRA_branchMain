@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { FileStack, Search, Eye, FileText, Loader2, Plus } from "lucide-react";
+import { FileStack, Search, Eye, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
@@ -13,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface CustomerDocument {
   id: string;
-  title: string | null;
+  name: string | null;
   document_type: string | null;
   status: string | null;
   created_at: string | null;
@@ -28,7 +27,7 @@ export default function CustomerDocumentsPage() {
   useEffect(() => {
     const fetchDocuments = async () => {
       if (!user?.id) return;
-      
+
       setIsLoading(true);
       const { data, error } = await supabase
         .from("auto_documents")
@@ -47,7 +46,7 @@ export default function CustomerDocumentsPage() {
 
   const filteredDocuments = documents?.filter((doc) => {
     const matchesSearch =
-      doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.document_type?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   }) || [];
@@ -93,7 +92,7 @@ export default function CustomerDocumentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -103,7 +102,7 @@ export default function CustomerDocumentsPage() {
               <TableBody>
                 {filteredDocuments.map((doc) => (
                   <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.title || "Untitled"}</TableCell>
+                    <TableCell className="font-medium">{doc.name || "Unnamed"}</TableCell>
                     <TableCell>{doc.document_type || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{doc.status || "Draft"}</Badge>

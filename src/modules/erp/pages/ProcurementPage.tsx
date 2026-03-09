@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { 
-  Plus, 
-  Search, 
-  Loader2, 
-  ShoppingCart, 
-  MoreHorizontal, 
-  Pencil, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Loader2,
+  ShoppingCart,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
   Calendar,
-  AlertTriangle 
+  AlertTriangle
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
@@ -23,12 +23,12 @@ import { Input } from "@/ui/shadcn/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/ui/shadcn/sheet";
 import { Label } from "@/ui/shadcn/label";
 import { useToast } from "@/core/hooks/use-toast";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger, 
-  DropdownMenuSeparator 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/ui/shadcn/dropdown-menu";
 
 // NEW: Proper Alert System imports
@@ -88,11 +88,11 @@ const STATUS_STYLES: Record<string, string> = {
 export default function ProcurementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  
+
   // State for managing Edit/Delete selections
   const [editingOrder, setEditingOrder] = useState<PurchaseOrderRow | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrderRow | null>(null);
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -140,8 +140,8 @@ export default function ProcurementPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-      toast({ 
-        title: editingOrder ? "Order Updated" : "Order Created", 
+      toast({
+        title: editingOrder ? "Order Updated" : "Order Created",
         description: editingOrder ? "The purchase order details have been saved." : "New purchase order has been logged.",
         className: "bg-green-50 border-green-200"
       });
@@ -149,10 +149,10 @@ export default function ProcurementPage() {
       setEditingOrder(null);
     },
     onError: (err: unknown) => {
-      toast({ 
-        title: "Operation Failed", 
-        description: getErrorMessage(err), 
-        variant: "destructive" 
+      toast({
+        title: "Operation Failed",
+        description: getErrorMessage(err),
+        variant: "destructive"
       });
     }
   });
@@ -165,18 +165,18 @@ export default function ProcurementPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-      toast({ 
-        title: "Order Deleted", 
+      toast({
+        title: "Order Deleted",
         description: "The purchase order has been permanently removed.",
         variant: "default"
       });
       setOrderToDelete(null); // Close alert dialog
     },
     onError: (err: unknown) => {
-      toast({ 
-        title: "Delete Failed", 
-        description: getErrorMessage(err), 
-        variant: "destructive" 
+      toast({
+        title: "Delete Failed",
+        description: getErrorMessage(err),
+        variant: "destructive"
       });
     }
   });
@@ -196,159 +196,159 @@ export default function ProcurementPage() {
     setOrderToDelete(order); // This triggers the Alert Dialog to open
   };
 
-  const filteredOrders = orders?.filter((order) => 
+  const filteredOrders = orders?.filter((order) =>
     (order.order_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.accounts?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-        {/* Header Section */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-xl md:text-3xl font-semibold tracking-tight">Procurement</h1>
-            <p className="text-sm text-muted-foreground">Manage vendor purchase orders and supply chain.</p>
-          </div>
-
-          {/* EDIT/CREATE SHEET */}
-          <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if(!open) setEditingOrder(null); }}>
-            <SheetTrigger asChild>
-              <Button onClick={handleCreateClick} className="shadow-sm">
-                <Plus className="h-4 w-4 mr-2" /> New Purchase Order
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="sm:max-w-md overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>{editingOrder ? `Edit ${editingOrder.order_number}` : "New Purchase Order"}</SheetTitle>
-                <SheetDescription>
-                  {editingOrder ? "Make changes to the existing order details." : "Fill out the details below to create a new PO."}
-                </SheetDescription>
-              </SheetHeader>
-              <PurchaseOrderForm 
-                initialData={editingOrder}
-                onSubmit={(data) => upsertOrderMutation.mutate(data)} 
-                isLoading={upsertOrderMutation.isPending} 
-              />
-            </SheetContent>
-          </Sheet>
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl md:text-3xl font-semibold tracking-tight">Procurement</h1>
+          <p className="text-sm text-muted-foreground">Manage vendor purchase orders and supply chain.</p>
         </div>
 
-        {/* Search Input */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search Order # or Vendor..." 
-            className="pl-9" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* DELETE ALERT DIALOG (The "Proper System") */}
-        <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Delete Purchase Order?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete order <strong>{orderToDelete?.order_number}</strong>? 
-                <br /><br />
-                This action cannot be undone and will remove all associated records.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => deleteOrderMutation.mutate(orderToDelete.id)}
-              >
-                {deleteOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete Order"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Data Table */}
-        
-        <Card className="shadow-sm border-muted/60">
-          <CardHeader className="bg-muted/10 pb-4">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-primary" />
-              Recent Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
-            ) : filteredOrders?.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Search className="h-10 w-10 mb-2 opacity-20" />
-                    <p>No orders found.</p>
-                </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Delivery Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders?.map((order) => (
-                    <TableRow key={order.id} className="group hover:bg-muted/5">
-                      <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                      <TableCell>{order.accounts?.name || "Unknown"}</TableCell>
-                      <TableCell>
-                        {order.expected_delivery_date ? (
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Calendar className="mr-1 h-3 w-3" />
-                            {new Date(order.expected_delivery_date).toLocaleDateString()}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-semibold">${order.total_amount?.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={STATUS_STYLES[order.status] || ""}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => handleEditClick(order)}>
-                              <Pencil className="mr-2 h-4 w-4 text-muted-foreground" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                              onClick={() => handleDeleteClick(order)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* EDIT/CREATE SHEET */}
+        <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) setEditingOrder(null); }}>
+          <SheetTrigger asChild>
+            <Button onClick={handleCreateClick} className="shadow-sm">
+              <Plus className="h-4 w-4 mr-2" /> New Purchase Order
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{editingOrder ? `Edit ${editingOrder.order_number}` : "New Purchase Order"}</SheetTitle>
+              <SheetDescription>
+                {editingOrder ? "Make changes to the existing order details." : "Fill out the details below to create a new PO."}
+              </SheetDescription>
+            </SheetHeader>
+            <PurchaseOrderForm
+              initialData={editingOrder}
+              onSubmit={(data) => upsertOrderMutation.mutate(data)}
+              isLoading={upsertOrderMutation.isPending}
+            />
+          </SheetContent>
+        </Sheet>
       </div>
+
+      {/* Search Input */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search Order # or Vendor..."
+          className="pl-9"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* DELETE ALERT DIALOG (The "Proper System") */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete Purchase Order?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete order <strong>{orderToDelete?.order_number}</strong>?
+              <br /><br />
+              This action cannot be undone and will remove all associated records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
+            >
+              {deleteOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete Order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Data Table */}
+
+      <Card className="shadow-sm border-muted/60">
+        <CardHeader className="bg-muted/10 pb-4">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-primary" />
+            Recent Orders
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+          ) : filteredOrders?.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Search className="h-10 w-10 mb-2 opacity-20" />
+              <p>No orders found.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Vendor</TableHead>
+                  <TableHead>Delivery Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders?.map((order) => (
+                  <TableRow key={order.id} className="group hover:bg-muted/5">
+                    <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
+                    <TableCell>{order.accounts?.name || "Unknown"}</TableCell>
+                    <TableCell>
+                      {order.expected_delivery_date ? (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          {new Date(order.expected_delivery_date).toLocaleDateString()}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-semibold">${order.total_amount?.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={STATUS_STYLES[order.status || "draft"] || ""}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onClick={() => handleEditClick(order as unknown as PurchaseOrderRow)}>
+                            <Pencil className="mr-2 h-4 w-4 text-muted-foreground" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            onClick={() => handleDeleteClick(order as unknown as PurchaseOrderRow)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -364,7 +364,7 @@ function PurchaseOrderForm({
 }) {
   const [formData, setFormData] = useState({
     order_number: initialData?.order_number || `PO-${Math.floor(1000 + Math.random() * 9000)}`,
-    vendor_id: initialData?.vendor_id || "", 
+    vendor_id: initialData?.vendor_id || "",
     total_amount: initialData?.total_amount || 0,
     status: initialData?.status || "ordered",
     order_date: initialData?.order_date ? new Date(initialData.order_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -405,20 +405,20 @@ function PurchaseOrderForm({
     <form onSubmit={handleSubmit} className="space-y-5 pt-6">
       <div className="space-y-2">
         <Label>Order Number</Label>
-        <Input 
+        <Input
           required
           value={formData.order_number}
-          onChange={(e) => setFormData({...formData, order_number: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, order_number: e.target.value })}
         />
       </div>
 
       <div className="space-y-2">
         <Label>Vendor</Label>
-        <select 
+        <select
           required
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={formData.vendor_id}
-          onChange={(e) => setFormData({...formData, vendor_id: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
         >
           <option value="">-- Select Vendor --</option>
           {(vendors as VendorOption[] | null)?.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -428,41 +428,41 @@ function PurchaseOrderForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Order Date</Label>
-          <Input 
-            type="date" 
+          <Input
+            type="date"
             required
             value={formData.order_date}
-            onChange={(e) => setFormData({...formData, order_date: e.target.value})} 
+            onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
           />
         </div>
         <div className="space-y-2">
           <Label>Delivery Date</Label>
-          <Input 
-            type="date" 
+          <Input
+            type="date"
             value={formData.expected_delivery_date}
-            onChange={(e) => setFormData({...formData, expected_delivery_date: e.target.value})} 
+            onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Total Amount ($)</Label>
-        <Input 
-          type="number" 
+        <Input
+          type="number"
           step="0.01"
           required
           placeholder="0.00"
           value={formData.total_amount}
-          onChange={(e) => setFormData({...formData, total_amount: parseFloat(e.target.value)})} 
+          onChange={(e) => setFormData({ ...formData, total_amount: parseFloat(e.target.value) })}
         />
       </div>
 
       <div className="space-y-2">
         <Label>Status</Label>
-        <select 
+        <select
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={formData.status}
-          onChange={(e) => setFormData({...formData, status: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
         >
           <option value="draft">Draft</option>
           <option value="pending">Pending</option>

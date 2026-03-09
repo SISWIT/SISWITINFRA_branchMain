@@ -210,7 +210,7 @@ const Dashboard = () => {
         if (activitiesRes.data) {
           setRecentActivity(
             activitiesRes.data.map((a) => ({
-              title: a.subject,
+              title: a.subject || "No Subject",
               time: a.created_at
                 ? new Date(a.created_at).toLocaleString()
                 : "Unknown",

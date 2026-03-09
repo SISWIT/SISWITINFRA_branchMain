@@ -95,8 +95,7 @@ async function recomputeQuoteTotals(
     .from("quote_line_items")
     .select("quantity, unit_price, discount_percent")
     .eq("quote_id", quoteId)
-    .eq("organization_id", requiredOrganizationId)
-    .is("deleted_at", null);
+    .eq("organization_id", requiredOrganizationId);
 
   if (itemsError) throw itemsError;
 
@@ -501,8 +500,7 @@ export function useUpdateQuote() {
           .from("quote_line_items")
           .select("quantity, unit_price, discount_percent")
           .eq("quote_id", id)
-          .eq("organization_id", requiredOrganizationId)
-          .is("deleted_at", null);
+          .eq("organization_id", requiredOrganizationId);
 
         if (itemsError) throw itemsError;
 
@@ -577,13 +575,9 @@ export function useDeleteQuote() {
 
       const { error: childError } = await supabase
         .from("quote_line_items")
-        .update({
-          deleted_at: new Date().toISOString(),
-          deleted_by: userId,
-        })
+        .delete()
         .eq("quote_id", id)
-        .eq("organization_id", requiredOrganizationId)
-        .is("deleted_at", null);
+        .eq("organization_id", requiredOrganizationId);
       if (childError) throw childError;
 
       const deleted = await softDeleteRecord({
@@ -628,7 +622,6 @@ export function useQuoteItems(quoteId: string) {
         .select("*")
         .eq("quote_id", quoteId)
         .eq("organization_id", requiredOrganizationId)
-        .is("deleted_at", null)
         .order("sort_order");
 
       if (error) throw error;
@@ -705,7 +698,7 @@ export function useUpdateQuoteItem() {
       if (updates.quantity !== undefined) payload.quantity = updates.quantity;
       if (updates.unit_price !== undefined) payload.unit_price = updates.unit_price;
       if (updates.discount_percent !== undefined) payload.discount_percent = updates.discount_percent;
-      
+
       // Recompute total if quantity, unit_price, or discount_percent changed
       if (
         updates.quantity !== undefined ||
@@ -733,7 +726,7 @@ export function useUpdateQuoteItem() {
 
         payload.total = calculateQuoteItemTotal(mergedItem);
       }
-      
+
       if (updates.sort_order !== undefined) payload.sort_order = updates.sort_order;
 
       const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
@@ -779,14 +772,14 @@ export function useDeleteQuoteItem() {
     mutationFn: async ({ id, quoteId }: { id: string; quoteId: string }) => {
       await ensureQuoteAccessible(quoteId, scope);
 
-      const deleted = await softDeleteRecord({
-        table: "quote_line_items",
-        id,
-        userId,
-        organizationId: tenantId || "",
-      });
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
+      const { error: deleteError } = await supabase
+        .from("quote_line_items")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", requiredOrganizationId);
 
-      if (!deleted) throw new Error("Failed to delete quote item");
+      if (deleteError) throw new Error("Failed to delete quote item");
 
       // Recompute quote totals after deleting item
       await recomputeQuoteTotals(quoteId, scope);

@@ -38,7 +38,7 @@ export default function CustomerContractsPage() {
   useEffect(() => {
     const fetchContracts = async () => {
       if (!user?.email) return;
-      
+
       setIsLoading(true);
       const { data, error } = await supabase
         .from("contracts")
@@ -114,8 +114,8 @@ export default function CustomerContractsPage() {
               </TableHeader>
               <TableBody>
                 {filteredContracts.map((contract) => {
-                  const status = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
-                  
+                  const status = STATUS_CONFIG[contract.status || "draft"] || STATUS_CONFIG.draft;
+
                   return (
                     <TableRow key={contract.id}>
                       <TableCell className="font-medium">{contract.contract_number || "N/A"}</TableCell>

@@ -554,37 +554,28 @@ export function useUpdateESignature() {
         scope,
         [],
       );
-      scope,
-        [],
-      );
-  const { data, error } = await scopedQuery.select().single();
-  if (error) throw error;
 
-  void writeAuditLog({
-    action: "contract_esignature_update",
-    entityType: "contract_esignature",
-    entityId: id,
-    tenantId,
-    userId,
-    newValues: payload,
-  });
+      const { data, error } = await scopedQuery.select().single();
+      if (error) throw error;
 
-  return mapESignature(data as unknown as ESignatureRow);
-},
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["esignatures"] });
-  toast.success("E-signature updated successfully");
-},
-  onError: (error: unknown) => {
-    toast.error("Error updating e-signature: " + getErrorMessage(error));
-  },
-  });
-queryClient.invalidateQueries({ queryKey: ["esignatures"] });
-toast.success("E-signature updated successfully");
+      void writeAuditLog({
+        action: "contract_esignature_update",
+        entityType: "contract_esignature",
+        entityId: id,
+        tenantId,
+        userId,
+        newValues: payload,
+      });
+
+      return mapESignature(data as unknown as ESignatureRow);
     },
-onError: (error: unknown) => {
-  toast.error("Error updating e-signature: " + getErrorMessage(error));
-},
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["esignatures"] });
+      toast.success("E-signature updated successfully");
+    },
+    onError: (error: unknown) => {
+      toast.error("Error updating e-signature: " + getErrorMessage(error));
+    },
   });
 }
 

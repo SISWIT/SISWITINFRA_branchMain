@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { 
-  Plus, 
-  Search, 
-  Loader2, 
-  Factory, 
-  MoreHorizontal, 
-  Pencil, 
-  Trash2, 
-  Calendar, 
+import {
+  Plus,
+  Search,
+  Loader2,
+  Factory,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Calendar,
   CheckCircle2,
   AlertTriangle
 } from "lucide-react";
@@ -24,12 +24,12 @@ import { Input } from "@/ui/shadcn/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/ui/shadcn/sheet";
 import { Label } from "@/ui/shadcn/label";
 import { useToast } from "@/core/hooks/use-toast";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger, 
-  DropdownMenuSeparator 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/ui/shadcn/dropdown-menu";
 import {
   AlertDialog,
@@ -88,11 +88,11 @@ const STATUS_STYLES: Record<string, string> = {
 export default function ProductionPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  
+
   // State for Edit/Delete
   const [editingOrder, setEditingOrder] = useState<ProductionOrderRow | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<ProductionOrderRow | null>(null);
-  
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -145,8 +145,8 @@ export default function ProductionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["production-orders"] });
-      toast({ 
-        title: editingOrder ? "Order Updated" : "Production Scheduled", 
+      toast({
+        title: editingOrder ? "Order Updated" : "Production Scheduled",
         description: "The production schedule has been updated.",
       });
       setIsSheetOpen(false);
@@ -195,168 +195,168 @@ export default function ProductionPage() {
     setIsSheetOpen(true);
   };
 
-  const filteredOrders = orders?.filter((order) => 
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredOrders = orders?.filter((order) =>
+    (order.order_number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.products?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-xl md:text-3xl font-semibold tracking-tight">Production Management</h1>
-            <p className="text-sm text-muted-foreground">Track manufacturing orders and shop floor progress.</p>
-          </div>
-
-          <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if(!open) setEditingOrder(null); }}>
-            <SheetTrigger asChild>
-              <Button onClick={handleCreateClick} className="shadow-sm">
-                <Plus className="h-4 w-4 mr-2" /> New Production Order
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="sm:max-w-md overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>{editingOrder ? `Edit ${editingOrder.order_number}` : "Schedule Production"}</SheetTitle>
-                <SheetDescription>
-                  {editingOrder ? "Update manufacturing details." : "Create a new job for the production line."}
-                </SheetDescription>
-              </SheetHeader>
-              <ProductionOrderForm 
-                initialData={editingOrder}
-                onSubmit={(data) => upsertOrderMutation.mutate(data)} 
-                isLoading={upsertOrderMutation.isPending} 
-              />
-            </SheetContent>
-          </Sheet>
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl md:text-3xl font-semibold tracking-tight">Production Management</h1>
+          <p className="text-sm text-muted-foreground">Track manufacturing orders and shop floor progress.</p>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search Order # or Product..." 
-            className="pl-9" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Delete Alert */}
-        <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" /> Delete Production Order?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently remove order <strong>{orderToDelete?.order_number}</strong>. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                className="bg-destructive hover:bg-destructive/90"
-                onClick={() => deleteOrderMutation.mutate(orderToDelete.id)}
-              >
-                {deleteOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Table */}
-        <Card className="shadow-sm border-muted/60">
-          <CardHeader className="bg-muted/10 pb-4">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Factory className="h-5 w-5 text-primary" />
-              Production Schedule
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
-            ) : filteredOrders?.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Factory className="h-10 w-10 mb-2 opacity-20" />
-                    <p>No active production orders.</p>
-                </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders?.map((order) => (
-                    <TableRow key={order.id} className="group hover:bg-muted/5">
-                      <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{order.products?.name || "Unknown"}</div>
-                        <div className="text-xs text-muted-foreground">{order.products?.sku}</div>
-                      </TableCell>
-                      <TableCell>{order.quantity_to_produce}</TableCell>
-                      <TableCell>
-                        {order.due_date ? (
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Calendar className="mr-1 h-3 w-3" />
-                            {new Date(order.due_date).toLocaleDateString()}
-                          </div>
-                        ) : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={STATUS_STYLES[order.status] || ""}>
-                          {order.status.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-2">
-                          {order.status !== 'completed' && order.status !== 'cancelled' && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
-                              title="Mark as Completed"
-                              onClick={() => completeOrderMutation.mutate(order.id)}
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditClick(order)}>
-                                <Pencil className="mr-2 h-4 w-4" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                                onClick={() => setOrderToDelete(order)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <Sheet open={isSheetOpen} onOpenChange={(open) => { setIsSheetOpen(open); if (!open) setEditingOrder(null); }}>
+          <SheetTrigger asChild>
+            <Button onClick={handleCreateClick} className="shadow-sm">
+              <Plus className="h-4 w-4 mr-2" /> New Production Order
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{editingOrder ? `Edit ${editingOrder.order_number}` : "Schedule Production"}</SheetTitle>
+              <SheetDescription>
+                {editingOrder ? "Update manufacturing details." : "Create a new job for the production line."}
+              </SheetDescription>
+            </SheetHeader>
+            <ProductionOrderForm
+              initialData={editingOrder}
+              onSubmit={(data) => upsertOrderMutation.mutate(data)}
+              isLoading={upsertOrderMutation.isPending}
+            />
+          </SheetContent>
+        </Sheet>
       </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search Order # or Product..."
+          className="pl-9"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Delete Alert */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Delete Production Order?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove order <strong>{orderToDelete?.order_number}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
+            >
+              {deleteOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Table */}
+      <Card className="shadow-sm border-muted/60">
+        <CardHeader className="bg-muted/10 pb-4">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <Factory className="h-5 w-5 text-primary" />
+            Production Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+          ) : filteredOrders?.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Factory className="h-10 w-10 mb-2 opacity-20" />
+              <p>No active production orders.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders?.map((order) => (
+                  <TableRow key={order.id} className="group hover:bg-muted/5">
+                    <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{order.products?.name || "Unknown"}</div>
+                      <div className="text-xs text-muted-foreground">{order.products?.sku}</div>
+                    </TableCell>
+                    <TableCell>{order.quantity_to_produce}</TableCell>
+                    <TableCell>
+                      {order.due_date ? (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          {new Date(order.due_date).toLocaleDateString()}
+                        </div>
+                      ) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={STATUS_STYLES[order.status || "planned"] || ""}>
+                        {(order.status || "planned").replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end items-center gap-2">
+                        {order.status !== 'completed' && order.status !== 'cancelled' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            title="Mark as Completed"
+                            onClick={() => completeOrderMutation.mutate(order.id)}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(order as unknown as ProductionOrderRow)}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              onClick={() => setOrderToDelete(order as unknown as ProductionOrderRow)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -403,20 +403,20 @@ function ProductionOrderForm({
     <form onSubmit={handleSubmit} className="space-y-5 pt-6">
       <div className="space-y-2">
         <Label>Order Number</Label>
-        <Input 
+        <Input
           required
           value={formData.order_number}
-          onChange={(e) => setFormData({...formData, order_number: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, order_number: e.target.value })}
         />
       </div>
 
       <div className="space-y-2">
         <Label>Product to Produce</Label>
-        <select 
+        <select
           required
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={formData.product_id}
-          onChange={(e) => setFormData({...formData, product_id: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
         >
           <option value="">-- Select Product --</option>
           {(products as ProductOption[] | null)?.map((p) => (
@@ -427,41 +427,41 @@ function ProductionOrderForm({
 
       <div className="space-y-2">
         <Label>Quantity to Produce</Label>
-        <Input 
-          type="number" 
+        <Input
+          type="number"
           min="1"
           required
           value={formData.quantity_to_produce}
-          onChange={(e) => setFormData({...formData, quantity_to_produce: parseInt(e.target.value)})} 
+          onChange={(e) => setFormData({ ...formData, quantity_to_produce: parseInt(e.target.value) })}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Start Date</Label>
-          <Input 
-            type="date" 
+          <Input
+            type="date"
             required
             value={formData.start_date}
-            onChange={(e) => setFormData({...formData, start_date: e.target.value})} 
+            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
           />
         </div>
         <div className="space-y-2">
           <Label>Due Date</Label>
-          <Input 
-            type="date" 
+          <Input
+            type="date"
             value={formData.due_date}
-            onChange={(e) => setFormData({...formData, due_date: e.target.value})} 
+            onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Status</Label>
-        <select 
+        <select
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={formData.status}
-          onChange={(e) => setFormData({...formData, status: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
         >
           <option value="planned">Planned</option>
           <option value="in_progress">In Progress</option>

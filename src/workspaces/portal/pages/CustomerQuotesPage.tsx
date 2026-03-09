@@ -40,7 +40,7 @@ export default function CustomerQuotesPage() {
   useEffect(() => {
     const fetchQuotes = async () => {
       if (!user?.email) return;
-      
+
       setIsLoading(true);
       const { data, error } = await supabase
         .from("quotes")
@@ -64,7 +64,7 @@ export default function CustomerQuotesPage() {
     return matchesSearch;
   }) || [];
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | null) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value || 0);
   };
 
@@ -119,9 +119,9 @@ export default function CustomerQuotesPage() {
               </TableHeader>
               <TableBody>
                 {filteredQuotes.map((quote) => {
-                  const status = STATUS_CONFIG[quote.status] || STATUS_CONFIG.draft;
+                  const status = STATUS_CONFIG[quote.status || "draft"] || STATUS_CONFIG.draft;
                   const StatusIcon = status.icon;
-                  
+
                   return (
                     <TableRow key={quote.id}>
                       <TableCell className="font-medium">{quote.quote_number || "N/A"}</TableCell>
