@@ -1,10 +1,10 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/core/api/client";
 import type { Database } from "@/core/api/types";
-import { useAuth } from "@/core/auth/useAuth";
-import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 import type {
   FinancialRecord,
   InventoryItem,
@@ -17,12 +17,11 @@ import {
   applyModuleMutationScope,
   applyModuleReadScope,
   buildModuleCreatePayload,
-  isModuleScopeReady,
   requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
-import { writeAuditLog } from "@/core/utils/audit";
+import { safeWriteAuditLog } from "@/core/utils/audit";
 
 type SupplierRow = Database["public"]["Tables"]["suppliers"]["Row"];
 type SupplierInsert = Database["public"]["Tables"]["suppliers"]["Insert"];
@@ -53,10 +52,6 @@ type FinancialRecordRow = Database["public"]["Tables"]["financial_records"]["Row
 type FinancialRecordInsert = Database["public"]["Tables"]["financial_records"]["Insert"];
 type FinancialRecordUpdate = Database["public"]["Tables"]["financial_records"]["Update"];
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 function mapSupplier(row: SupplierRow): Supplier {
   return {
@@ -183,31 +178,12 @@ function mapFinancialRecord(row: FinancialRecordRow): FinancialRecord {
     description: row.description ?? undefined,
     amount: row.amount ?? undefined,
     reference_id: row.reference_number ?? undefined,
-    reference_type: row.status ?? undefined,
+    reference_type: row.reference_type ?? undefined,
+    status: row.status ?? undefined,
     notes: row.notes ?? undefined,
     created_by: row.created_by ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
-  };
-}
-
-function useErpScope() {
-  const { user, role } = useAuth();
-  const { organization, organizationLoading } = useOrganization();
-
-  const scope: ModuleScopeContext = {
-    organizationId: organization?.id ?? null,
-    userId: user?.id ?? null,
-    role,
-  };
-
-  return {
-    scope,
-    organizationId: scope.organizationId,
-    // Compatibility alias to avoid touching downstream query keys yet.
-    tenantId: scope.organizationId,
-    userId: scope.userId,
-    enabled: isModuleScopeReady(scope, organizationLoading),
   };
 }
 
@@ -222,7 +198,7 @@ async function ensurePurchaseOrderAccessible(purchaseOrderId: string, scope: Mod
 
 // ===== SUPPLIERS =====
 export function useSuppliers() {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["suppliers", tenantId, userId],
@@ -231,7 +207,7 @@ export function useSuppliers() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("suppliers").select("*"),
         scope,
-        { ownerColumns: ["created_by"] },
+        { ownerColumns: ["created_by"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.neq("is_active", false).order("name");
@@ -244,7 +220,7 @@ export function useSuppliers() {
 
 export function useCreateSupplier() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (supplier: Omit<Partial<Supplier>, "id" | "created_at" | "updated_at">) => {
@@ -270,7 +246,7 @@ export function useCreateSupplier() {
       const { data, error } = await supabase.from("suppliers").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "supplier_create",
         entityType: "supplier",
         entityId: data.id,
@@ -293,7 +269,7 @@ export function useCreateSupplier() {
 
 export function useUpdateSupplier() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Supplier> & { id: string }) => {
@@ -323,7 +299,7 @@ export function useUpdateSupplier() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "supplier_update",
         entityType: "supplier",
         entityId: id,
@@ -346,7 +322,7 @@ export function useUpdateSupplier() {
 
 export function useDeleteSupplier() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -368,7 +344,7 @@ export function useDeleteSupplier() {
       });
       if (!deleted) throw new Error("Failed to delete supplier");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "supplier_delete",
         entityType: "supplier",
         entityId: id,
@@ -388,7 +364,7 @@ export function useDeleteSupplier() {
 
 // ===== INVENTORY ITEMS =====
 export function useInventoryItems() {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["inventory_items", tenantId, userId],
@@ -397,7 +373,7 @@ export function useInventoryItems() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("inventory_items").select("*, product:products(*)"),
         scope,
-        { ownerColumns: [] },
+        { ownerColumns: [], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -410,7 +386,7 @@ export function useInventoryItems() {
 
 export function useCreateInventoryItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (item: Omit<Partial<InventoryItem>, "id" | "created_at" | "updated_at" | "quantity_available">) => {
@@ -456,7 +432,7 @@ export function useCreateInventoryItem() {
       const { data, error } = await supabase.from("inventory_items").insert(payload).select("*, product:products(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "inventory_item_create",
         entityType: "inventory_item",
         entityId: data.id,
@@ -479,7 +455,7 @@ export function useCreateInventoryItem() {
 
 export function useUpdateInventoryItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<InventoryItem> & { id: string }) => {
@@ -504,7 +480,7 @@ export function useUpdateInventoryItem() {
       const { data, error } = await scopedQuery.select("*, product:products(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "inventory_item_update",
         entityType: "inventory_item",
         entityId: id,
@@ -527,7 +503,7 @@ export function useUpdateInventoryItem() {
 
 export function useDeleteInventoryItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -549,7 +525,7 @@ export function useDeleteInventoryItem() {
       });
       if (!deleted) throw new Error("Failed to delete inventory item");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "inventory_item_delete",
         entityType: "inventory_item",
         entityId: id,
@@ -569,7 +545,7 @@ export function useDeleteInventoryItem() {
 
 // ===== PURCHASE ORDERS =====
 export function usePurchaseOrders() {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["purchase_orders", tenantId, userId],
@@ -590,7 +566,7 @@ export function usePurchaseOrders() {
 }
 
 export function usePurchaseOrder(id: string) {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["purchase_order", id, tenantId, userId],
@@ -605,10 +581,12 @@ export function usePurchaseOrder(id: string) {
       const { data, error } = await scopedQuery.single();
       if (error) throw error;
 
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const { data: items, error: itemsError } = await supabase
         .from("purchase_order_items")
         .select("*")
         .eq("purchase_order_id", id)
+        .eq("organization_id", requiredOrganizationId)
         .is("deleted_at", null)
         .order("created_at");
       if (itemsError) throw itemsError;
@@ -623,7 +601,7 @@ export function usePurchaseOrder(id: string) {
 
 export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (po: Omit<Partial<PurchaseOrder>, "id" | "created_at" | "updated_at">) => {
@@ -648,7 +626,7 @@ export function useCreatePurchaseOrder() {
       const { data, error } = await supabase.from("purchase_orders").insert(payload).select("*, supplier:suppliers(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "purchase_order_create",
         entityType: "purchase_order",
         entityId: data.id,
@@ -671,7 +649,7 @@ export function useCreatePurchaseOrder() {
 
 export function useUpdatePurchaseOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<PurchaseOrder> & { id: string }) => {
@@ -701,7 +679,7 @@ export function useUpdatePurchaseOrder() {
       const { data, error } = await scopedQuery.select("*, supplier:suppliers(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "purchase_order_update",
         entityType: "purchase_order",
         entityId: id,
@@ -725,7 +703,7 @@ export function useUpdatePurchaseOrder() {
 
 export function useDeletePurchaseOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -749,7 +727,7 @@ export function useDeletePurchaseOrder() {
       });
       if (!deleted) throw new Error("Failed to delete purchase order");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "purchase_order_delete",
         entityType: "purchase_order",
         entityId: id,
@@ -770,7 +748,7 @@ export function useDeletePurchaseOrder() {
 // ===== PURCHASE ORDER ITEMS =====
 export function useCreatePurchaseOrderItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (item: {
@@ -798,7 +776,7 @@ export function useCreatePurchaseOrderItem() {
       const { data, error } = await supabase.from("purchase_order_items").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "purchase_order_item_create",
         entityType: "purchase_order_item",
         entityId: data.id,
@@ -822,7 +800,7 @@ export function useCreatePurchaseOrderItem() {
 
 export function useDeletePurchaseOrderItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -847,7 +825,7 @@ export function useDeletePurchaseOrderItem() {
       });
       if (!deleted) throw new Error("Failed to delete purchase order item");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "purchase_order_item_delete",
         entityType: "purchase_order_item",
         entityId: id,
@@ -868,7 +846,7 @@ export function useDeletePurchaseOrderItem() {
 
 // ===== PRODUCTION ORDERS =====
 export function useProductionOrders() {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["production_orders", tenantId, userId],
@@ -877,7 +855,7 @@ export function useProductionOrders() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("production_orders").select("*, product:products(*)"),
         scope,
-        { ownerColumns: ["created_by"] },
+        { ownerColumns: ["created_by"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -890,7 +868,7 @@ export function useProductionOrders() {
 
 export function useCreateProductionOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (order: Omit<Partial<ProductionOrder>, "id" | "created_at" | "updated_at">) => {
@@ -912,7 +890,7 @@ export function useCreateProductionOrder() {
       const { data, error } = await supabase.from("production_orders").insert(payload).select("*, product:products(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "production_order_create",
         entityType: "production_order",
         entityId: data.id,
@@ -935,7 +913,7 @@ export function useCreateProductionOrder() {
 
 export function useUpdateProductionOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ProductionOrder> & { id: string }) => {
@@ -962,7 +940,7 @@ export function useUpdateProductionOrder() {
       const { data, error } = await scopedQuery.select("*, product:products(*)").single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "production_order_update",
         entityType: "production_order",
         entityId: id,
@@ -985,7 +963,7 @@ export function useUpdateProductionOrder() {
 
 export function useDeleteProductionOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1007,7 +985,7 @@ export function useDeleteProductionOrder() {
       });
       if (!deleted) throw new Error("Failed to delete production order");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "production_order_delete",
         entityType: "production_order",
         entityId: id,
@@ -1027,7 +1005,7 @@ export function useDeleteProductionOrder() {
 
 // ===== FINANCIAL RECORDS =====
 export function useFinancialRecords() {
-  const { scope, enabled, tenantId, userId } = useErpScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["financial_records", tenantId, userId],
@@ -1036,7 +1014,7 @@ export function useFinancialRecords() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("financial_records").select("*"),
         scope,
-        { ownerColumns: ["created_by"] },
+        { ownerColumns: ["created_by"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("record_date", { ascending: false });
@@ -1049,7 +1027,7 @@ export function useFinancialRecords() {
 
 export function useCreateFinancialRecord() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (record: Omit<Partial<FinancialRecord>, "id" | "created_at" | "updated_at">) => {
@@ -1071,7 +1049,7 @@ export function useCreateFinancialRecord() {
       const { data, error } = await supabase.from("financial_records").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "financial_record_create",
         entityType: "financial_record",
         entityId: data.id,
@@ -1094,7 +1072,7 @@ export function useCreateFinancialRecord() {
 
 export function useUpdateFinancialRecord() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<FinancialRecord> & { id: string }) => {
@@ -1120,7 +1098,7 @@ export function useUpdateFinancialRecord() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "financial_record_update",
         entityType: "financial_record",
         entityId: id,
@@ -1143,7 +1121,7 @@ export function useUpdateFinancialRecord() {
 
 export function useDeleteFinancialRecord() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useErpScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1165,7 +1143,7 @@ export function useDeleteFinancialRecord() {
       });
       if (!deleted) throw new Error("Failed to delete financial record");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "financial_record_delete",
         entityType: "financial_record",
         entityId: id,
@@ -1182,4 +1160,5 @@ export function useDeleteFinancialRecord() {
     },
   });
 }
+
 

@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useState } from "react";
 import {
   Plus,
@@ -71,10 +72,6 @@ interface VendorOption {
   name: string;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 // Status Colors Helper
 const STATUS_STYLES: Record<string, string> = {
@@ -478,3 +475,4 @@ function PurchaseOrderForm({
     </form>
   );
 }
+

@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useState, useEffect } from "react";
 import { Plus, AlertTriangle, Package, Search, Loader2, Warehouse } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,10 +34,6 @@ interface InventoryFormData {
   warehouse_location: string;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -314,3 +311,4 @@ function InventoryForm({ onSubmit, isLoading }: { onSubmit: (data: InventoryForm
     </form>
   );
 }
+

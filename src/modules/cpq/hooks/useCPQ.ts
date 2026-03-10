@@ -1,25 +1,25 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
-import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import type { Database } from "@/core/api/types";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 import type { Product, Quote, QuoteItem, QuoteStatus } from "@/core/types/cpq";
+import { canReadAllTenantRows, isOwnerScopedRole } from "@/core/types/roles";
 import {
   applyModuleMutationScope,
   applyModuleReadScope,
   buildModuleCreatePayload,
-  isModuleScopeReady,
   requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
-import { writeAuditLog } from "@/core/utils/audit";
+import { safeWriteAuditLog } from "@/core/utils/audit";
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
+type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
+type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
+
 
 // ===== QUOTE STATUS VALIDATION =====
 const QUOTE_STATUS_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
@@ -71,79 +71,9 @@ function calculateQuoteTotals(
   };
 }
 
-// Recompute quote totals after line item changes
-async function recomputeQuoteTotals(
-  quoteId: string,
-  scope: ModuleScopeContext,
-) {
-  const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
-
-  const { data: quote, error: quoteError } = await applyModuleReadScope(
-    supabase
-      .from("quotes")
-      .select("id, discount_percent, tax_percent")
-      .eq("id", quoteId),
-    scope,
-    { ownerColumns: ["owner_id"] },
-  ).single();
-
-  if (quoteError || !quote) {
-    throw quoteError || new Error("Quote not found");
-  }
-
-  const { data: items, error: itemsError } = await supabase
-    .from("quote_line_items")
-    .select("quantity, unit_price, discount_percent")
-    .eq("quote_id", quoteId)
-    .eq("organization_id", requiredOrganizationId);
-
-  if (itemsError) throw itemsError;
-
-  const computed = calculateQuoteTotals(
-    (items ?? []) as Partial<QuoteItem>[],
-    Number(quote.discount_percent ?? 0),
-    Number(quote.tax_percent ?? 0),
-  );
-
-  const scopedUpdate = applyModuleMutationScope(
-    supabase.from("quotes").update({
-      subtotal: computed.subtotal,
-      discount_amount: computed.discountAmount,
-      tax_amount: computed.taxAmount,
-      total_amount: computed.totalAmount,
-      updated_at: new Date().toISOString(),
-    }).eq("id", quoteId),
-    scope,
-    ["owner_id"],
-  );
-
-  const { error: updateError } = await scopedUpdate;
-  if (updateError) throw updateError;
-}
-
-function useCpqScope() {
-  const { user, role } = useAuth();
-  const { organization, organizationLoading } = useOrganization();
-
-  const scope: ModuleScopeContext = {
-    organizationId: organization?.id ?? null,
-    userId: user?.id ?? null,
-    role,
-  };
-
-  return {
-    scope,
-    organizationId: scope.organizationId,
-    // Compatibility alias to avoid touching downstream query keys yet.
-    tenantId: scope.organizationId,
-    userId: scope.userId,
-    enabled: isModuleScopeReady(scope, organizationLoading),
-  };
-}
-
 async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext) {
   const query = supabase.from("quotes").select("id").eq("id", quoteId);
-  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"] });
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: false });
   const result = await scoped.maybeSingle();
   if (result.error || !result.data) {
     throw new Error("Quote not found or not accessible");
@@ -152,7 +82,7 @@ async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext)
 
 // ===== PRODUCTS =====
 export function useProducts() {
-  const { scope, enabled, tenantId } = useCpqScope();
+  const { scope, enabled, tenantId } = useModuleScope();
 
   return useQuery({
     queryKey: ["products", tenantId],
@@ -178,11 +108,11 @@ export function useProducts() {
 
 export function useCreateProduct() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (product: Omit<Partial<Product>, "id" | "created_at" | "updated_at">) => {
-      const payload = buildModuleCreatePayload(
+      const payload = buildModuleCreatePayload<ProductInsert>(
         {
           name: product.name || "",
           description: product.description,
@@ -194,12 +124,12 @@ export function useCreateProduct() {
         },
         scope,
         { ownerColumn: null },
-      ) as any;
+      );
 
       const { data, error } = await supabase.from("products").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "product_create",
         entityType: "product",
         entityId: data.id,
@@ -225,7 +155,7 @@ export function useCreateProduct() {
 
 export function useUpdateProduct() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Product> & { id: string }) => {
@@ -250,7 +180,7 @@ export function useUpdateProduct() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "product_update",
         entityType: "product",
         entityId: id,
@@ -276,7 +206,7 @@ export function useUpdateProduct() {
 
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -298,7 +228,7 @@ export function useDeleteProduct() {
       });
       if (!deleted) throw new Error("Failed to delete product");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "product_delete",
         entityType: "product",
         entityId: id,
@@ -318,7 +248,7 @@ export function useDeleteProduct() {
 
 // ===== QUOTES =====
 export function useQuotes() {
-  const { scope, enabled, tenantId, userId } = useCpqScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["quotes", tenantId, userId],
@@ -329,7 +259,7 @@ export function useQuotes() {
           .from("quotes")
           .select("*, accounts(id, name), contacts(id, first_name, last_name, email, phone), opportunities(id, name)"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -345,7 +275,7 @@ export function useQuotes() {
 }
 
 export function useQuote(id: string) {
-  const { scope, enabled, tenantId, userId } = useCpqScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["quote", id, tenantId, userId],
@@ -357,7 +287,7 @@ export function useQuote(id: string) {
           .select("*, accounts(id, name, billing_address, billing_city, billing_state, billing_zip, billing_country), contacts(id, first_name, last_name, email, phone), opportunities(id, name)")
           .eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.single();
@@ -374,7 +304,7 @@ export function useQuote(id: string) {
 
 export function useCreateQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (quote: Omit<Partial<Quote>, "id" | "created_at" | "updated_at"> & { items?: QuoteItem[] }) => {
@@ -388,7 +318,7 @@ export function useCreateQuote() {
         Number(quoteData.tax_percent || 0),
       );
 
-      const payload = buildModuleCreatePayload(
+      const payload = buildModuleCreatePayload<QuoteInsert>(
         {
           account_id: quoteData.account_id || null,
           contact_id: quoteData.contact_id || null,
@@ -406,7 +336,7 @@ export function useCreateQuote() {
           quote_number: quoteData.quote_number || `QT-${Date.now()}`,
         },
         scope,
-      ) as any;
+      );
 
       const { data, error } = await supabase.from("quotes").insert(payload).select().single();
       if (error) throw error;
@@ -431,7 +361,7 @@ export function useCreateQuote() {
         if (itemsResult.error) throw itemsResult.error;
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_create",
         entityType: "quote",
         entityId: data.id,
@@ -458,10 +388,23 @@ export function useCreateQuote() {
 
 export function useUpdateQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Quote> & { id: string }) => {
+      // Validate status transition before building payload.
+      if (updates.status !== undefined) {
+        const { data: currentQuote } = await applyModuleReadScope(
+          supabase.from("quotes").select("status").eq("id", id),
+          scope,
+          { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        ).single();
+
+        if (currentQuote) {
+          validateQuoteStatusTransition(currentQuote.status ?? "draft", updates.status);
+        }
+      }
+
       const payload: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
@@ -489,7 +432,7 @@ export function useUpdateQuote() {
         const { data: existingQuote, error: quoteError } = await applyModuleReadScope(
           supabase.from("quotes").select("discount_percent, tax_percent").eq("id", id),
           scope,
-          { ownerColumns: ["owner_id"] },
+          { ownerColumns: ["owner_id"], hasSoftDelete: false },
         ).single();
 
         if (quoteError || !existingQuote) throw quoteError || new Error("Quote not found");
@@ -537,7 +480,7 @@ export function useUpdateQuote() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_update",
         entityType: "quote",
         entityId: id,
@@ -565,7 +508,7 @@ export function useUpdateQuote() {
 
 export function useDeleteQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -575,9 +518,13 @@ export function useDeleteQuote() {
 
       const { error: childError } = await supabase
         .from("quote_line_items")
-        .delete()
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: userId,
+        })
         .eq("quote_id", id)
-        .eq("organization_id", requiredOrganizationId);
+        .eq("organization_id", requiredOrganizationId)
+        .is("deleted_at", null);
       if (childError) throw childError;
 
       const deleted = await softDeleteRecord({
@@ -588,7 +535,7 @@ export function useDeleteQuote() {
       });
       if (!deleted) throw new Error("Failed to delete quote");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_delete",
         entityType: "quote",
         entityId: id,
@@ -608,21 +555,25 @@ export function useDeleteQuote() {
 
 // ===== QUOTE ITEMS =====
 export function useQuoteItems(quoteId: string) {
-  const { scope, enabled, tenantId, userId } = useCpqScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["quote_line_items", quoteId, tenantId, userId],
     enabled: enabled && Boolean(quoteId),
     queryFn: async () => {
-      await ensureQuoteAccessible(quoteId, scope);
-
-      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
-      const { data, error } = await supabase
+      const { organizationId: requiredOrganizationId, userId: requiredUserId } = requireOrganizationScope(scope);
+      let query = supabase
         .from("quote_line_items")
-        .select("*")
+        .select("*, quote:quotes!inner(id, organization_id, owner_id)")
         .eq("quote_id", quoteId)
-        .eq("organization_id", requiredOrganizationId)
-        .order("sort_order");
+        .eq("quote.organization_id", requiredOrganizationId)
+        .is("deleted_at", null);
+
+      if (!canReadAllTenantRows(scope.role) && isOwnerScopedRole(scope.role)) {
+        query = query.eq("quote.owner_id", requiredUserId);
+      }
+
+      const { data, error } = await query.order("sort_order");
 
       if (error) throw error;
       return (data ?? []) as QuoteItem[];
@@ -632,7 +583,7 @@ export function useQuoteItems(quoteId: string) {
 
 export function useCreateQuoteItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (item: Omit<Partial<QuoteItem>, "id" | "created_at" | "updated_at">) => {
@@ -659,10 +610,9 @@ export function useCreateQuoteItem() {
 
       if (error) throw error;
 
-      // Recompute quote totals after adding new item
-      await recomputeQuoteTotals(quoteId, scope);
+      // Totals are recomputed by database trigger.
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_item_create",
         entityType: "quote_item",
         entityId: data.id,
@@ -685,7 +635,7 @@ export function useCreateQuoteItem() {
 
 export function useUpdateQuoteItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, quoteId, ...updates }: Partial<QuoteItem> & { id: string; quoteId: string }) => {
@@ -740,10 +690,9 @@ export function useUpdateQuoteItem() {
 
       if (error) throw error;
 
-      // Recompute quote totals after updating item
-      await recomputeQuoteTotals(quoteId, scope);
+      // Totals are recomputed by database trigger.
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_item_update",
         entityType: "quote_item",
         entityId: id,
@@ -766,7 +715,7 @@ export function useUpdateQuoteItem() {
 
 export function useDeleteQuoteItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, quoteId }: { id: string; quoteId: string }) => {
@@ -781,10 +730,9 @@ export function useDeleteQuoteItem() {
 
       if (deleteError) throw new Error("Failed to delete quote item");
 
-      // Recompute quote totals after deleting item
-      await recomputeQuoteTotals(quoteId, scope);
+      // Totals are recomputed by database trigger.
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_item_delete",
         entityType: "quote_item",
         entityId: id,
@@ -805,7 +753,7 @@ export function useDeleteQuoteItem() {
 // ===== UPDATE QUOTE STATUS =====
 export function useUpdateQuoteStatus() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCpqScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: QuoteStatus }) => {
@@ -813,7 +761,7 @@ export function useUpdateQuoteStatus() {
       const readQuery = applyModuleReadScope(
         supabase.from("quotes").select("id, status").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data: existingQuote, error: readError } = await readQuery.single();
@@ -836,7 +784,7 @@ export function useUpdateQuoteStatus() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_status_update",
         entityType: "quote",
         entityId: id,
@@ -861,4 +809,5 @@ export function useUpdateQuoteStatus() {
     },
   });
 }
+
 

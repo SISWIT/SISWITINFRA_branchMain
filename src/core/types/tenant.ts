@@ -6,6 +6,12 @@
 
 import { AppRole } from "./roles";
 import type { ModuleType } from "./modules";
+import {
+  getEnabledModules as getEnabledModulesUtil,
+  isModuleEnabled as isModuleEnabledUtil,
+  isModuleInPlan as isModuleInPlanUtil,
+  PLAN_MODULES as PLAN_MODULES_UTIL,
+} from "@/core/utils/modules";
 
 // Re-export for consumers that import from this file
 export type { ModuleType } from "./modules";
@@ -151,17 +157,13 @@ export interface AuthUser {
 /**
  * Plan configuration - defines what modules are available in each plan
  */
-export const PLAN_MODULES: Record<PlanType, ModuleType[]> = {
-  starter: ["crm", "cpq", "documents"],
-  professional: ["crm", "cpq", "clm", "documents"],
-  enterprise: ["crm", "cpq", "clm", "erp", "documents"],
-};
+export const PLAN_MODULES = PLAN_MODULES_UTIL;
 
 /**
  * Check if a module is available in a plan
  */
 export const isModuleInPlan = (module: ModuleType, plan: PlanType): boolean => {
-  return PLAN_MODULES[plan].includes(module);
+  return isModuleInPlanUtil(module, plan);
 };
 
 /**
@@ -171,22 +173,7 @@ export const isModuleEnabled = (
   subscription: TenantSubscription | null | undefined,
   module: ModuleType
 ): boolean => {
-  if (!subscription) return false;
-
-  switch (module) {
-    case "crm":
-      return subscription.module_crm;
-    case "clm":
-      return subscription.module_clm;
-    case "cpq":
-      return subscription.module_cpq;
-    case "erp":
-      return subscription.module_erp;
-    case "documents":
-      return subscription.module_documents;
-    default:
-      return false;
-  }
+  return isModuleEnabledUtil(subscription, module);
 };
 
 /**
@@ -195,14 +182,5 @@ export const isModuleEnabled = (
 export const getEnabledModules = (
   subscription: TenantSubscription | undefined
 ): ModuleType[] => {
-  if (!subscription) return [];
-
-  const modules: ModuleType[] = [];
-  if (subscription.module_crm) modules.push("crm");
-  if (subscription.module_clm) modules.push("clm");
-  if (subscription.module_cpq) modules.push("cpq");
-  if (subscription.module_erp) modules.push("erp");
-  if (subscription.module_documents) modules.push("documents");
-
-  return modules;
+  return getEnabledModulesUtil(subscription);
 };

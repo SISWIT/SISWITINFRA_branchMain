@@ -1,5 +1,4 @@
-"use client";
-
+import { getErrorMessage } from "@/core/utils/errors";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session, User, SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/core/api/client";
@@ -41,10 +40,6 @@ type OrganizationLookupRow = {
   org_code: string;
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 async function getFunctionInvokeErrorMessage(error: unknown): Promise<string> {
   const baseMessage = getErrorMessage(error);
@@ -770,7 +765,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const approveClientMembership = useCallback(
-    async (membershipId: string): Promise<{ error: string | null }> => {
+    async (membershipId: string, currentOrganizationId: string): Promise<{ error: string | null }> => {
       try {
         const { error } = await unsafeSupabase
           .from("organization_memberships")
@@ -780,7 +775,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", membershipId)
-          .eq("role", "client");
+          .eq("role", "client")
+          .eq("organization_id", currentOrganizationId);
 
         if (error) {
           return { error: error.message };
@@ -795,7 +791,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const rejectClientMembership = useCallback(
-    async (membershipId: string): Promise<{ error: string | null }> => {
+    async (membershipId: string, currentOrganizationId: string): Promise<{ error: string | null }> => {
       try {
         const { error } = await unsafeSupabase
           .from("organization_memberships")
@@ -805,7 +801,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", membershipId)
-          .eq("role", "client");
+          .eq("role", "client")
+          .eq("organization_id", currentOrganizationId);
 
         if (error) {
           return { error: error.message };
@@ -975,8 +972,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       // W-05: Clear React Query cache to prevent stale data across sessions
-      const { queryClient } = await import("@/app/App");
-      queryClient.clear();
+      const { clearAllCaches } = await import("@/app/App");
+      clearAllCaches();
       await supabase.auth.signOut();
     } finally {
       setUser(null);
@@ -1111,3 +1108,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+

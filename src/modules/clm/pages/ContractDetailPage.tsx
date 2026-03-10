@@ -1,4 +1,5 @@
-﻿import { Link, useNavigate, useParams } from "react-router-dom";
+import { getErrorMessage } from "@/core/utils/errors";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle,
@@ -37,10 +38,6 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground" },
 };
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 export default function ContractDetailPage() {
   const { id, tenantSlug } = useParams<{ id: string; tenantSlug: string }>();
@@ -296,3 +293,4 @@ export default function ContractDetailPage() {
     </div>
   );
 }
+

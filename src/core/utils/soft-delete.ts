@@ -1,7 +1,8 @@
-import { supabase } from "@/core/api/client";
+import { typedFrom, type TableName } from "@/core/api/typed-client";
+import { logger } from "@/core/utils/logger";
 
 interface SoftDeleteInput {
-  table: string;
+  table: TableName;
   id: string;
   userId: string | null;
   // Required for tenant isolation.
@@ -9,7 +10,7 @@ interface SoftDeleteInput {
 }
 
 interface RestoreInput {
-  table: string;
+  table: TableName;
   id: string;
   // Optional for backward compatibility during migration.
   organizationId?: string | null;
@@ -26,9 +27,7 @@ export async function softDeleteRecord(input: SoftDeleteInput): Promise<boolean>
     throw new Error("softDeleteRecord requires organizationId for tenant isolation");
   }
 
-  const { error } = await supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from(input.table as any)
+  const { error } = await typedFrom(input.table)
     .update({
       deleted_at: new Date().toISOString(),
       deleted_by: input.userId,
@@ -39,7 +38,12 @@ export async function softDeleteRecord(input: SoftDeleteInput): Promise<boolean>
     .is("deleted_at", null);
 
   if (error) {
-    console.error(`Soft delete error on table ${input.table} (ID: ${input.id}):`, error);
+    logger.error("Soft delete failed", {
+      table: input.table,
+      id: input.id,
+      organizationId: input.organizationId,
+      error,
+    });
     throw new Error(error.message || `Failed to soft delete record in ${input.table}`);
   }
 
@@ -47,9 +51,7 @@ export async function softDeleteRecord(input: SoftDeleteInput): Promise<boolean>
 }
 
 export async function restoreSoftDeletedRecord(input: RestoreInput): Promise<boolean> {
-  let query = supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .from(input.table as any)
+  let query = typedFrom(input.table)
     .update({
       deleted_at: null,
       deleted_by: null,
@@ -64,7 +66,12 @@ export async function restoreSoftDeletedRecord(input: RestoreInput): Promise<boo
   const { error } = await query;
 
   if (error) {
-    console.error(`Restore soft delete error on table ${input.table} (ID: ${input.id}):`, error);
+    logger.error("Restore soft delete failed", {
+      table: input.table,
+      id: input.id,
+      organizationId: input.organizationId ?? null,
+      error,
+    });
     throw new Error(error.message || `Failed to restore record in ${input.table}`);
   }
 

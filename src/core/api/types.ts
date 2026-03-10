@@ -26,6 +26,7 @@ export type Database = {
           billing_state: string | null
           billing_zip: string | null
           created_at: string | null
+          description: string | null
           domain: string | null
           id: string
           industry: string | null
@@ -48,6 +49,7 @@ export type Database = {
           billing_state?: string | null
           billing_zip?: string | null
           created_at?: string | null
+          description?: string | null
           domain?: string | null
           id?: string
           industry?: string | null
@@ -70,6 +72,7 @@ export type Database = {
           billing_state?: string | null
           billing_zip?: string | null
           created_at?: string | null
+          description?: string | null
           domain?: string | null
           id?: string
           industry?: string | null
@@ -1554,6 +1557,7 @@ export type Database = {
           record_date: string | null
           record_type: string | null
           reference_number: string | null
+          reference_type: string | null
           status: string | null
           tenant_id: string | null
           transaction_date: string | null
@@ -1574,6 +1578,7 @@ export type Database = {
           record_date?: string | null
           record_type?: string | null
           reference_number?: string | null
+          reference_type?: string | null
           status?: string | null
           tenant_id?: string | null
           transaction_date?: string | null
@@ -1594,6 +1599,7 @@ export type Database = {
           record_date?: string | null
           record_type?: string | null
           reference_number?: string | null
+          reference_type?: string | null
           status?: string | null
           tenant_id?: string | null
           transaction_date?: string | null
@@ -2511,6 +2517,7 @@ export type Database = {
         Row: {
           category: string | null
           cost: number | null
+          cost_price: number | null
           created_at: string | null
           currency: string | null
           description: string | null
@@ -2531,6 +2538,7 @@ export type Database = {
         Insert: {
           category?: string | null
           cost?: number | null
+          cost_price?: number | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
@@ -2551,6 +2559,7 @@ export type Database = {
         Update: {
           category?: string | null
           cost?: number | null
+          cost_price?: number | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
@@ -2859,11 +2868,13 @@ export type Database = {
       quote_line_items: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           description: string | null
           discount_percent: number | null
           id: string
           line_total: number | null
-          organization_id: string | null
+          organization_id: string
           product_id: string | null
           product_name: string | null
           quantity: number | null
@@ -2877,11 +2888,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           discount_percent?: number | null
           id?: string
           line_total?: number | null
-          organization_id?: string | null
+          organization_id: string
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
@@ -2895,11 +2908,13 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           discount_percent?: number | null
           id?: string
           line_total?: number | null
-          organization_id?: string | null
+          organization_id?: string
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
@@ -3565,6 +3580,14 @@ export type Database = {
         Returns: string
       }
       hash_invitation_token: { Args: { p_token: string }; Returns: string }
+      recompute_quote_totals: {
+        Args: { p_quote_id: string }
+        Returns: undefined
+      }
+      recompute_quote_totals_for_quote: {
+        Args: { p_quote_id: string }
+        Returns: undefined
+      }
       search_signup_organizations: {
         Args: { p_limit?: number; p_query: string }
         Returns: {

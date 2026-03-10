@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Save, Send, ArrowLeft, Building, User, Calendar, DollarSign } from "lucide-react";
@@ -14,10 +15,6 @@ import { toast } from "sonner";
 import { Separator } from "@/ui/shadcn/separator";
 import { Badge } from "@/ui/shadcn/badge";
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 export default function ContractBuilderPage() {
   const navigate = useNavigate();
@@ -347,3 +344,4 @@ export default function ContractBuilderPage() {
     </div>
   );
 }
+

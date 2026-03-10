@@ -189,7 +189,7 @@ export function useModuleRoute(module: ModuleType) {
 /**
  * Hook for CRUD operations with tenant isolation
  */
-export function useCRUD<T extends { organization_id?: string; tenant_id?: string }>(tableName: string) {
+export function useCRUD() {
   const { user, role: userRole } = useAuth();
   const { organization } = useOrganization();
   const isPlatformAdmin = isPlatformRole(userRole);
@@ -224,14 +224,13 @@ export function useCRUD<T extends { organization_id?: string; tenant_id?: string
   /**
    * Check if user can update records
    */
-  const canUpdate = (record?: T): boolean => {
+  const canUpdate = (record?: { owner_id?: string; created_by?: string }): boolean => {
     if (!user || !userRole) return false;
     if (isPlatformAdmin) return true;
     if (userRole === "admin" || userRole === "manager") return true;
     if ((userRole === "employee" || userRole === "user") && record) {
       // S-08: Check record ownership for non-admin roles
-      const ownable = record as Record<string, unknown>;
-      return ownable.owner_id === user.id || ownable.created_by === user.id;
+      return record.owner_id === user.id || record.created_by === user.id;
     }
     return false;
   };

@@ -1,4 +1,6 @@
 import { supabase } from "@/core/api/client";
+import { getErrorMessage } from "@/core/utils/errors";
+import { logger } from "@/core/utils/logger";
 
 export type BackgroundJobType =
   | "document.generate"
@@ -59,6 +61,29 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<string | null>
 
   if (error) return null;
   return data?.id ?? null;
+}
+
+export async function safeEnqueueJob<T extends Record<string, unknown>>(
+  enqueueFn: (params: T) => Promise<string | null>,
+  params: T,
+): Promise<string | null> {
+  try {
+    const jobId = await enqueueFn(params);
+    if (!jobId) {
+      logger.error("Job enqueue failed", {
+        enqueueFn: enqueueFn.name || "anonymous_enqueue_fn",
+        params,
+      });
+    }
+    return jobId;
+  } catch (error) {
+    logger.error("Job enqueue failed", {
+      enqueueFn: enqueueFn.name || "anonymous_enqueue_fn",
+      params,
+      error: getErrorMessage(error),
+    });
+    return null;
+  }
 }
 
 export async function enqueueDocumentPdfJob(input: {

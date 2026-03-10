@@ -18,6 +18,7 @@ interface ScopedQuery<TQuery> {
 interface ReadScopeOptions {
   ownerColumns?: string[];
   includeSoftDeleted?: boolean;
+  hasSoftDelete?: boolean;
 }
 
 interface CreatePayloadOptions {
@@ -57,10 +58,11 @@ export function applyModuleReadScope<TQuery extends ScopedQuery<TQuery>>(
 ): TQuery {
   const { organizationId, userId } = requireOrganizationScope(scope);
   const ownerColumns = options.ownerColumns ?? ["owner_id"];
+  const hasSoftDelete = options.hasSoftDelete ?? true;
   const includeSoftDeleted = options.includeSoftDeleted ?? false;
 
   let scoped = query.eq("organization_id", organizationId);
-  if (!includeSoftDeleted) {
+  if (hasSoftDelete && !includeSoftDeleted) {
     scoped = scoped.is("deleted_at", null);
   }
 

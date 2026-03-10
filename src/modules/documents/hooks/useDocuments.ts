@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
@@ -11,10 +10,11 @@ import type {
   DocumentVersion,
 } from "@/core/types/documents";
 import { toast } from "sonner";
-import { enqueueDocumentPdfJob, enqueueEmailSendJob, enqueueReminderJob } from "@/core/utils/jobs";
+import { enqueueDocumentPdfJob, enqueueEmailSendJob, enqueueReminderJob, safeEnqueueJob } from "@/core/utils/jobs";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
-import { writeAuditLog } from "@/core/utils/audit";
+import { safeWriteAuditLog } from "@/core/utils/audit";
 import { applyTenantOwnershipScope, withOwnershipCreate } from "@/core/utils/data-ownership";
+import { applyModuleReadScope, type ModuleScopeContext } from "@/core/utils/module-scope";
 import { isPlatformRole } from "@/core/types/roles";
 
 type DocumentESignatureWithDocument = DocumentESignature & {
@@ -28,40 +28,7 @@ function isMissingTableError(error: unknown): boolean {
   return (error as { code?: string }).code === "42P01";
 }
 
-function useDocumentsRealtime(userId?: string, scope = "global", organizationId?: string | null) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
-
-    const orgFilter = organizationId
-      ? `organization_id=eq.${organizationId}`
-      : undefined;
-
-    const channel = supabase
-      .channel(`documents-realtime-${userId}-${scope}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "auto_documents", filter: orgFilter }, () => {
-        queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
-        queryClient.invalidateQueries({ queryKey: ["auto_document"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "document_templates", filter: orgFilter }, () => {
-        queryClient.invalidateQueries({ queryKey: ["document_templates"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "document_esignatures", filter: orgFilter }, () => {
-        queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
-        queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, scope, userId, organizationId]);
-}
-
-async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise<void> {
+async function syncAutoDocumentStatusFromSignatures(documentId: string, organizationId: string): Promise<void> {
   const { data, error } = await supabase
     .from("document_esignatures")
     .select("status")
@@ -96,7 +63,8 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise
   const { error: updateError } = await supabase
     .from("auto_documents")
     .update({ status: nextStatus })
-    .eq("id", documentId);
+    .eq("id", documentId)
+    .eq("organization_id", organizationId);
 
   if (updateError && !isMissingTableError(updateError)) {
     throw updateError;
@@ -107,7 +75,6 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string): Promise
 export function useDocumentTemplates() {
   const { user, role } = useAuth();
   const { organization } = useOrganization();
-  useDocumentsRealtime(user?.id, "templates", organization?.id);
 
   return useQuery({
     queryKey: ["document_templates", user?.id, organization?.id],
@@ -179,7 +146,7 @@ export function useCreateDocumentTemplate() {
         throw error;
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_template_created",
         entityType: "document_templates",
         entityId: data.id,
@@ -223,7 +190,7 @@ export function useUpdateDocumentTemplate() {
         throw error;
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_template_updated",
         entityType: "document_templates",
         entityId: id,
@@ -261,7 +228,7 @@ export function useDeleteDocumentTemplate() {
         throw new Error("Failed to soft-delete template");
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_template_soft_deleted",
         entityType: "document_templates",
         entityId: id,
@@ -283,7 +250,11 @@ export function useDeleteDocumentTemplate() {
 export function useAutoDocuments() {
   const { user, role } = useAuth();
   const { organization } = useOrganization();
-  useDocumentsRealtime(user?.id, "documents", organization?.id);
+  const scope: ModuleScopeContext = {
+    organizationId: organization?.id ?? null,
+    userId: user?.id ?? null,
+    role,
+  };
 
   return useQuery({
     queryKey: ["auto_documents", user?.id, organization?.id],
@@ -294,17 +265,13 @@ export function useAutoDocuments() {
         throw new Error("User not authenticated");
       }
 
-      let query = supabase.from("auto_documents").select("*").is("deleted_at", null);
-      query = applyTenantOwnershipScope(query, {
-        organizationId: organization?.id,
-        isPlatformAdmin: isPlatformRole(role),
-      });
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("auto_documents").select("*"),
+        scope,
+        { ownerColumns: ["owner_id", "created_by"], hasSoftDelete: false },
+      );
 
-      if (!isPlatformRole(role)) {
-        query = query.or(`owner_id.eq.${user.id},created_by.eq.${user.id}`);
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false });
+      const { data, error } = await scopedQuery.order("created_at", { ascending: false });
 
       if (error) {
         throw error;
@@ -398,7 +365,7 @@ export function useCreateAutoDocument() {
         throw error;
       }
 
-      void enqueueDocumentPdfJob({
+      void safeEnqueueJob(enqueueDocumentPdfJob, {
         organizationId: organization.id,
         documentId: data.id,
         documentName: data.name,
@@ -406,7 +373,7 @@ export function useCreateAutoDocument() {
         createdBy: user?.id,
       });
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_created",
         entityType: "auto_documents",
         entityId: data.id,
@@ -450,7 +417,7 @@ export function useUpdateAutoDocument() {
         throw error;
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_updated",
         entityType: "auto_documents",
         entityId: id,
@@ -489,7 +456,7 @@ export function useDeleteAutoDocument() {
         throw new Error("Failed to soft-delete document");
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_soft_deleted",
         entityType: "auto_documents",
         entityId: id,
@@ -511,7 +478,6 @@ export function useDeleteAutoDocument() {
 export function useDocumentESignatures(documentId?: string) {
   const { user, role } = useAuth();
   const { organization } = useOrganization();
-  useDocumentsRealtime(user?.id, `esignatures-${documentId || "all"}`, organization?.id);
 
   return useQuery({
     queryKey: ["document_esignatures", documentId || "all", user?.id, organization?.id],
@@ -578,6 +544,8 @@ export function useCreateDocumentESignature() {
         .from("document_esignatures")
         .insert({
           document_id: signature.document_id,
+          organization_id: resolvedOrganizationId,
+          tenant_id: resolvedOrganizationId,
           recipient_name: signature.recipient_name || "",
           recipient_email: signature.recipient_email || "",
           status: signature.status || "pending",
@@ -604,7 +572,7 @@ export function useCreateDocumentESignature() {
       }
 
       if (resolvedOrganizationId && signature.recipient_email) {
-        void enqueueEmailSendJob({
+        void safeEnqueueJob(enqueueEmailSendJob, {
           organizationId: resolvedOrganizationId,
           to: signature.recipient_email,
           template: "document_signature_request",
@@ -617,7 +585,7 @@ export function useCreateDocumentESignature() {
         });
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_signature_requested",
         entityType: "document_esignatures",
         entityId: data.id,
@@ -651,15 +619,37 @@ export function useUpdateDocumentESignature() {
 
   return useMutation({
     mutationFn: async ({ id, document_id, ...updates }: Partial<DocumentESignature> & { id: string }) => {
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
+      if (!document_id) {
+        throw new Error("document_id is required to update an e-signature");
+      }
+
       const payload = { ...updates } as Partial<DocumentESignature>;
       if (updates.status === "signed") {
         payload.signed_at = updates.signed_at || new Date().toISOString();
+      }
+
+      const { data: parentDoc, error: parentDocError } = await supabase
+        .from("auto_documents")
+        .select("id")
+        .eq("id", document_id)
+        .eq("organization_id", organization.id)
+        .maybeSingle();
+
+      if (parentDocError) {
+        throw parentDocError;
+      }
+      if (!parentDoc) {
+        throw new Error("Document not found or not accessible");
       }
 
       const { data, error } = await supabase
         .from("document_esignatures")
         .update(payload)
         .eq("id", id)
+        .eq("document_id", document_id)
         .select()
         .single();
 
@@ -667,11 +657,9 @@ export function useUpdateDocumentESignature() {
         throw error;
       }
 
-      if (document_id) {
-        await syncAutoDocumentStatusFromSignatures(document_id);
-      }
+      await syncAutoDocumentStatusFromSignatures(document_id, organization.id);
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_signature_updated",
         entityType: "document_esignatures",
         entityId: id,
@@ -703,10 +691,15 @@ export function useSendDocumentReminder() {
 
   return useMutation({
     mutationFn: async (signatureId: string) => {
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
+
       const { data: current, error: currentError } = await supabase
         .from("document_esignatures")
-        .select("id, reminder_count, recipient_email, document_id")
+        .select("id, reminder_count, recipient_email, document_id, document:auto_documents!inner(organization_id)")
         .eq("id", signatureId)
+        .eq("document.organization_id", organization.id)
         .single();
 
       if (currentError) {
@@ -729,7 +722,7 @@ export function useSendDocumentReminder() {
       }
 
       if (organization?.id && data.recipient_email) {
-        void enqueueReminderJob({
+        void safeEnqueueJob(enqueueReminderJob, {
           organizationId: organization.id,
           recipientEmail: data.recipient_email,
           entityType: "document_signature",
@@ -738,7 +731,7 @@ export function useSendDocumentReminder() {
         });
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "document_signature_reminder_sent",
         entityType: "document_esignatures",
         entityId: data.id,
@@ -775,11 +768,14 @@ export function useDocumentVersions(documentId: string) {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
 
       // Verify the user can access the parent document before reading versions.
       let docCheckQuery = supabase.from("auto_documents").select("id").eq("id", documentId);
       if (!isPlatformRole(role)) {
-        docCheckQuery = docCheckQuery.eq("organization_id", organization?.id ?? "");
+        docCheckQuery = docCheckQuery.eq("organization_id", organization.id);
       }
       const { data: docCheck } = await docCheckQuery.maybeSingle();
 
@@ -791,6 +787,7 @@ export function useDocumentVersions(documentId: string) {
         .from("document_versions")
         .select("*")
         .eq("document_id", documentId)
+        .eq("organization_id", organization.id)
         .order("version_number", { ascending: false });
 
       if (error) {
@@ -953,5 +950,6 @@ export function useRemoveDocumentPermission() {
     },
   });
 }
+
 
 

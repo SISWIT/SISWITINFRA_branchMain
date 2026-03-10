@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useState, useMemo } from "react";
 import {
   Plus,
@@ -34,10 +35,6 @@ interface TransactionFormData {
   transaction_date: string;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 export default function FinancePage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -355,3 +352,4 @@ function TransactionForm({ onSubmit, isLoading }: { onSubmit: (data: Transaction
     </form>
   );
 }
+

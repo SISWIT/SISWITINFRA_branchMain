@@ -105,6 +105,7 @@ export interface FinancialRecord {
   amount?: number;
   reference_id?: string;
   reference_type?: string;
+  status?: string;
   notes?: string;
   created_by?: string;
   created_at: string;

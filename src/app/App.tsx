@@ -25,6 +25,7 @@ import { PlatformAdminLayout } from "@/workspaces/platform/layout/PlatformAdminL
 import { TenantAdminLayout } from "@/workspaces/organization_admin/layout/TenantAdminLayout";
 import { CustomerPortalLayout } from "@/workspaces/portal/layout/CustomerPortalLayout";
 import { ImpersonationProvider } from "@/app/providers/ImpersonationProvider";
+import { DocumentsRealtimeProvider } from "@/modules/documents/providers/DocumentsRealtimeProvider";
 import {
   normalizeLegacyDashboardPath,
   platformPath,
@@ -32,7 +33,11 @@ import {
 } from "@/core/utils/routes";
 import { isPlatformRole, isTenantUserRole } from "@/core/types/roles";
 
-export const queryClient = new QueryClient(); // W-05: exported for cache clearing on logout
+const queryClient = new QueryClient(); // W-05: shared instance for app-wide query cache
+
+export function clearAllCaches() {
+  queryClient.clear();
+}
 
 const Auth = lazy(() => import("../workspaces/auth/pages/Auth"));
 const SignUp = lazy(() => import("../workspaces/auth/pages/SignUp"));
@@ -281,8 +286,22 @@ function AppRoutes() {
           <Route path="contracts" element={<CustomerContractsPage />} />
           <Route path="contract-templates" element={<TemplatesPage />} />
           <Route path="documents" element={<CustomerDocumentsPage />} />
-          <Route path="document-create" element={<DocumentCreatePage />} />
-          <Route path="document-history" element={<DocumentHistoryPage />} />
+          <Route
+            path="document-create"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentCreatePage />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="document-history"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentHistoryPage />
+              </DocumentsRealtimeProvider>
+            }
+          />
           <Route path="pending-signatures" element={<CustomerPendingSignaturesPage />} />
           <Route path="settings" element={<Navigate to=".." replace />} />
         </Route>
@@ -321,12 +340,54 @@ function AppRoutes() {
           <Route path="crm/opportunities" element={<OpportunitiesPage />} />
           <Route path="crm/activities" element={<ActivitiesPage />} />
 
-          <Route path="documents" element={<DocumentsDashboard />} />
-          <Route path="documents/create" element={<DocumentCreatePage />} />
-          <Route path="documents/templates" element={<DocumentTemplatesPage />} />
-          <Route path="documents/history" element={<DocumentHistoryPage />} />
-          <Route path="documents/pending" element={<PendingSignaturesPage />} />
-          <Route path="documents/:id/esign" element={<DocumentESignPage />} />
+          <Route
+            path="documents"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentsDashboard />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="documents/create"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentCreatePage />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="documents/templates"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentTemplatesPage />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="documents/history"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentHistoryPage />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="documents/pending"
+            element={
+              <DocumentsRealtimeProvider>
+                <PendingSignaturesPage />
+              </DocumentsRealtimeProvider>
+            }
+          />
+          <Route
+            path="documents/:id/esign"
+            element={
+              <DocumentsRealtimeProvider>
+                <DocumentESignPage />
+              </DocumentsRealtimeProvider>
+            }
+          />
 
           <Route path="erp" element={<ERPDashboard />} />
           <Route path="erp/inventory" element={<InventoryPage />} />

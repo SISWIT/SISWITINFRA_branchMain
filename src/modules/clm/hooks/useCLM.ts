@@ -1,22 +1,21 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
-import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 import type { Contract, ContractScan, ContractTemplate, ESignature } from "@/core/types/clm";
 import { canReadAllTenantRows } from "@/core/types/roles";
 import {
   applyModuleMutationScope,
   applyModuleReadScope,
   buildModuleCreatePayload,
-  isModuleScopeReady,
   requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
-import { writeAuditLog } from "@/core/utils/audit";
-import { enqueueContractExpiryAlert, enqueueEmailSendJob, enqueueReminderJob } from "@/core/utils/jobs";
+import { safeWriteAuditLog } from "@/core/utils/audit";
+import { enqueueContractExpiryAlert, enqueueEmailSendJob, enqueueReminderJob, safeEnqueueJob } from "@/core/utils/jobs";
 
 type ContractStatus =
   | "draft"
@@ -38,10 +37,6 @@ interface ESignatureRow {
   created_at: string | null;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 function mapESignature(row: ESignatureRow): ESignature {
   return {
@@ -56,29 +51,9 @@ function mapESignature(row: ESignatureRow): ESignature {
   };
 }
 
-function useClmScope() {
-  const { user, role } = useAuth();
-  const { organization, organizationLoading } = useOrganization();
-
-  const scope: ModuleScopeContext = {
-    organizationId: organization?.id ?? null,
-    userId: user?.id ?? null,
-    role,
-  };
-
-  return {
-    scope,
-    organizationId: scope.organizationId,
-    // Compatibility alias to avoid touching downstream query keys yet.
-    tenantId: scope.organizationId,
-    userId: scope.userId,
-    enabled: isModuleScopeReady(scope, organizationLoading),
-  };
-}
-
 async function ensureContractAccessible(contractId: string, scope: ModuleScopeContext) {
   const query = supabase.from("contracts").select("id").eq("id", contractId);
-  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"] });
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: false });
   const result = await scoped.maybeSingle();
   if (result.error || !result.data) {
     throw new Error("Contract not found or not accessible");
@@ -87,7 +62,7 @@ async function ensureContractAccessible(contractId: string, scope: ModuleScopeCo
 
 // ===== CONTRACT TEMPLATES =====
 export function useContractTemplates() {
-  const { scope, enabled, tenantId, userId } = useClmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["contract_templates", tenantId, userId],
@@ -116,7 +91,7 @@ export function useContractTemplates() {
 
 export function useCreateContractTemplate() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<ContractTemplate>, "id" | "created_at" | "updated_at">) => {
@@ -135,7 +110,7 @@ export function useCreateContractTemplate() {
       const { data, error } = await supabase.from("contract_templates").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_template_create",
         entityType: "contract_template",
         entityId: data.id,
@@ -158,7 +133,7 @@ export function useCreateContractTemplate() {
 
 export function useUpdateContractTemplate() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContractTemplate> & { id: string }) => {
@@ -174,7 +149,7 @@ export function useUpdateContractTemplate() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_template_update",
         entityType: "contract_template",
         entityId: id,
@@ -197,7 +172,7 @@ export function useUpdateContractTemplate() {
 
 export function useDeleteContractTemplate() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -221,7 +196,7 @@ export function useDeleteContractTemplate() {
 
       if (!deleted) throw new Error("Failed to delete template");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_template_delete",
         entityType: "contract_template",
         entityId: id,
@@ -241,7 +216,7 @@ export function useDeleteContractTemplate() {
 
 // ===== CONTRACTS =====
 export function useContracts() {
-  const { scope, enabled, tenantId, userId } = useClmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["contracts", tenantId, userId],
@@ -250,7 +225,7 @@ export function useContracts() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contracts").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -261,7 +236,7 @@ export function useContracts() {
 }
 
 export function useContract(id: string) {
-  const { scope, enabled, tenantId, userId } = useClmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["contract", id, tenantId, userId],
@@ -270,7 +245,7 @@ export function useContract(id: string) {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contracts").select("*").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.single();
@@ -282,7 +257,7 @@ export function useContract(id: string) {
 
 export function useCreateContract() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (contract: Omit<Partial<Contract>, "id" | "created_at" | "updated_at">) => {
@@ -312,7 +287,7 @@ export function useCreateContract() {
         const now = new Date();
         const msPerDay = 1000 * 60 * 60 * 24;
         const daysUntilExpiry = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / msPerDay));
-        void enqueueContractExpiryAlert({
+        void safeEnqueueJob(enqueueContractExpiryAlert, {
           tenantId,
           contractId: data.id,
           contractName: data.name,
@@ -321,7 +296,7 @@ export function useCreateContract() {
         });
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_create",
         entityType: "contract",
         entityId: data.id,
@@ -344,7 +319,7 @@ export function useCreateContract() {
 
 export function useUpdateContract() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contract> & { id: string }) => {
@@ -365,7 +340,7 @@ export function useUpdateContract() {
         const now = new Date();
         const msPerDay = 1000 * 60 * 60 * 24;
         const daysUntilExpiry = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / msPerDay));
-        void enqueueContractExpiryAlert({
+        void safeEnqueueJob(enqueueContractExpiryAlert, {
           tenantId,
           contractId: id,
           contractName: data.name,
@@ -374,7 +349,7 @@ export function useUpdateContract() {
         });
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_update",
         entityType: "contract",
         entityId: id,
@@ -398,7 +373,7 @@ export function useUpdateContract() {
 
 export function useDeleteContract() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -422,7 +397,7 @@ export function useDeleteContract() {
 
       if (!deleted) throw new Error("Failed to delete contract");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_delete",
         entityType: "contract",
         entityId: id,
@@ -442,7 +417,7 @@ export function useDeleteContract() {
 
 // ===== E-SIGNATURES =====
 export function useESignatures(contractId: string) {
-  const { scope, enabled, tenantId, userId } = useClmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["esignatures", contractId, tenantId, userId],
@@ -465,15 +440,18 @@ export function useESignatures(contractId: string) {
 
 export function useCreateESignature() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (sig: Omit<Partial<ESignature>, "id" | "created_at" | "updated_at">) => {
       const contractId = sig.contract_id || "";
       await ensureContractAccessible(contractId, scope);
 
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
       const payload = {
         contract_id: contractId,
+        organization_id: requiredOrganizationId,
+        tenant_id: requiredOrganizationId,
         signer_email: sig.recipient_email || "",
         signer_name: sig.recipient_name || "",
         status: sig.status || "pending",
@@ -484,7 +462,7 @@ export function useCreateESignature() {
       if (error) throw error;
 
       if (tenantId && sig.recipient_email) {
-        void enqueueEmailSendJob({
+        void safeEnqueueJob(enqueueEmailSendJob, {
           tenantId,
           to: sig.recipient_email,
           template: "contract_signature_request",
@@ -495,7 +473,7 @@ export function useCreateESignature() {
           createdBy: userId,
         });
 
-        void enqueueReminderJob({
+        void safeEnqueueJob(enqueueReminderJob, {
           tenantId,
           recipientEmail: sig.recipient_email,
           entityType: "contract_signature",
@@ -504,7 +482,7 @@ export function useCreateESignature() {
         });
       }
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_esignature_create",
         entityType: "contract_esignature",
         entityId: data.id,
@@ -527,7 +505,7 @@ export function useCreateESignature() {
 
 export function useUpdateESignature() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, contract_id, ...updates }: Partial<ESignature> & { id: string; contract_id?: string }) => {
@@ -558,7 +536,7 @@ export function useUpdateESignature() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_esignature_update",
         entityType: "contract_esignature",
         entityId: id,
@@ -581,7 +559,7 @@ export function useUpdateESignature() {
 
 // ===== CONTRACT SCANS =====
 export function useContractScans(contractId: string) {
-  const { scope, enabled, tenantId, userId } = useClmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["contract_scans", contractId, tenantId, userId],
@@ -592,7 +570,7 @@ export function useContractScans(contractId: string) {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contract_scans").select("*").eq("contract_id", contractId),
         scope,
-        { ownerColumns: ["created_by"] },
+        { ownerColumns: ["created_by"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -604,7 +582,7 @@ export function useContractScans(contractId: string) {
 
 export function useCreateContractScan() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (scan: Omit<Partial<ContractScan>, "id" | "created_at" | "updated_at">) => {
@@ -628,7 +606,7 @@ export function useCreateContractScan() {
       const { data, error } = await supabase.from("contract_scans").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_scan_create",
         entityType: "contract_scan",
         entityId: data.id,
@@ -651,7 +629,7 @@ export function useCreateContractScan() {
 
 export function useDeleteContractScan() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useClmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -675,7 +653,7 @@ export function useDeleteContractScan() {
 
       if (!deleted) throw new Error("Failed to delete contract scan");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contract_scan_delete",
         entityType: "contract_scan",
         entityId: id,
@@ -692,4 +670,5 @@ export function useDeleteContractScan() {
     },
   });
 }
+
 

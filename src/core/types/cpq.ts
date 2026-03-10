@@ -1,77 +1,33 @@
 // CPQ (Configure Price Quote) Type Definitions
+import type { Product, Quote as SharedQuote, QuoteItem } from "./shared";
 
 export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'accepted' | 'expired' | 'cancelled';
 
-export interface Product {
+export interface QuoteAccount {
   id: string;
   name: string;
-  description?: string;
-  category?: string;
-  unit_price: number;
-  cost_price?: number;
-  sku?: string;
-  is_active?: boolean;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
 }
 
-export interface Quote {
+export interface QuoteContact {
   id: string;
-  quote_number?: string;
-  account_id?: string;
-  contact_id?: string;
-  opportunity_id?: string;
-  status: QuoteStatus;
-  valid_until?: string;
-  terms?: string;
-  notes?: string;
-  subtotal: number;
-  discount_percent: number;
-  discount_amount: number;
-  tax_percent: number;
-  tax_amount: number;
-  total?: number;
-  owner_id?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-  accounts?: {
-    id: string;
-    name: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    postal_code?: string;
-    country?: string;
-  };
-  contacts?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email?: string;
-    phone?: string;
-  };
-  opportunities?: {
-    id: string;
-    name: string;
-  };
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
 }
 
-export interface QuoteItem {
-  id?: string;
-  quote_id?: string;
-  product_id: string;
-  product_name: string;
-  description?: string;
-  quantity: number;
-  unit_price: number;
-  discount_percent: number;
-  total?: number;
-  sort_order?: number;
-  created_at?: string;
-  updated_at?: string;
+export interface QuoteOpportunity {
+  id: string;
+  name: string;
 }
+
+export type { Product, QuoteItem } from "./shared";
+export type Quote = SharedQuote<QuoteStatus, QuoteAccount, QuoteContact, QuoteOpportunity>;
 
 // Status colors
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {

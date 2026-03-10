@@ -1,4 +1,6 @@
 // CRM Type Definitions
+import type { TenantScoped } from "./base";
+import type { Product, Quote as SharedQuote, QuoteItem } from "./shared";
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted';
 export type LeadSource = 'website' | 'referral' | 'cold_call' | 'advertisement' | 'social_media' | 'trade_show' | 'other';
@@ -6,7 +8,7 @@ export type OpportunityStage = 'new' | 'qualified' | 'proposal' | 'negotiation' 
 export type ActivityType = 'call' | 'email' | 'meeting' | 'task' | 'note';
 export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'accepted' | 'expired';
 
-export interface Account {
+export interface Account extends TenantScoped {
   id: string;
   name: string;
   industry?: string;
@@ -27,7 +29,7 @@ export interface Account {
   updated_at: string;
 }
 
-export interface Contact {
+export interface Contact extends TenantScoped {
   id: string;
   first_name: string;
   last_name: string;
@@ -50,7 +52,7 @@ export interface Contact {
   account?: Account;
 }
 
-export interface Lead {
+export interface Lead extends TenantScoped {
   id: string;
   first_name: string;
   last_name: string;
@@ -80,7 +82,7 @@ export interface Lead {
   updated_at: string;
 }
 
-export interface Opportunity {
+export interface Opportunity extends TenantScoped {
   id: string;
   name: string;
   account_id?: string;
@@ -104,7 +106,7 @@ export interface Opportunity {
   contact?: Contact;
 }
 
-export interface Activity {
+export interface Activity extends TenantScoped {
   id: string;
   type: ActivityType;
   subject: string;
@@ -123,59 +125,8 @@ export interface Activity {
   updated_at: string;
 }
 
-export interface Product {
-  id: string;
-  name: string;
-  sku?: string;
-  description?: string;
-  category?: string;
-  unit_price: number;
-  cost_price?: number;
-  is_active?: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Quote {
-  id: string;
-  quote_number?: string;
-  opportunity_id?: string;
-  account_id?: string;
-  contact_id?: string;
-  status: QuoteStatus;
-  subtotal?: number;
-  discount_percent?: number;
-  discount_amount?: number;
-  tax_percent?: number;
-  tax_amount?: number;
-  total?: number;
-  valid_until?: string;
-  terms?: string;
-  notes?: string;
-  approved_by?: string;
-  approved_at?: string;
-  owner_id?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-  opportunity?: Opportunity;
-  account?: Account;
-  items?: QuoteItem[];
-}
-
-export interface QuoteItem {
-  id: string;
-  quote_id: string;
-  product_id?: string;
-  product_name: string;
-  description?: string;
-  quantity: number;
-  unit_price: number;
-  discount_percent?: number;
-  total?: number;
-  sort_order?: number;
-  created_at: string;
-}
+export type { Product, QuoteItem } from "./shared";
+export type Quote = SharedQuote<QuoteStatus, Account, Contact, Opportunity>;
 
 
 

@@ -1,10 +1,10 @@
+import { getErrorMessage } from "@/core/utils/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { supabase } from "@/core/api/client";
 import type { Database } from "@/core/api/types";
-import { useAuth } from "@/core/auth/useAuth";
-import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 import type {
   Account,
   Activity,
@@ -24,32 +24,36 @@ import {
   applyModuleMutationScope,
   applyModuleReadScope,
   buildModuleCreatePayload,
-  isModuleScopeReady,
   requireOrganizationScope,
   type ModuleScopeContext,
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
-import { writeAuditLog } from "@/core/utils/audit";
+import { safeWriteAuditLog } from "@/core/utils/audit";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 type LeadUpdate = Database["public"]["Tables"]["leads"]["Update"];
+type LeadRowWithCreatedBy = LeadRow & { created_by?: string | null };
 
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
 type AccountInsert = Database["public"]["Tables"]["accounts"]["Insert"];
 type AccountUpdate = Database["public"]["Tables"]["accounts"]["Update"];
+type AccountRowWithCreatedBy = AccountRow & { created_by?: string | null };
 
 type ContactRow = Database["public"]["Tables"]["contacts"]["Row"];
 type ContactInsert = Database["public"]["Tables"]["contacts"]["Insert"];
 type ContactUpdate = Database["public"]["Tables"]["contacts"]["Update"];
+type ContactRowWithCreatedBy = ContactRow & { created_by?: string | null };
 
 type OpportunityRow = Database["public"]["Tables"]["opportunities"]["Row"];
 type OpportunityInsert = Database["public"]["Tables"]["opportunities"]["Insert"];
 type OpportunityUpdate = Database["public"]["Tables"]["opportunities"]["Update"];
+type OpportunityRowWithCreatedBy = OpportunityRow & { created_by?: string | null };
 
 type ActivityRow = Database["public"]["Tables"]["activities"]["Row"];
 type ActivityInsert = Database["public"]["Tables"]["activities"]["Insert"];
 type ActivityUpdate = Database["public"]["Tables"]["activities"]["Update"];
+type ActivityRowWithCreatedBy = ActivityRow & { created_by?: string | null };
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
@@ -103,10 +107,6 @@ const QUOTE_STATUSES: QuoteStatus[] = [
   "expired",
 ];
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 function asLeadStatus(value: string | null | undefined): LeadStatus {
   if (value && LEAD_STATUSES.includes(value as LeadStatus)) {
@@ -143,7 +143,7 @@ function asQuoteStatus(value: string | null | undefined): QuoteStatus {
   return "draft";
 }
 
-function mapLead(row: LeadRow): Lead {
+function mapLead(row: LeadRowWithCreatedBy): Lead {
   return {
     id: row.id,
     first_name: row.first_name ?? "",
@@ -160,13 +160,13 @@ function mapLead(row: LeadRow): Lead {
     converted_contact_id: row.converted_to_contact_id ?? undefined,
     converted_opportunity_id: row.converted_to_opportunity_id ?? undefined,
     owner_id: row.owner_id ?? undefined,
-    created_by: row.owner_id ?? undefined,
+    created_by: row.created_by ?? row.owner_id ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
   };
 }
 
-function mapAccount(row: AccountRow): Account {
+function mapAccount(row: AccountRowWithCreatedBy): Account {
   return {
     id: row.id,
     name: row.name,
@@ -181,15 +181,15 @@ function mapAccount(row: AccountRow): Account {
     postal_code: row.billing_zip ?? undefined,
     annual_revenue: row.annual_revenue ?? undefined,
     employee_count: row.number_of_employees ?? undefined,
-    description: row.ownership ?? undefined,
+    description: row.description ?? undefined,
     owner_id: row.owner_id ?? undefined,
-    created_by: row.owner_id ?? undefined,
+    created_by: row.created_by ?? row.owner_id ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
   };
 }
 
-function mapContact(row: ContactRow): Contact {
+function mapContact(row: ContactRowWithCreatedBy): Contact {
   return {
     id: row.id,
     first_name: row.first_name,
@@ -206,13 +206,13 @@ function mapContact(row: ContactRow): Contact {
     country: row.country ?? undefined,
     postal_code: row.zip ?? undefined,
     owner_id: row.owner_id ?? undefined,
-    created_by: row.owner_id ?? undefined,
+    created_by: row.created_by ?? row.owner_id ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
   };
 }
 
-function mapOpportunity(row: OpportunityRow): Opportunity {
+function mapOpportunity(row: OpportunityRowWithCreatedBy): Opportunity {
   return {
     id: row.id,
     name: row.name,
@@ -228,13 +228,13 @@ function mapOpportunity(row: OpportunityRow): Opportunity {
     is_closed: row.is_closed ?? undefined,
     is_won: row.is_won ?? undefined,
     owner_id: row.owner_id ?? undefined,
-    created_by: row.owner_id ?? undefined,
+    created_by: row.created_by ?? row.owner_id ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
   };
 }
 
-function mapActivity(row: ActivityRow): Activity {
+function mapActivity(row: ActivityRowWithCreatedBy): Activity {
   const isCompleted = row.status === "completed" || Boolean(row.completed_at);
 
   const related = {
@@ -254,7 +254,7 @@ function mapActivity(row: ActivityRow): Activity {
     is_completed: isCompleted,
     priority: row.priority ?? undefined,
     owner_id: row.owner_id ?? undefined,
-    created_by: row.owner_id ?? undefined,
+    created_by: row.created_by ?? row.owner_id ?? undefined,
     created_at: row.created_at ?? new Date().toISOString(),
     updated_at: row.updated_at ?? new Date().toISOString(),
     ...related,
@@ -328,29 +328,9 @@ function resolveActivityRelation(activity: Partial<Activity>): { relatedType: st
   return { relatedType: null, relatedId: null };
 }
 
-function useCrmScope() {
-  const { user, role } = useAuth();
-  const { organization, organizationLoading } = useOrganization();
-
-  const scope: ModuleScopeContext = {
-    organizationId: organization?.id ?? null,
-    userId: user?.id ?? null,
-    role,
-  };
-
-  return {
-    scope,
-    organizationId: scope.organizationId,
-    // Compatibility alias to avoid touching downstream query keys yet.
-    tenantId: scope.organizationId,
-    userId: scope.userId,
-    enabled: isModuleScopeReady(scope, organizationLoading),
-  };
-}
-
 async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext) {
   const query = supabase.from("quotes").select("id").eq("id", quoteId);
-  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"] });
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: false });
   const result = await scoped.maybeSingle();
   if (result.error || !result.data) {
     throw new Error("Quote not found or not accessible");
@@ -359,7 +339,7 @@ async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext)
 
 // ===== LEADS =====
 export function useLeads() {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["leads", tenantId, userId],
@@ -368,7 +348,7 @@ export function useLeads() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("leads").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -381,7 +361,7 @@ export function useLeads() {
 
 export function useCreateLead() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (lead: Omit<Partial<Lead>, "id" | "created_at" | "updated_at">) => {
@@ -403,7 +383,7 @@ export function useCreateLead() {
       const { data, error } = await supabase.from("leads").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "lead_create",
         entityType: "lead",
         entityId: data.id,
@@ -426,7 +406,7 @@ export function useCreateLead() {
 
 export function useUpdateLead() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lead> & { id: string }) => {
@@ -454,7 +434,7 @@ export function useUpdateLead() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "lead_update",
         entityType: "lead",
         entityId: id,
@@ -477,7 +457,7 @@ export function useUpdateLead() {
 
 export function useDeleteLead() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -499,7 +479,7 @@ export function useDeleteLead() {
       });
       if (!deleted) throw new Error("Failed to delete lead");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "lead_delete",
         entityType: "lead",
         entityId: id,
@@ -519,7 +499,7 @@ export function useDeleteLead() {
 
 // ===== ACCOUNTS =====
 export function useAccounts() {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["accounts", tenantId, userId],
@@ -528,7 +508,7 @@ export function useAccounts() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("accounts").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -541,7 +521,7 @@ export function useAccounts() {
 
 export function useCreateAccount() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (account: Omit<Partial<Account>, "id" | "created_at" | "updated_at">) => {
@@ -559,7 +539,7 @@ export function useCreateAccount() {
           billing_state: account.state ?? null,
           billing_country: account.country ?? null,
           billing_zip: account.postal_code ?? null,
-          ownership: account.description ?? null,
+          description: account.description ?? null,
         },
         scope,
       );
@@ -567,7 +547,7 @@ export function useCreateAccount() {
       const { data, error } = await supabase.from("accounts").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "account_create",
         entityType: "account",
         entityId: data.id,
@@ -590,7 +570,7 @@ export function useCreateAccount() {
 
 export function useUpdateAccount() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
@@ -610,7 +590,7 @@ export function useUpdateAccount() {
       if (updates.state !== undefined) payload.billing_state = updates.state ?? null;
       if (updates.country !== undefined) payload.billing_country = updates.country ?? null;
       if (updates.postal_code !== undefined) payload.billing_zip = updates.postal_code ?? null;
-      if (updates.description !== undefined) payload.ownership = updates.description ?? null;
+      if (updates.description !== undefined) payload.description = updates.description ?? null;
       if (updates.owner_id !== undefined) payload.owner_id = updates.owner_id ?? null;
 
       const scopedQuery = applyModuleMutationScope(
@@ -622,7 +602,7 @@ export function useUpdateAccount() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "account_update",
         entityType: "account",
         entityId: id,
@@ -645,7 +625,7 @@ export function useUpdateAccount() {
 
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -667,7 +647,7 @@ export function useDeleteAccount() {
       });
       if (!deleted) throw new Error("Failed to delete account");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "account_delete",
         entityType: "account",
         entityId: id,
@@ -687,7 +667,7 @@ export function useDeleteAccount() {
 
 // ===== CONTACTS =====
 export function useContacts(accountId?: string) {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["contacts", tenantId, userId, accountId],
@@ -696,7 +676,7 @@ export function useContacts(accountId?: string) {
       let scopedQuery = applyModuleReadScope(
         supabase.from("contacts").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       if (accountId) {
@@ -713,7 +693,7 @@ export function useContacts(accountId?: string) {
 
 export function useCreateContact() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (contact: Omit<Partial<Contact>, "id" | "created_at" | "updated_at">) => {
@@ -739,7 +719,7 @@ export function useCreateContact() {
       const { data, error } = await supabase.from("contacts").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contact_create",
         entityType: "contact",
         entityId: data.id,
@@ -762,7 +742,7 @@ export function useCreateContact() {
 
 export function useUpdateContact() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contact> & { id: string }) => {
@@ -794,7 +774,7 @@ export function useUpdateContact() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contact_update",
         entityType: "contact",
         entityId: id,
@@ -817,7 +797,7 @@ export function useUpdateContact() {
 
 export function useDeleteContact() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -839,7 +819,7 @@ export function useDeleteContact() {
       });
       if (!deleted) throw new Error("Failed to delete contact");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "contact_delete",
         entityType: "contact",
         entityId: id,
@@ -859,7 +839,7 @@ export function useDeleteContact() {
 
 // ===== OPPORTUNITIES =====
 export function useOpportunities(accountId?: string) {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["opportunities", tenantId, userId, accountId],
@@ -868,7 +848,7 @@ export function useOpportunities(accountId?: string) {
       let scopedQuery = applyModuleReadScope(
         supabase.from("opportunities").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       if (accountId) {
@@ -885,7 +865,7 @@ export function useOpportunities(accountId?: string) {
 
 export function useCreateOpportunity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (opportunity: Omit<Partial<Opportunity>, "id" | "created_at" | "updated_at" | "expected_revenue">) => {
@@ -913,7 +893,7 @@ export function useCreateOpportunity() {
       const { data, error } = await supabase.from("opportunities").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "opportunity_create",
         entityType: "opportunity",
         entityId: data.id,
@@ -936,7 +916,7 @@ export function useCreateOpportunity() {
 
 export function useUpdateOpportunity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Opportunity> & { id: string }) => {
@@ -977,7 +957,7 @@ export function useUpdateOpportunity() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "opportunity_update",
         entityType: "opportunity",
         entityId: id,
@@ -1000,7 +980,7 @@ export function useUpdateOpportunity() {
 
 export function useDeleteOpportunity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1022,7 +1002,7 @@ export function useDeleteOpportunity() {
       });
       if (!deleted) throw new Error("Failed to delete opportunity");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "opportunity_delete",
         entityType: "opportunity",
         entityId: id,
@@ -1042,7 +1022,7 @@ export function useDeleteOpportunity() {
 
 // ===== ACTIVITIES =====
 export function useActivities(filters?: { opportunityId?: string; leadId?: string; accountId?: string }) {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["activities", tenantId, userId, filters],
@@ -1051,7 +1031,7 @@ export function useActivities(filters?: { opportunityId?: string; leadId?: strin
       let scopedQuery = applyModuleReadScope(
         supabase.from("activities").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       if (filters?.opportunityId) {
@@ -1074,7 +1054,7 @@ export function useActivities(filters?: { opportunityId?: string; leadId?: strin
 
 export function useCreateActivity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (activity: Omit<Partial<Activity>, "id" | "created_at" | "updated_at">) => {
@@ -1099,7 +1079,7 @@ export function useCreateActivity() {
       const { data, error } = await supabase.from("activities").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "activity_create",
         entityType: "activity",
         entityId: data.id,
@@ -1122,7 +1102,7 @@ export function useCreateActivity() {
 
 export function useUpdateActivity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Activity> & { id: string }) => {
@@ -1155,7 +1135,7 @@ export function useUpdateActivity() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "activity_update",
         entityType: "activity",
         entityId: id,
@@ -1178,7 +1158,7 @@ export function useUpdateActivity() {
 
 export function useDeleteActivity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1200,7 +1180,7 @@ export function useDeleteActivity() {
       });
       if (!deleted) throw new Error("Failed to delete activity");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "activity_delete",
         entityType: "activity",
         entityId: id,
@@ -1220,7 +1200,7 @@ export function useDeleteActivity() {
 
 // ===== PRODUCTS =====
 export function useProducts() {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["products", tenantId, userId],
@@ -1242,7 +1222,7 @@ export function useProducts() {
 
 export function useCreateProduct() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (product: Omit<Partial<Product>, "id" | "created_at" | "updated_at">) => {
@@ -1263,7 +1243,7 @@ export function useCreateProduct() {
       const { data, error } = await supabase.from("products").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "product_create",
         entityType: "product",
         entityId: data.id,
@@ -1286,7 +1266,7 @@ export function useCreateProduct() {
 
 // ===== QUOTES =====
 export function useQuotes() {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["quotes", tenantId, userId],
@@ -1295,7 +1275,7 @@ export function useQuotes() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("quotes").select("*"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -1307,7 +1287,7 @@ export function useQuotes() {
 }
 
 export function useQuote(id: string) {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["quote", id, tenantId, userId],
@@ -1316,7 +1296,7 @@ export function useQuote(id: string) {
       const scopedQuoteQuery = applyModuleReadScope(
         supabase.from("quotes").select("*").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
       const { data, error } = await scopedQuoteQuery.single();
       if (error) throw error;
@@ -1341,7 +1321,7 @@ export function useQuote(id: string) {
 
 export function useCreateQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (quote: Omit<Partial<Quote>, "id" | "created_at" | "updated_at">) => {
@@ -1367,7 +1347,7 @@ export function useCreateQuote() {
       const { data, error } = await supabase.from("quotes").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_create",
         entityType: "quote",
         entityId: data.id,
@@ -1390,7 +1370,7 @@ export function useCreateQuote() {
 
 export function useUpdateQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Quote> & { id: string }) => {
@@ -1421,7 +1401,7 @@ export function useUpdateQuote() {
       const { data, error } = await scopedQuery.select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_update",
         entityType: "quote",
         entityId: id,
@@ -1445,7 +1425,7 @@ export function useUpdateQuote() {
 
 export function useCreateQuoteItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (item: Omit<Partial<QuoteItem>, "id" | "created_at">) => {
@@ -1469,7 +1449,7 @@ export function useCreateQuoteItem() {
       const { data, error } = await supabase.from("quote_line_items").insert(payload).select().single();
       if (error) throw error;
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_item_create",
         entityType: "quote_item",
         entityId: data.id,
@@ -1493,7 +1473,7 @@ export function useCreateQuoteItem() {
 
 export function useDeleteQuoteItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useCrmScope();
+  const { scope, tenantId, userId } = useModuleScope();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -1512,14 +1492,14 @@ export function useDeleteQuoteItem() {
       await ensureQuoteAccessible(itemResult.data.quote_id, scope);
 
       const deleted = await softDeleteRecord({
-        table: "quote_items",
+        table: "quote_line_items",
         id,
         userId,
         organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete quote item");
 
-      void writeAuditLog({
+      void safeWriteAuditLog({
         action: "quote_item_delete",
         entityType: "quote_item",
         entityId: id,
@@ -1540,7 +1520,7 @@ export function useDeleteQuoteItem() {
 
 // ===== DASHBOARD STATS =====
 export function useDashboardStats() {
-  const { scope, enabled, tenantId, userId } = useCrmScope();
+  const { scope, enabled, tenantId, userId } = useModuleScope();
 
   return useQuery({
     queryKey: ["crm_dashboard_stats", tenantId, userId],
@@ -1549,25 +1529,25 @@ export function useDashboardStats() {
       const leadsQuery = applyModuleReadScope(
         supabase.from("leads").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const accountsQuery = applyModuleReadScope(
         supabase.from("accounts").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const quotesQuery = applyModuleReadScope(
         supabase.from("quotes").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const opportunitiesQuery = applyModuleReadScope(
         supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_closed, is_won"),
         scope,
-        { ownerColumns: ["owner_id"] },
+        { ownerColumns: ["owner_id"], hasSoftDelete: false },
       );
 
       const [{ count: leadsCount, error: leadsError }, { count: accountsCount, error: accountsError }, { count: quotesCount, error: quotesError }, { data: oppData, error: oppError }] =
@@ -1609,3 +1589,5 @@ export function useDashboardStats() {
     },
   });
 }
+
+

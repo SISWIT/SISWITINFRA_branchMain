@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/core/auth/useAuth";
@@ -6,6 +6,7 @@ import { useTenant } from "@/core/tenant/useTenant";
 import { useImpersonation } from "@/core/hooks/useImpersonation";
 import { supabase } from "@/core/api/client";
 import { isPlatformRole } from "@/core/types/roles";
+import { logger } from "@/core/utils/logger";
 
 interface TenantSlugGuardProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
   const { tenant, tenantLoading, memberships, switchTenantBySlug } = useTenant();
   const { state: impersonation, startImpersonation } = useImpersonation();
   const [resolving, setResolving] = useState(false);
+  const lastSwitchedSlugRef = useRef<string | null>(null);
 
   const hasMembership = useMemo(() => {
     if (!tenantSlug) return false;
@@ -53,8 +55,11 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
             });
           }
         })().catch((err) => {
-          // W-04: Log error instead of silently swallowing
-          console.error("Impersonation lookup failed:", err);
+          logger.error("Impersonation lookup failed", {
+            tenantSlug,
+            userId: user?.id,
+            error: err,
+          });
         });
       }
       return;
@@ -62,7 +67,9 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
 
     if (tenant?.slug === tenantSlug) return;
     if (!hasMembership) return;
+    if (tenantSlug === lastSwitchedSlugRef.current) return;
 
+    lastSwitchedSlugRef.current = tenantSlug;
     setResolving(true);
     void switchTenantBySlug(tenantSlug).finally(() => setResolving(false));
   }, [
