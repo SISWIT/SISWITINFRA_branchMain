@@ -1,20 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { useAuth } from "@/core/auth/useAuth";
 import { useToast } from "@/core/hooks/use-toast";
 import { supabase } from "@/core/api/client";
 
-function hashToken(token: string): Promise<string> {
-  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)).then((digest) => {
-    const bytes = new Uint8Array(digest);
-    return Array.from(bytes)
-      .map((value) => value.toString(16).padStart(2, "0"))
-      .join("");
-  });
-}
+type InvitationState = "loading" | "valid" | "missing" | "invalid" | "expired";
 
 export default function AcceptClientInvitation() {
   const [params] = useSearchParams();
@@ -26,6 +19,8 @@ export default function AcceptClientInvitation() {
   const [email, setEmail] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [organizationCode, setOrganizationCode] = useState("");
+  const [invitationState, setInvitationState] = useState<InvitationState>(token ? "loading" : "missing");
+  const [invitationError, setInvitationError] = useState("");
 
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -35,20 +30,59 @@ export default function AcceptClientInvitation() {
 
   useEffect(() => {
     const load = async () => {
-      if (!token) return;
+      if (!token) {
+        setInvitationState("missing");
+        setInvitationError("Invitation token is missing from the link.");
+        return;
+      }
 
-      const tokenHash = await hashToken(token);
-      const { data } = await supabase
-        .from("client_invitations")
-        .select("invited_email, organization:organizations(name, org_code)")
-        .eq("token_hash", tokenHash)
-        .maybeSingle();
+      setInvitationState("loading");
+      setInvitationError("");
 
-      if (!data) return;
+      try {
+        const { data, error } = await supabase.rpc("get_client_invitation_details", {
+          p_token: token,
+        });
 
-      setEmail(data.invited_email ?? "");
-      setOrganizationName(data.organization?.name ?? "");
-      setOrganizationCode(data.organization?.org_code ?? "");
+        if (error || !data) {
+          setInvitationState("invalid");
+          setInvitationError("This invitation link is invalid.");
+          return;
+        }
+
+        const invitation = Array.isArray(data) ? data[0] : data;
+        if (!invitation) {
+          setInvitationState("invalid");
+          setInvitationError("This invitation link is invalid.");
+          return;
+        }
+
+        if (invitation.status !== "pending") {
+          if (invitation.status === "expired") {
+            setInvitationState("expired");
+            setInvitationError("This invitation has expired.");
+            return;
+          }
+
+          setInvitationState("invalid");
+          setInvitationError("This invitation is no longer valid.");
+          return;
+        }
+
+        if (new Date(invitation.expires_at).getTime() < Date.now()) {
+          setInvitationState("expired");
+          setInvitationError("This invitation has expired.");
+          return;
+        }
+
+        setEmail(invitation.invited_email ?? "");
+        setOrganizationName(invitation.organization_name ?? "");
+        setOrganizationCode(invitation.organization_code ?? "");
+        setInvitationState("valid");
+      } catch {
+        setInvitationState("invalid");
+        setInvitationError("Unable to validate invitation link.");
+      }
     };
 
     void load();
@@ -56,6 +90,11 @@ export default function AcceptClientInvitation() {
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (invitationState !== "valid") {
+      toast({ variant: "destructive", title: "Invalid link", description: "Please use a valid invitation link." });
+      return;
+    }
 
     if (!token) {
       toast({ variant: "destructive", title: "Invalid link", description: "Invitation token is missing." });
@@ -85,6 +124,18 @@ export default function AcceptClientInvitation() {
     setSubmitted(true);
   };
 
+  if (invitationState === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="w-full max-w-lg border rounded-xl p-6 space-y-4 text-center">
+          <Loader2 className="h-6 w-6 mx-auto animate-spin text-primary" />
+          <h1 className="text-2xl font-semibold">Validating invitation</h1>
+          <p className="text-sm text-muted-foreground">Please wait while we verify your invitation link.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-background">
@@ -94,6 +145,32 @@ export default function AcceptClientInvitation() {
           <Button asChild>
             <Link to="/auth/sign-in">Go to sign in</Link>
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (invitationState !== "valid") {
+    const title = invitationState === "expired" ? "Invitation expired" : "Invalid invitation";
+
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="w-full max-w-lg border rounded-xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-destructive/10 p-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <h1 className="text-2xl font-semibold">{title}</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">{invitationError || "This invitation link cannot be used."}</p>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild>
+              <Link to="/auth/sign-in">Go to sign in</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/">Back to home</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );

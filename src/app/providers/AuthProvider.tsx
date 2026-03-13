@@ -40,6 +40,28 @@ type OrganizationLookupRow = {
   org_code: string;
 };
 
+type EmployeeInvitationLookupRow = {
+  id: string;
+  organization_id: string;
+  invited_email: string;
+  role: string;
+  employee_role_id?: string | null;
+  expires_at: string;
+  status: string;
+  organization_name?: string | null;
+  organization_code?: string | null;
+};
+
+type ClientInvitationLookupRow = {
+  id: string;
+  organization_id: string;
+  invited_email: string;
+  expires_at: string;
+  status: string;
+  organization_name?: string | null;
+  organization_code?: string | null;
+};
+
 
 async function getFunctionInvokeErrorMessage(error: unknown): Promise<string> {
   const baseMessage = getErrorMessage(error);
@@ -412,16 +434,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         await upsertProfile(data.user.id, input.fullName);
 
-        const { error: membershipError } = await unsafeSupabase.from("organization_memberships").insert({
-          organization_id: organization.id,
-          user_id: data.user.id,
-          email: input.email,
-          role: "client",
-          account_state: "pending_verification",
-          is_email_verified: false,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        const { error: membershipError } = await unsafeSupabase.rpc("create_client_signup_membership", {
+          p_user_id: data.user.id,
+          p_organization_id: organization.id,
         });
 
         if (membershipError) {
@@ -440,30 +455,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getEmployeeInvitationByToken = useCallback(
     async (token: string) => {
-      const tokenHash = await hashToken(token);
+      const { data, error } = await unsafeSupabase.rpc("get_employee_invitation_details", {
+        p_token: token,
+      });
 
-      const { data } = await unsafeSupabase
-        .from("employee_invitations")
-        .select("id, organization_id, invited_email, role, employee_role_id, expires_at, status")
-        .eq("token_hash", tokenHash)
-        .maybeSingle();
-
-      return data ?? null;
+      if (error || !data) return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row as EmployeeInvitationLookupRow | null) ?? null;
     },
     [unsafeSupabase],
   );
 
   const getClientInvitationByToken = useCallback(
     async (token: string) => {
-      const tokenHash = await hashToken(token);
+      const { data, error } = await unsafeSupabase.rpc("get_client_invitation_details", {
+        p_token: token,
+      });
 
-      const { data } = await unsafeSupabase
-        .from("client_invitations")
-        .select("id, organization_id, invited_email, expires_at, status")
-        .eq("token_hash", tokenHash)
-        .maybeSingle();
-
-      return data ?? null;
+      if (error || !data) return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row as ClientInvitationLookupRow | null) ?? null;
     },
     [unsafeSupabase],
   );
@@ -504,35 +515,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         await upsertProfile(data.user.id, input.fullName);
 
-        const { error: membershipError } = await unsafeSupabase.from("organization_memberships").insert({
-          organization_id: invitation.organization_id,
-          user_id: data.user.id,
-          email: invitation.invited_email,
-          role: invitation.role,
-          employee_role_id: invitation.employee_role_id,
-          employee_id: input.employeeId ?? null,
-          account_state: "pending_verification",
-          is_email_verified: false,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        const { error: membershipError } = await unsafeSupabase.rpc("accept_employee_invitation_signup", {
+          p_user_id: data.user.id,
+          p_token: input.token,
+          p_employee_id: input.employeeId ?? null,
         });
 
         if (membershipError) {
           return { error: `Unable to create employee membership: ${membershipError.message}` };
-        }
-
-        const { error: invitationUpdateError } = await unsafeSupabase
-          .from("employee_invitations")
-          .update({
-            status: "accepted",
-            accepted_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", invitation.id);
-
-        if (invitationUpdateError) {
-          return { error: `Membership created, but invitation status update failed: ${invitationUpdateError.message}` };
         }
 
         return { error: null };
@@ -581,33 +571,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         await upsertProfile(data.user.id, input.fullName);
 
-        const { error: membershipError } = await unsafeSupabase.from("organization_memberships").insert({
-          organization_id: invitation.organization_id,
-          user_id: data.user.id,
-          email: invitation.invited_email,
-          role: "client",
-          account_state: "pending_verification",
-          is_email_verified: false,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        const { error: membershipError } = await unsafeSupabase.rpc("accept_client_invitation_signup", {
+          p_user_id: data.user.id,
+          p_token: input.token,
         });
 
         if (membershipError) {
           return { error: `Unable to create client membership: ${membershipError.message}` };
-        }
-
-        const { error: invitationUpdateError } = await unsafeSupabase
-          .from("client_invitations")
-          .update({
-            status: "accepted",
-            accepted_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", invitation.id);
-
-        if (invitationUpdateError) {
-          return { error: `Membership created, but invitation status update failed: ${invitationUpdateError.message}` };
         }
 
         return { error: null };

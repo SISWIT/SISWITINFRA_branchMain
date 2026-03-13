@@ -9,15 +9,6 @@ import { supabase } from "@/core/api/client";
 
 type InvitationState = "loading" | "valid" | "missing" | "invalid" | "expired";
 
-function hashToken(token: string): Promise<string> {
-  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)).then((digest) => {
-    const bytes = new Uint8Array(digest);
-    return Array.from(bytes)
-      .map((v) => v.toString(16).padStart(2, "0"))
-      .join("");
-  });
-}
-
 export default function AcceptEmployeeInvitation() {
   const [params] = useSearchParams();
   const token = useMemo(() => params.get("token") ?? "", [params]);
@@ -51,21 +42,26 @@ export default function AcceptEmployeeInvitation() {
       setInvitationError("");
 
       try {
-        const tokenHash = await hashToken(token);
-        const { data } = await supabase
-          .from("employee_invitations")
-          .select("invited_email, role, expires_at, status, organization:organizations(name, org_code)")
-          .eq("token_hash", tokenHash)
-          .maybeSingle();
+        const { data, error } = await supabase.rpc("get_employee_invitation_details", {
+          p_token: token,
+        });
 
-        if (!data) {
+        if (error || !data) {
           setInvitationState("invalid");
           setInvitationError("This invitation link is invalid.");
           return;
         }
 
-        if (data.status !== "pending") {
-          if (data.status === "expired") {
+        const invitation = Array.isArray(data) ? data[0] : data;
+
+        if (!invitation) {
+          setInvitationState("invalid");
+          setInvitationError("This invitation link is invalid.");
+          return;
+        }
+
+        if (invitation.status !== "pending") {
+          if (invitation.status === "expired") {
             setInvitationState("expired");
             setInvitationError("This invitation has expired.");
             return;
@@ -76,16 +72,16 @@ export default function AcceptEmployeeInvitation() {
           return;
         }
 
-        if (new Date(data.expires_at).getTime() < Date.now()) {
+        if (new Date(invitation.expires_at).getTime() < Date.now()) {
           setInvitationState("expired");
           setInvitationError("This invitation has expired.");
           return;
         }
 
-        setEmail(data.invited_email ?? "");
-        setRole(data.role ?? "");
-        setOrganizationName(data.organization?.name ?? "");
-        setOrganizationCode(data.organization?.org_code ?? "");
+        setEmail(invitation.invited_email ?? "");
+        setRole(invitation.role ?? "");
+        setOrganizationName(invitation.organization_name ?? "");
+        setOrganizationCode(invitation.organization_code ?? "");
         setInvitationState("valid");
       } catch {
         setInvitationState("invalid");

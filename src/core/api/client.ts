@@ -5,7 +5,19 @@ import type { Database as CoreDatabase } from './types';
 type SignupRpcDatabase = {
   public: {
     Functions: {
+      accept_client_invitation_signup: {
+        Args: { p_token: string; p_user_id: string };
+        Returns: string;
+      };
+      accept_employee_invitation_signup: {
+        Args: { p_employee_id?: string | null; p_token: string; p_user_id: string };
+        Returns: string;
+      };
       claim_pending_invitations: { Args: never; Returns: number };
+      create_client_signup_membership: {
+        Args: { p_organization_id: string; p_user_id: string };
+        Returns: string;
+      };
       find_signup_organization: {
         Args: { p_slug_or_code: string };
         Returns: {
@@ -13,6 +25,32 @@ type SignupRpcDatabase = {
           name: string;
           org_code: string;
           slug: string;
+        }[];
+      };
+      get_client_invitation_details: {
+        Args: { p_token: string };
+        Returns: {
+          expires_at: string;
+          id: string;
+          invited_email: string;
+          organization_code: string | null;
+          organization_id: string;
+          organization_name: string | null;
+          status: "pending" | "accepted" | "expired" | "cancelled" | "rejected";
+        }[];
+      };
+      get_employee_invitation_details: {
+        Args: { p_token: string };
+        Returns: {
+          employee_role_id: string | null;
+          expires_at: string;
+          id: string;
+          invited_email: string;
+          organization_code: string | null;
+          organization_id: string;
+          organization_name: string | null;
+          role: "admin" | "manager" | "employee";
+          status: "pending" | "accepted" | "expired" | "cancelled" | "rejected";
         }[];
       };
       search_signup_organizations: {
