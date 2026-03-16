@@ -139,7 +139,7 @@ function buildInviteToken(): string {
 
 function getAuthEmailRedirectTo(): string {
   if (typeof window === "undefined") return "";
-  return `${window.location.origin}/auth/sign-in`;
+  return `${window.location.origin}/auth/verify-success`;
 }
 
 function membershipPriority(role: string): number {
@@ -807,14 +807,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resendVerificationEmail = useCallback(async (email: string): Promise<{ error: string | null }> => {
     try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: email.trim(),
-        options: {
-          emailRedirectTo: getAuthEmailRedirectTo(),
+      const { error } = await supabase.functions.invoke("send-verification-email", {
+        body: { 
+          email: email.trim(),
+          redirectTo: getAuthEmailRedirectTo()
         },
       });
-      return { error: error?.message ?? null };
+      
+      if (error) {
+        const detailedMessage = await getFunctionInvokeErrorMessage(error);
+        return { error: detailedMessage || "Failed to resend verification email." };
+      }
+      
+      return { error: null };
     } catch (error: unknown) {
       return { error: getErrorMessage(error) };
     }
@@ -869,33 +874,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // C-02 fix: Block login if email is not yet verified
         if (access.role === ("pending_verification" as AuthRole)) {
-          // Check if Supabase Auth has already confirmed the email
-          const emailConfirmed = !!data.user.email_confirmed_at;
-          if (emailConfirmed) {
-            // S-09: Determine target state based on role - clients need admin approval
-            const { data: membership } = await unsafeSupabase
-              .from("organization_memberships")
-              .select("role")
-              .eq("user_id", data.user.id)
-              .eq("account_state", "pending_verification")
-              .maybeSingle();
+          // Use Edge Function to sync verification state (bypasses RLS)
+          const { error: syncError } = await supabase.functions.invoke("sync-user-verification", {
+            body: { userId: data.user.id }
+          });
 
-            const targetState = membership?.role === "client" ? "pending_approval" : "active";
-
-            const { error: activateError } = await unsafeSupabase
-              .from("organization_memberships")
-              .update({
-                account_state: targetState,
-                is_email_verified: true,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("user_id", data.user.id)
-              .eq("account_state", "pending_verification");
-
-            if (!activateError) {
-              // Re-fetch the role now that membership is updated
-              access = await getUserAccess(data.user.id);
-            }
+          if (!syncError) {
+            // Re-fetch the role now that membership *should* have been activated in DB
+            access = await getUserAccess(data.user.id);
           }
 
           // If still pending (email not confirmed or activation failed), block login
@@ -987,6 +973,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Keep best-effort role discovery only.
           }
         }
+
+        // Auto-sync if still pending_verification but possibly confirmed in Auth
+        if (access.role === ("pending_verification" as AuthRole) && nextSession.user.email_confirmed_at) {
+          await supabase.functions.invoke("sync-user-verification", {
+            body: { userId: nextSession.user.id },
+          });
+          access = await getUserAccess(nextSession.user.id);
+        }
         if (!mounted) return;
 
         setRole(access.role);
@@ -1034,6 +1028,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Keep best-effort role discovery only.
         }
       }
+
+      // Auto-sync if still pending_verification but possibly confirmed in Auth
+      if (access.role === ("pending_verification" as AuthRole) && nextSession.user.email_confirmed_at) {
+        await supabase.functions.invoke("sync-user-verification", {
+          body: { userId: nextSession.user.id },
+        });
+        access = await getUserAccess(nextSession.user.id);
+      }
       if (!mounted) return;
 
       setRole(access.role);
@@ -1078,4 +1080,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9f9f9; }
+    .container { max-width: 600px; margin: 20px auto; padding: 30px; border: 1px solid #eee; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { color: #6366f1; margin: 0; font-size: 28px; letter-spacing: 2px; }
+    .content { margin-bottom: 40px; }
+    .btn-container { text-align: center; margin: 40px 0; }
+    .btn { display: inline-block; padding: 14px 30px; background-color: #6366f1; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; }
+    .footer { font-size: 12px; color: #999; margin-top: 40px; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+    .link-alt { word-break: break-all; color: #6366f1; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SISWIT</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>Thank you for joining SISWIT! To complete your account setup and ensure the security of your workspace, please verify your email address by clicking the button below.</p>
+      
+      <div class="btn-container">
+        <a href="{{ .ConfirmationURL }}" class="btn">Verify Email Address</a>
+      </div>
+      
+      <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+      <p class="link-alt"><a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a></p>
+      
+      <p>This verification link will expire in 24 hours.</p>
+    </div>
+    <div class="footer">
+      &copy; 2024 SISWIT. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

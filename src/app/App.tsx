@@ -45,6 +45,7 @@ const AcceptEmployeeInvitation = lazy(() => import("../workspaces/auth/pages/Acc
 const AcceptClientInvitation = lazy(() => import("../workspaces/auth/pages/AcceptClientInvitation"));
 const ForgotPassword = lazy(() => import("../workspaces/auth/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("../workspaces/auth/pages/ResetPassword"));
+const VerifySuccess = lazy(() => import("../workspaces/auth/pages/VerifySuccess"));
 const Index = lazy(() => import("../workspaces/website/pages/Index"));
 const About = lazy(() => import("../workspaces/website/pages/About"));
 const Contact = lazy(() => import("../workspaces/website/pages/Contact"));
@@ -200,6 +201,7 @@ function AppRoutes() {
         <Route path="/auth/accept-client-invitation" element={<AcceptClientInvitation />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/reset-password" element={<ResetPassword />} />
+        <Route path="/auth/verify-success" element={<VerifySuccess />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route
           path="/auth/pending-approval"
