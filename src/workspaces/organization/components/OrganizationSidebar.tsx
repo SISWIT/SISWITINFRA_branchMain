@@ -3,20 +3,28 @@ import { NavLink } from "react-router-dom";
 import type { ComponentType } from "react";
 import {
   Bell,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
-  Download,
   LayoutDashboard,
+  LogOut,
   MailPlus,
   Settings,
   ShieldCheck,
   Users,
 } from "lucide-react";
+import { Button } from "@/ui/shadcn/button";
 import { cn } from "@/core/utils/utils";
+import { useAuth } from "@/core/auth/useAuth";
+import { useNavigate } from "react-router-dom";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 
 interface OrganizationSidebarProps {
   className?: string;
   onNavigate?: () => void;
+  collapsed?: boolean;
+  onCollapseToggle?: () => void;
+  hideCollapseControl?: boolean;
 }
 
 interface SidebarItem {
@@ -35,9 +43,22 @@ const sidebarItems: SidebarItem[] = [
   { label: "Settings", href: "/organization/settings", icon: Settings },
 ];
 
-export function OrganizationSidebar({ className, onNavigate }: OrganizationSidebarProps) {
+export function OrganizationSidebar({ 
+  className, 
+  onNavigate,
+  collapsed = false,
+  onCollapseToggle,
+  hideCollapseControl = false,
+}: OrganizationSidebarProps) {
   const { organization } = useOrganization();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
   const [logoFailed, setLogoFailed] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth/sign-in", { replace: true });
+  };
 
   const organizationName = organization?.name?.trim() || "Organization";
   const organizationSubtitle = organization?.org_code ?? organization?.slug ?? "Owner Workspace";
@@ -53,27 +74,33 @@ export function OrganizationSidebar({ className, onNavigate }: OrganizationSideb
 
   return (
     <aside className={cn("org-sidebar-panel flex h-full w-full flex-col", className)}>
-      <div className="org-sidebar-brand">
+      <div className={cn("org-sidebar-brand", collapsed && "justify-center px-0")}>
         {organization?.logo_url && !logoFailed ? (
           <img
             src={organization.logo_url}
             alt={`${organizationName} logo`}
-            className="h-8 w-8 rounded-full border border-border/70 object-cover"
+            className="h-8 w-8 rounded-full border border-border/70 object-cover shrink-0"
             onError={() => setLogoFailed(true)}
           />
         ) : (
-          <div className="org-brand-icon" aria-hidden>
+          <div className="org-brand-icon shrink-0" aria-hidden>
             {organizationInitials}
           </div>
         )}
-        <div>
-          <p className="text-sm font-semibold leading-none">{organizationName}</p>
-          <p className="text-xs text-muted-foreground">{organizationSubtitle}</p>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0 overflow-hidden">
+            <p className="truncate text-sm font-semibold leading-none">{organizationName}</p>
+            <p className="truncate text-xs text-muted-foreground">{organizationSubtitle}</p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex-1 space-y-2 overflow-y-auto pr-1">
-        <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Menu</p>
+        {!collapsed && (
+          <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Menu
+          </p>
+        )}
         <nav className="space-y-1.5">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
@@ -82,25 +109,53 @@ export function OrganizationSidebar({ className, onNavigate }: OrganizationSideb
                 key={item.href}
                 to={item.href}
                 onClick={onNavigate}
-                className={({ isActive }) => cn("org-sidebar-link", isActive && "org-sidebar-link-active")}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) => cn(
+                  "org-sidebar-link", 
+                  isActive && "org-sidebar-link-active",
+                  collapsed && "justify-center px-2"
+                )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                <Icon className={cn("h-4 w-4 shrink-0", collapsed && "mr-0")} />
+                {!collapsed && <span>{item.label}</span>}
               </NavLink>
             );
           })}
         </nav>
       </div>
 
-      <div className="org-sidebar-download mt-6">
-        <p className="text-sm font-medium">Workspace update</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          More organization tools are being rolled out.
-        </p>
-        <button type="button" className="org-sidebar-download-btn mt-3" disabled>
-          <Download className="h-4 w-4" />
-          Coming soon
-        </button>
+      <div className="mt-auto pt-6 pb-2 border-t border-border/40 space-y-2">
+        {!hideCollapseControl && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCollapseToggle}
+            className={cn("w-full text-muted-foreground hover:text-foreground", collapsed ? "justify-center px-2" : "justify-start")}
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                <span>Collapse</span>
+              </>
+            )}
+          </Button>
+        )}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSignOut}
+          className={cn(
+            "w-full text-destructive hover:text-destructive hover:bg-destructive/10",
+            collapsed ? "justify-center px-2" : "justify-start",
+          )}
+          title={collapsed ? "Sign Out" : undefined}
+        >
+          <LogOut className={cn("h-4 w-4", !collapsed && "mr-2")} />
+          {!collapsed && <span>Sign Out</span>}
+        </Button>
       </div>
     </aside>
   );

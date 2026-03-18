@@ -203,9 +203,9 @@ export default function OrganizationInvitationsPage() {
                 <SelectValue placeholder="Expiry" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">2 days</SelectItem>
-                <SelectItem value="5">5 days</SelectItem>
-                <SelectItem value="7">7 days</SelectItem>
+                <SelectItem value="2">Expires in 2 days</SelectItem>
+                <SelectItem value="5">Expires in 5 days</SelectItem>
+                <SelectItem value="7">Expires in 7 days</SelectItem>
               </SelectContent>
             </Select>
             <Textarea
@@ -248,9 +248,9 @@ export default function OrganizationInvitationsPage() {
                 <SelectValue placeholder="Expiry" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="3">3 days</SelectItem>
-                <SelectItem value="7">7 days</SelectItem>
-                <SelectItem value="14">14 days</SelectItem>
+                <SelectItem value="3">Expires in 3 days</SelectItem>
+                <SelectItem value="7">Expires in 7 days</SelectItem>
+                <SelectItem value="14">Expires in 14 days</SelectItem>
               </SelectContent>
             </Select>
             <Textarea
