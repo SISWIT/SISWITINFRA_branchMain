@@ -8,7 +8,7 @@ import { cn } from "@/core/utils/utils";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Separator } from "@/ui/shadcn/separator";
-import { Sheet, SheetContent } from "@/ui/shadcn/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/ui/shadcn/sheet";
 import { Skeleton } from "@/ui/shadcn/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/shadcn/tooltip";
 
@@ -164,6 +164,8 @@ const Sidebar = React.forwardRef<
           }
           side={side}
         >
+          <SheetTitle className="sr-only">Sidebar</SheetTitle>
+          <SheetDescription className="sr-only">Mobile sidebar menu</SheetDescription>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>

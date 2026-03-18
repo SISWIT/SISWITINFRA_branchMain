@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Sheet, SheetContent } from "@/ui/shadcn/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/ui/shadcn/sheet";
 import { OrganizationSidebar } from "@/workspaces/organization/components/OrganizationSidebar";
 import { OrganizationTopBar } from "@/workspaces/organization/components/OrganizationTopBar";
 
@@ -21,6 +21,8 @@ export default function OrganizationOwnerLayout() {
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-[290px] border-r border-border/70 p-0">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <SheetDescription className="sr-only">Organization navigation links</SheetDescription>
           <OrganizationSidebar className="h-full" onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>
