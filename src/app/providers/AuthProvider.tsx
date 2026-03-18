@@ -12,10 +12,12 @@ import {
   type InviteEmployeeInput,
   type OrganizationSignUpInput,
 } from "@/core/auth/auth-context";
+import { setAuthPersistenceMode } from "@/core/auth/session-persistence";
 import { normalizeRole, PlatformRole } from "@/core/types/roles";
 
 const ROLE_CACHE_KEY_PREFIX = "org_role_";
 const AUTH_ROLE_LOOKUP_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_ROLE_LOOKUP_TIMEOUT_MS ?? "5000");
+const AUTH_SESSION_RECOVERY_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_SESSION_RECOVERY_TIMEOUT_MS ?? "10000");
 const INVITE_EMAILS_DISABLED = (() => {
   const raw = String(import.meta.env.VITE_DISABLE_INVITE_EMAILS ?? "").trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes";
@@ -204,6 +206,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const clearAuthState = useCallback((userId?: string | null) => {
+    if (userId) {
+      sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
+    }
+
+    setUser(null);
+    setSession(null);
+    setRole(null);
+    setAccountState(null);
+  }, []);
+
   const cacheAccess = useCallback((userId: string, userRole: AuthRole, accState: string | null) => {
     if (userRole) {
       const payload = { role: userRole, accountState: accState, timestamp: Date.now() };
@@ -310,17 +323,90 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [getCachedAccess, pickMembership, resolveRoleFromMembershipState, unsafeSupabase],
   );
 
-  const refreshRole = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const access = await getUserAccess(user.id);
+  const claimPendingInvitations = useCallback(async (): Promise<number> => {
+    const { data, error } = await unsafeSupabase.rpc("claim_pending_invitations");
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const parsed =
+      typeof data === "number"
+        ? data
+        : typeof data === "string"
+          ? Number(data)
+          : Array.isArray(data) && data.length > 0
+            ? Number(data[0])
+            : 0;
+
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, [unsafeSupabase]);
+
+  const applyResolvedAccess = useCallback(
+    (userId: string, access: { role: AuthRole; accountState: string | null }) => {
       setRole(access.role);
       setAccountState(access.accountState);
-      cacheAccess(user.id, access.role, access.accountState);
-    } catch (error) {
-      // Non-blocking refresh, add error to telemetry/logs if needed in future
+      cacheAccess(userId, access.role, access.accountState);
+    },
+    [cacheAccess],
+  );
+
+  const clearRecoveredSession = useCallback(
+    async (userId?: string | null) => {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // Fall through to local state reset even if remote/local sign-out errors.
+      } finally {
+        clearAuthState(userId);
+      }
+    },
+    [clearAuthState],
+  );
+
+  const resolveAccessForUser = useCallback(
+    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null }> => {
+      let access = await getUserAccess(nextUser.id);
+      if (!access.role) {
+        try {
+          await claimPendingInvitations();
+        } catch {
+          // Keep best-effort role discovery only.
+        }
+
+        access = await getUserAccess(nextUser.id);
+      }
+
+      // Auto-sync: If still pending_verification but confirmed in Auth, re-fetch access
+      if (access.role === ("pending_verification" as AuthRole) && nextUser.email_confirmed_at) {
+        access = await getUserAccess(nextUser.id);
+      }
+
+      return access;
+    },
+    [claimPendingInvitations, getUserAccess],
+  );
+
+  const resolveRecoveredAccessForUser = useCallback(
+    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null }> => {
+      return withTimeout(resolveAccessForUser(nextUser), AUTH_SESSION_RECOVERY_TIMEOUT_MS);
+    },
+    [resolveAccessForUser],
+  );
+
+  const refreshRole = useCallback(async () => {
+    if (!user) return;
+    try {
+      const access = await resolveAccessForUser(user);
+      if (!access.role) {
+        clearAuthState(user.id);
+        return;
+      }
+
+      applyResolvedAccess(user.id, access);
+    } catch {
+      clearAuthState(user.id);
     }
-  }, [cacheAccess, getUserAccess, user?.id]);
+  }, [applyResolvedAccess, clearAuthState, resolveAccessForUser, user]);
 
   const upsertProfile = useCallback(
     async (userId: string, fullName: string) => {
@@ -859,28 +945,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const claimPendingInvitations = useCallback(async (): Promise<number> => {
-    const { data, error } = await unsafeSupabase.rpc("claim_pending_invitations");
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const parsed =
-      typeof data === "number"
-        ? data
-        : typeof data === "string"
-          ? Number(data)
-          : Array.isArray(data) && data.length > 0
-            ? Number(data[0])
-            : 0;
-
-    return Number.isFinite(parsed) ? parsed : 0;
-  }, [unsafeSupabase]);
-
   const signIn = useCallback(
-    async (email: string, password: string) => { // W-10: removed unused _rememberMe
+    async (email: string, password: string, rememberMe = true) => {
       try {
         setLoading(true);
+        setAuthPersistenceMode(rememberMe);
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
@@ -891,39 +960,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: "User not found", role: null as AuthRole };
         }
 
-        let access = await getUserAccess(data.user.id);
-        if (!access.role) {
-          try {
-            await claimPendingInvitations();
-          } catch {
-            // Non-blocking: keep original fallback behavior below.
-          }
-
-          access = await getUserAccess(data.user.id);
-        }
+        const access = await resolveAccessForUser(data.user);
 
         if (!access.role) {
+          await clearRecoveredSession(data.user.id);
           return { error: "No organization access assigned", role: null as AuthRole };
         }
 
         // C-02 fix: Block login if email is not yet verified
         if (access.role === ("pending_verification" as AuthRole)) {
-          // Re-fetch the role one last time in case the database trigger just finished
-          access = await getUserAccess(data.user.id);
-
-          // If still pending (email not confirmed or activation failed), block login
-          if (access.role === ("pending_verification" as AuthRole)) {
-            await supabase.auth.signOut();
-            return {
-              error: "Please verify your email address before signing in. Check your inbox for the verification link.",
-              role: null as AuthRole,
-            };
-          }
+          await clearRecoveredSession(data.user.id);
+          return {
+            error: "Please verify your email address before signing in. Check your inbox for the verification link.",
+            role: null as AuthRole,
+          };
         }
 
-        cacheAccess(data.user.id, access.role, access.accountState);
-        setRole(access.role);
-        setAccountState(access.accountState);
+        applyResolvedAccess(data.user.id, access);
         setUser(data.user);
         setSession(data.session);
 
@@ -934,7 +987,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [cacheAccess, claimPendingInvitations, getUserAccess, unsafeSupabase],
+    [applyResolvedAccess, clearRecoveredSession, resolveAccessForUser],
   );
 
   /** @deprecated Use signUpOrganization, signUpClientSelf, or invitation acceptance instead. */
@@ -949,23 +1002,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userId = user?.id;
     setIsLoggingOut(true);
 
-    if (userId) {
-      sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-    }
-
     try {
       // W-05: Clear React Query cache to prevent stale data across sessions
       const { clearAllCaches } = await import("@/app/App");
       clearAllCaches();
       await supabase.auth.signOut();
     } finally {
-      setUser(null);
-      setSession(null);
-      setRole(null);
-      setAccountState(null);
+      clearAuthState(userId);
       setIsLoggingOut(false);
     }
-  }, [user?.id]);
+  }, [clearAuthState, user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -976,46 +1022,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const {
           data: { session: nextSession },
-        } = await supabase.auth.getSession();
+        } = await withTimeout(supabase.auth.getSession(), AUTH_SESSION_RECOVERY_TIMEOUT_MS);
 
         if (!mounted) return;
 
         if (!nextSession?.user) {
-          setUser(null);
-          setSession(null);
-          setRole(null);
-          setAccountState(null);
+          clearAuthState();
           return;
         }
 
         setUser(nextSession.user);
         setSession(nextSession);
 
-        let access = await getUserAccess(nextSession.user.id);
-        if (!access.role) {
-          try {
-            await claimPendingInvitations();
-            access = await getUserAccess(nextSession.user.id);
-          } catch {
-            // Keep best-effort role discovery only.
-          }
-        }
-
-        // Auto-sync: If still pending_verification but confirmed in Auth, re-fetch access
-        if (access.role === ("pending_verification" as AuthRole) && nextSession.user.email_confirmed_at) {
-          access = await getUserAccess(nextSession.user.id);
-        }
+        const access = await resolveRecoveredAccessForUser(nextSession.user);
         if (!mounted) return;
 
-        setRole(access.role);
-        setAccountState(access.accountState);
-        cacheAccess(nextSession.user.id, access.role, access.accountState);
-      } catch {
+        if (!access.role) {
+          clearAuthState(nextSession.user.id);
+          return;
+        }
+
+        applyResolvedAccess(nextSession.user.id, access);
+      } catch (e) {
         if (mounted) {
-          setUser(null);
-          setSession(null);
-          setRole(null);
-          setAccountState(null);
+          // If getSession() timed out, Supabase may still be holding an internal
+          // auth lock (e.g. mid-token-refresh). Force a local sign-out to release
+          // the lock so subsequent signIn calls don't deadlock.
+          try {
+            await Promise.race([
+              supabase.auth.signOut({ scope: 'local' }),
+              new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+            ]);
+          } catch {
+            // Best-effort cleanup — even if signOut fails, we still clear state below.
+          }
+          clearAuthState();
         }
       } finally {
         if (mounted) {
@@ -1028,14 +1069,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
 
+      if (event === "INITIAL_SESSION") {
+        return;
+      }
+
       if (event === "SIGNED_OUT" || !nextSession?.user) {
-        setUser(null);
-        setSession(null);
-        setRole(null);
-        setAccountState(null);
+        clearAuthState();
         setLoading(false);
         return;
       }
@@ -1043,33 +1085,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextSession.user);
       setSession(nextSession);
 
-      let access = await getUserAccess(nextSession.user.id);
-      if (!access.role) {
+      // Decouple from Supabase auth lock to prevent deadlock
+      setTimeout(async () => {
         try {
-          await claimPendingInvitations();
-          access = await getUserAccess(nextSession.user.id);
+          const access = await resolveAccessForUser(nextSession.user);
+          if (!mounted) return;
+
+          if (!access.role) {
+            clearAuthState(nextSession.user.id);
+            setLoading(false);
+            return;
+          }
+
+          applyResolvedAccess(nextSession.user.id, access);
+          setLoading(false);
         } catch {
-          // Keep best-effort role discovery only.
+          if (!mounted) return;
+          clearAuthState(nextSession.user.id);
+          setLoading(false);
         }
-      }
-
-      // Auto-sync: If still pending_verification but confirmed in Auth, re-fetch access
-      if (access.role === ("pending_verification" as AuthRole) && nextSession.user.email_confirmed_at) {
-        access = await getUserAccess(nextSession.user.id);
-      }
-      if (!mounted) return;
-
-      setRole(access.role);
-      setAccountState(access.accountState);
-      cacheAccess(nextSession.user.id, access.role, access.accountState);
-      setLoading(false);
+      }, 0);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [cacheAccess, claimPendingInvitations, getUserAccess]);
+  }, [applyResolvedAccess, clearAuthState, resolveAccessForUser, resolveRecoveredAccessForUser]);
 
   return (
     <AuthContext.Provider

@@ -4,6 +4,7 @@ import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Mail } from "lucide-react
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Checkbox } from "@/ui/shadcn/checkbox";
+import { getRememberMeDefault } from "@/core/auth/session-persistence";
 import { useToast } from "@/core/hooks/use-toast";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
@@ -23,7 +24,7 @@ const Auth = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(() => getRememberMeDefault());
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -336,4 +337,3 @@ const Auth = () => {
 };
 
 export default Auth;
-
