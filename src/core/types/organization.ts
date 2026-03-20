@@ -51,7 +51,10 @@ export interface OrganizationMembership {
   department?: string | null;
   account_state: string;
   is_active: boolean;
+  contact_id?: string | null;
+  account_id?: string | null;
   organization?: Organization | null;
+  created_at?: string | null;
 }
 
 export const isModuleEnabled = (

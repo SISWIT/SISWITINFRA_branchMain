@@ -11,21 +11,16 @@ import {
   Send,
   XCircle,
 } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 import { Badge } from "@/ui/shadcn/badge";
 import { Button } from "@/ui/shadcn/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Separator } from "@/ui/shadcn/separator";
-import { useAuth } from "@/core/auth/useAuth";
-import { supabase } from "@/core/api/client";
-import type { Database } from "@/core/api/types";
-import { tenantModulePath } from "@/core/utils/routes";
+import { useContract, useUpdateContract } from "@/modules/clm/hooks/useCLM";
 
-type ContractRow = Database["public"]["Tables"]["contracts"]["Row"];
-type ContractStatus = ContractRow["status"] extends string ? ContractRow["status"] : string;
+
+// Remove local type definitions that conflict with imports
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
@@ -42,61 +37,12 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 export default function ContractDetailPage() {
   const { id, tenantSlug } = useParams<{ id: string; tenantSlug: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { data: contract, isLoading, isError, error } = useContract(id || "");
+  const updateContract = useUpdateContract();
 
-  const contractsRootPath = tenantSlug
-    ? tenantModulePath(tenantSlug, "clm", "contracts")
-    : "/dashboard/clm/contracts";
+  const contractsRootPath = `/${tenantSlug}/app/clm/contracts`;
+  const toTenantPath = (suffix = "") => `/${tenantSlug}/app/clm/contracts/${suffix}`;
 
-  const toTenantPath = (suffix = "") => {
-    if (!tenantSlug) {
-      return suffix ? `${contractsRootPath}/${suffix}` : contractsRootPath;
-    }
-    const normalized = suffix.replace(/^\/+/, "");
-    return normalized
-      ? tenantModulePath(tenantSlug, "clm", `contracts/${normalized}`)
-      : tenantModulePath(tenantSlug, "clm", "contracts");
-  };
-
-  const { data: contract, isLoading, isError, error } = useQuery({
-    queryKey: ["contract-detail", id, user?.id],
-    enabled: Boolean(id && user?.id),
-    queryFn: async () => {
-      if (!id || !user?.id) throw new Error("User or contract context is missing");
-
-      const { data, error: queryError } = await supabase
-        .from("contracts")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (queryError) throw queryError;
-      return data as ContractRow;
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: ContractStatus) => {
-      if (!id) throw new Error("Missing contract id");
-      const updates: Database["public"]["Tables"]["contracts"]["Update"] = {
-        status,
-        updated_at: new Date().toISOString(),
-        ...(status === "signed" ? { signed_date: new Date().toISOString() } : {}),
-      };
-
-      const { error: updateError } = await supabase.from("contracts").update(updates).eq("id", id);
-      if (updateError) throw updateError;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["contract-detail", id, user?.id] });
-      void queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success("Contract status updated");
-    },
-    onError: (mutationError: unknown) => {
-      toast.error(`Failed to update contract status: ${getErrorMessage(mutationError)}`);
-    },
-  });
 
   const status = contract?.status ?? "draft";
   const statusConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
@@ -170,7 +116,7 @@ export default function ContractDetailPage() {
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </Button>
-              <Button onClick={() => updateStatusMutation.mutate("pending_review")}> 
+              <Button onClick={() => updateContract.mutate({ id: id!, status: "pending_review" })}> 
                 <Send className="mr-2 h-4 w-4" />
                 Submit for Review
               </Button>
@@ -179,11 +125,11 @@ export default function ContractDetailPage() {
 
           {status === "pending_review" && (
             <>
-              <Button variant="outline" onClick={() => updateStatusMutation.mutate("draft")}>
+              <Button variant="outline" onClick={() => updateContract.mutate({ id: id!, status: "draft" })}>
                 <XCircle className="mr-2 h-4 w-4" />
                 Send Back
               </Button>
-              <Button onClick={() => updateStatusMutation.mutate("approved")}>
+              <Button onClick={() => updateContract.mutate({ id: id!, status: "approved" })}>
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Approve
               </Button>
@@ -200,7 +146,7 @@ export default function ContractDetailPage() {
           )}
 
           {status === "sent" && (
-            <Button onClick={() => updateStatusMutation.mutate("signed")}>
+            <Button onClick={() => updateContract.mutate({ id: id!, status: "signed" })}>
               <CheckCircle className="mr-2 h-4 w-4" />
               Mark as Signed
             </Button>
@@ -226,7 +172,7 @@ export default function ContractDetailPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Value</span>
-                <span className="font-medium">{formatCurrency(contract.value)}</span>
+                <span className="font-medium">{formatCurrency(contract.value ?? null)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Start Date</span>

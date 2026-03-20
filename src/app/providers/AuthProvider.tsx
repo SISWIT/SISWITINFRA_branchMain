@@ -12,8 +12,8 @@ import {
   type InviteEmployeeInput,
   type OrganizationSignUpInput,
 } from "@/core/auth/auth-context";
-import { setAuthPersistenceMode } from "@/core/auth/session-persistence";
 import { normalizeRole, PlatformRole } from "@/core/types/roles";
+import { pickMembership } from "@/core/auth/membership";
 
 const ROLE_CACHE_KEY_PREFIX = "org_role_";
 const AUTH_ROLE_LOOKUP_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_ROLE_LOOKUP_TIMEOUT_MS ?? "5000");
@@ -178,22 +178,7 @@ function getAuthEmailRedirectTo(): string {
   return getAuthUrl("/auth/verify-success");
 }
 
-function membershipPriority(role: string): number {
-  switch (role) {
-    case "owner":
-      return 1;
-    case "admin":
-      return 2;
-    case "manager":
-      return 3;
-    case "employee":
-      return 4;
-    case "client":
-      return 5;
-    default:
-      return 99;
-  }
-}
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // W-02: Stabilize reference to prevent infinite re-render risk
@@ -250,20 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const pickMembership = useCallback((rows: MembershipLookupRow[]): MembershipLookupRow | null => {
-    if (!rows.length) return null;
 
-    const sorted = [...rows].sort((a, b) => {
-      const roleOrder = membershipPriority(a.role) - membershipPriority(b.role);
-      if (roleOrder !== 0) return roleOrder;
-      const aCreated = new Date(a.created_at ?? 0).getTime();
-      const bCreated = new Date(b.created_at ?? 0).getTime();
-      if (aCreated !== bCreated) return aCreated - bCreated;
-      return a.id.localeCompare(b.id);
-    });
-
-    return sorted[0] ?? null;
-  }, []);
 
   const resolveRoleFromMembershipState = useCallback((membership: MembershipLookupRow | null): AuthRole => {
     if (!membership) return null;
@@ -320,7 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return getCachedAccess(userId);
       }
     },
-    [getCachedAccess, pickMembership, resolveRoleFromMembershipState, unsafeSupabase],
+    [getCachedAccess, resolveRoleFromMembershipState, unsafeSupabase],
   );
 
   const claimPendingInvitations = useCallback(async (): Promise<number> => {
@@ -946,12 +918,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(
-    async (email: string, password: string, rememberMe = true) => {
+    async (email: string, password: string, rememberMe: boolean = false) => {
       try {
         setLoading(true);
-        setAuthPersistenceMode(rememberMe);
 
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email, 
+          password,
+        });
+
+        // W-04: Dynamically configure persistence if requested
+        if (data?.session) {
+          // If rememberMe is false, the user wants the session to expire when the browser session ends.
+          // By default Supabase uses localStorage. If we wanted true session-only, we'd need
+          // to re-initialize the client with sessionStorage, which is heavy.
+          // Instead, we will store the 'rememberMe' preference in the session metadata or similar.
+          // For now, we will simply ensure the session is established.
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          
+          if (!rememberMe) {
+            // Mark the session as non-persistent in our local cache
+            sessionStorage.setItem("auth_session_ephemeral", "true");
+          } else {
+            sessionStorage.removeItem("auth_session_ephemeral");
+          }
+        }
+        
         if (error) {
           return { error: error.message, role: null as AuthRole };
         }
@@ -1004,7 +999,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       // W-05: Clear React Query cache to prevent stale data across sessions
-      const { clearAllCaches } = await import("@/app/App");
+      const { clearAllCaches } = await import("@/core/utils/cache");
       clearAllCaches();
       await supabase.auth.signOut();
     } finally {
@@ -1107,9 +1102,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, 0);
     });
 
+    // W-04: Ephemeral session cleanup
+    const handleUnload = () => {
+      if (sessionStorage.getItem("auth_session_ephemeral") === "true") {
+        // We can't use async signOut here reliably, but we can clear local storage
+        // to ensure the next visit requires sign-in.
+        const key = `${import.meta.env.VITE_SUPABASE_URL}-auth-token`;
+        localStorage.removeItem(key);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleUnload);
     };
   }, [applyResolvedAccess, clearAuthState, resolveAccessForUser, resolveRecoveredAccessForUser]);
 

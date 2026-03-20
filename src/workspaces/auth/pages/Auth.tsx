@@ -3,9 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
-import { Checkbox } from "@/ui/shadcn/checkbox";
-import { getRememberMeDefault } from "@/core/auth/session-persistence";
 import { useToast } from "@/core/hooks/use-toast";
+import { Checkbox } from "@/ui/shadcn/checkbox";
+import { Label } from "@/ui/shadcn/label";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import heroBg from "@/assets/hero-bg.jpg";
@@ -24,7 +24,7 @@ const Auth = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => getRememberMeDefault());
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -242,18 +242,23 @@ const Auth = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 pt-1 text-sm dark:text-white/75">
-                    <label className="flex items-center gap-2.5 text-muted-foreground dark:text-white/75">
-                      <Checkbox
-                        checked={rememberMe}
-                        onCheckedChange={(v) => setRememberMe(Boolean(v))}
-                        className="border-input data-[state=checked]:border-primary data-[state=checked]:bg-primary dark:border-white/40"
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="rememberMe" 
+                        checked={rememberMe} 
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
                       />
-                      <span>Remember me</span>
-                    </label>
+                      <Label 
+                        htmlFor="rememberMe" 
+                        className="text-sm font-medium leading-none cursor-pointer text-muted-foreground dark:text-white/75"
+                      >
+                        Remember me
+                      </Label>
+                    </div>
                     <Link
                       to="/auth/forgot-password"
-                      className="font-medium text-primary hover:underline"
+                      className="text-sm font-medium text-primary hover:underline"
                     >
                       Forgot password?
                     </Link>

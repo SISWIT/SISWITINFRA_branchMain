@@ -1,6 +1,6 @@
 /// <reference path="./edge-runtime.d.ts" />
 
-// @ts-ignore
+// @ts-expect-error: Deno npm specifiers are not understood by the standard TypeScript environment used for linting
 import nodemailer from "npm:nodemailer";
 
 // S-11: Support multiple CORS origins from environment variable

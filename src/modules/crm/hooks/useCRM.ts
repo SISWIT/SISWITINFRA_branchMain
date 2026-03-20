@@ -1,4 +1,4 @@
-﻿import { getErrorMessage } from "@/core/utils/errors";
+import { getErrorMessage } from "@/core/utils/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -330,7 +330,7 @@ function resolveActivityRelation(activity: Partial<Activity>): { relatedType: st
 
 async function ensureQuoteAccessible(quoteId: string, scope: ModuleScopeContext) {
   const query = supabase.from("quotes").select("id").eq("id", quoteId);
-  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: false });
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: true });
   const result = await scoped.maybeSingle();
   if (result.error || !result.data) {
     throw new Error("Quote not found or not accessible");
@@ -348,7 +348,7 @@ export function useLeads() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("leads").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -508,7 +508,7 @@ export function useAccounts() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("accounts").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -676,7 +676,7 @@ export function useContacts(accountId?: string) {
       let scopedQuery = applyModuleReadScope(
         supabase.from("contacts").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       if (accountId) {
@@ -848,7 +848,7 @@ export function useOpportunities(accountId?: string) {
       let scopedQuery = applyModuleReadScope(
         supabase.from("opportunities").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       if (accountId) {
@@ -1031,7 +1031,7 @@ export function useActivities(filters?: { opportunityId?: string; leadId?: strin
       let scopedQuery = applyModuleReadScope(
         supabase.from("activities").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       if (filters?.opportunityId) {
@@ -1275,7 +1275,7 @@ export function useQuotes() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("quotes").select("*"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -1296,7 +1296,7 @@ export function useQuote(id: string) {
       const scopedQuoteQuery = applyModuleReadScope(
         supabase.from("quotes").select("*").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
       const { data, error } = await scopedQuoteQuery.single();
       if (error) throw error;
@@ -1530,25 +1530,25 @@ export function useDashboardStats() {
       const leadsQuery = applyModuleReadScope(
         supabase.from("leads").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const accountsQuery = applyModuleReadScope(
         supabase.from("accounts").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const quotesQuery = applyModuleReadScope(
         supabase.from("quotes").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const opportunitiesQuery = applyModuleReadScope(
         supabase.from("opportunities").select("id, stage, amount, expected_revenue, is_closed, is_won"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const [{ count: leadsCount, error: leadsError }, { count: accountsCount, error: accountsError }, { count: quotesCount, error: quotesError }, { data: oppData, error: oppError }] =

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Copy, Loader2, MailPlus, UserPlus, ShieldCheck, Clock3, Info } from "lucide-react";
+import { Loader2, MailPlus, UserPlus, ShieldCheck, Clock3 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";

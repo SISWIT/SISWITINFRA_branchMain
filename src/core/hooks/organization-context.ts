@@ -17,6 +17,7 @@ export interface OrganizationContextType {
   switchOrganization: (organizationId: string) => Promise<void>;
   switchOrganizationBySlug: (organizationSlug: string) => Promise<void>;
   refreshOrganization: () => Promise<void>;
+  updateOrganization: (updates: Partial<Organization>) => Promise<void>;
 }
 
 export const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);

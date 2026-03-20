@@ -21,7 +21,7 @@ interface PendingSignature {
 }
 
 export default function CustomerPendingSignaturesPage() {
-  const { organizationId, organizationLoading, portalEmail, isReady } = usePortalScope();
+  const { organizationId, organizationLoading, portalEmail, contactId, accountId, isReady } = usePortalScope();
   const [signatures, setSignatures] = useState<PendingSignature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,11 +35,16 @@ export default function CustomerPendingSignaturesPage() {
         return;
       }
 
-      const { data: userContracts } = await supabase
+      let query = supabase
         .from("contracts")
         .select("id")
-        .eq("organization_id", organizationId)
-        .eq("customer_email", portalEmail);
+        .eq("organization_id", organizationId);
+        
+      if (contactId) query = query.eq("contact_id", contactId);
+      else if (accountId) query = query.eq("account_id", accountId);
+      else query = query.eq("customer_email", portalEmail);
+
+      const { data: userContracts } = await query;
 
       const contractIds = userContracts?.map((contract) => contract.id) || [];
 
@@ -58,7 +63,7 @@ export default function CustomerPendingSignaturesPage() {
         .order("created_at", { ascending: false });
 
       if (!error && data) {
-        setSignatures(data as any);
+        setSignatures(data as unknown as PendingSignature[]);
       }
       setIsLoading(false);
     };

@@ -2,14 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../../core/api/client";
 import { useTenant } from "../../../core/tenant/useTenant";
 
-interface DashboardKPIs {
+export interface DashboardKPIs {
     leads: number;
     contracts: number;
     quotes: number;
     orders: number;
 }
 
-interface DashboardOpportunity {
+export interface DashboardOpportunity {
     id: string;
     name: string | null;
     stage: string | null;
@@ -17,7 +17,7 @@ interface DashboardOpportunity {
     close_date: string | null;
 }
 
-interface DashboardContract {
+export interface DashboardContract {
     id: string;
     name: string | null;
     status: string | null;
@@ -25,7 +25,7 @@ interface DashboardContract {
     end_date: string | null;
 }
 
-interface DashboardActivity {
+export interface DashboardActivity {
     id: string;
     subject: string | null;
     type: string | null;
@@ -33,7 +33,7 @@ interface DashboardActivity {
     assigned_to_id: string | null;
 }
 
-interface DashboardLead {
+export interface DashboardLead {
     id: string;
     first_name: string | null;
     last_name: string | null;
@@ -43,7 +43,7 @@ interface DashboardLead {
     created_at: string | null;
 }
 
-interface DashboardAuditLog {
+export interface DashboardAuditLog {
     id: string;
     action: string | null;
     entity_type: string | null;
@@ -51,7 +51,7 @@ interface DashboardAuditLog {
     user_id: string | null;
 }
 
-interface DashboardChartItem {
+export interface DashboardChartItem {
     status: string | null;
     created_at: string | null;
 }

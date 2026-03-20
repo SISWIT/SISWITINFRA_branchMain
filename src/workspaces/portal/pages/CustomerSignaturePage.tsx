@@ -11,21 +11,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { usePortalScope } from "@/workspaces/portal/hooks/usePortalScope";
 
 export default function CustomerSignaturePage() {
+  const { organizationId, portalEmail, isReady } = usePortalScope();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: signature, isLoading } = useQuery({
-    queryKey: ["portal-signature", id],
-    enabled: !!id,
+    queryKey: ["portal-signature", id, organizationId, portalEmail],
+    enabled: !!id && isReady,
     queryFn: async () => {
-      if (!id) throw new Error("Signature ID is required");
+      if (!id || !organizationId || !portalEmail) throw new Error("Missing context");
       const { data, error } = await supabase
         .from("contract_esignatures")
         .select("*, contracts:contracts(*)")
         .eq("id", id)
+        .eq("organization_id", organizationId)
+        .eq("signer_email", portalEmail)
         .single();
       if (error) throw error;
       return data;
@@ -34,11 +38,13 @@ export default function CustomerSignaturePage() {
 
   const signMutation = useMutation({
     mutationFn: async () => {
-      if (!id) return;
+      if (!id || !organizationId || !portalEmail) return;
       const { error } = await supabase
         .from("contract_esignatures")
         .update({ status: "signed", signed_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+        .eq("signer_email", portalEmail);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -49,11 +55,13 @@ export default function CustomerSignaturePage() {
 
   const rejectMutation = useMutation({
     mutationFn: async () => {
-      if (!id) return;
+      if (!id || !organizationId || !portalEmail) return;
       const { error } = await supabase
         .from("contract_esignatures")
         .update({ status: "rejected" })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("organization_id", organizationId)
+        .eq("signer_email", portalEmail);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -7,7 +7,6 @@ import {
   ChevronRight,
   FileSignature,
   FileStack,
-  FileText,
   History,
   LayoutDashboard,
   LogOut,

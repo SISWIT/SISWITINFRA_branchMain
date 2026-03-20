@@ -21,7 +21,7 @@ interface TenantMembershipRow {
   tenant_id: string;
 }
 
-const statusTone: Record<TenantRow["status"], string> = {
+const statusTone: Record<string, string> = {
   active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
   suspended: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   trial: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
@@ -37,29 +37,30 @@ export default function TenantsPanel() {
     const load = async () => {
       setLoading(true);
 
-      const [tenantsResult, membershipsResult] = await Promise.all([
+      const [orgsResult, membershipsResult] = await Promise.all([
         supabase
-          .from("tenants")
+          .from("organizations")
           .select("id,name,slug,status,plan_type,created_at")
           .order("created_at", { ascending: false }),
-        supabase.from("tenant_users").select("tenant_id").eq("is_active", true),
+        supabase.from("organization_memberships").select("organization_id").eq("is_active", true),
       ]);
 
-      if (tenantsResult.error) {
+      if (orgsResult.error) {
         setTenants([]);
         setLoading(false);
         return;
       }
 
-      const memberships = (membershipsResult.data as TenantMembershipRow[] | null) ?? [];
-      const memberCountByTenant = memberships.reduce<Map<string, number>>((map, item) => {
-        map.set(item.tenant_id, (map.get(item.tenant_id) ?? 0) + 1);
+      const memberships = (membershipsResult.data as any[] | null) ?? [];
+      const memberCountByOrg = memberships.reduce<Map<string, number>>((map, item) => {
+        const orgId = item.organization_id;
+        map.set(orgId, (map.get(orgId) ?? 0) + 1);
         return map;
       }, new Map());
 
-      const rows = ((tenantsResult.data as Omit<TenantRow, "active_users">[] | null) ?? []).map((tenant) => ({
-        ...tenant,
-        active_users: memberCountByTenant.get(tenant.id) ?? 0,
+      const rows = ((orgsResult.data as any[] | null) ?? []).map((org) => ({
+        ...org,
+        active_users: memberCountByOrg.get(org.id) ?? 0,
       }));
 
       setTenants(rows);

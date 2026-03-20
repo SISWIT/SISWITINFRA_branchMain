@@ -17,12 +17,15 @@ const supabase = createClient(url, serviceRoleKey, {
 
 const HANDLERS = {
   "document.generate": async (job) => {
+    // TODO: Integrate with document generation service
     console.log(`[job:${job.id}] document.generate`, job.payload);
   },
   "document.generate_pdf": async (job) => {
+    // TODO: Integrate with PDF conversion service
     console.log(`[job:${job.id}] document.generate_pdf`, job.payload);
   },
   "email.send": async (job) => {
+    // TODO: Integrate with Supabase Edge Function 'send-email'
     console.log(`[job:${job.id}] email.send`, job.payload);
   },
   "email.reminder": async (job) => {
@@ -32,6 +35,19 @@ const HANDLERS = {
     console.log(`[job:${job.id}] contract.expiry_alert`, job.payload);
   },
 };
+
+/**
+ * Calculates exponential backoff in seconds: 60 * (2 ^ attempts)
+ * attempts: 0 -> 60s
+ * attempts: 1 -> 120s
+ * attempts: 2 -> 240s
+ * attempts: 3 -> 480s (8 min)
+ */
+function getBackoffTime(attempts) {
+  const minutes = Math.pow(2, attempts);
+  return minutes * 60 * 1000;
+}
+
 
 async function claimJobs(limit = 10) {
   const now = new Date().toISOString();
@@ -73,7 +89,12 @@ async function markDone(jobId) {
 
 async function markFailed(job, errorMessage) {
   const nextAttempts = (job.attempts ?? 0) + 1;
-  const exhausted = nextAttempts >= (job.max_attempts ?? 5);
+  const maxAttempts = job.max_attempts ?? 5;
+  const exhausted = nextAttempts >= maxAttempts;
+  
+  const backoffMs = getBackoffTime(nextAttempts - 1);
+  const nextAvailableAt = new Date(Date.now() + backoffMs).toISOString();
+
   await supabase
     .from("background_jobs")
     .update({
@@ -82,7 +103,7 @@ async function markFailed(job, errorMessage) {
       last_error: errorMessage,
       locked_at: null,
       locked_by: null,
-      available_at: exhausted ? job.available_at : new Date(Date.now() + 60_000).toISOString(),
+      available_at: exhausted ? job.available_at : nextAvailableAt,
       finished_at: exhausted ? new Date().toISOString() : null,
     })
     .eq("id", job.id);
@@ -104,7 +125,24 @@ async function processJob(job) {
   }
 }
 
+async function recoverStuckJobs() {
+  const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const { error } = await supabase
+    .from("background_jobs")
+    .update({
+      status: "queued",
+      locked_at: null,
+      locked_by: null,
+      last_error: "Job timed out in processing state",
+    })
+    .eq("status", "processing")
+    .lt("locked_at", oneHourAgo);
+
+  if (error) console.error("Failed to recover stuck jobs:", error);
+}
+
 async function run() {
+  await recoverStuckJobs();
   const jobs = await claimJobs();
   if (!jobs.length) {
     console.log("No queued jobs.");

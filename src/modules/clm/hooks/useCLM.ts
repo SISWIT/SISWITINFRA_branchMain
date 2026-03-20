@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/core/api/client";
 import type { Database } from "@/core/api/types";
 import { useModuleScope } from "@/core/hooks/useModuleScope";
-import type { Contract, ContractScan, ContractTemplate, ESignature } from "@/core/types/clm";
+import type { Contract, ContractScan, ContractTemplate, ESignature, CLMDashboardStats } from "@/core/types/clm";
 import { canReadAllTenantRows, isOwnerScopedRole } from "@/core/types/roles";
 import {
   applyModuleMutationScope,
@@ -56,7 +56,7 @@ function mapESignature(
 
 async function ensureContractAccessible(contractId: string, scope: ModuleScopeContext) {
   const query = supabase.from("contracts").select("id").eq("id", contractId);
-  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: false });
+  const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: true });
   const result = await scoped.maybeSingle();
   if (result.error || !result.data) {
     throw new Error("Contract not found or not accessible");
@@ -71,21 +71,13 @@ export function useContractTemplates() {
     queryKey: ["contract_templates", tenantId, userId],
     enabled,
     queryFn: async () => {
-      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
-      const isTenantWideReader = canReadAllTenantRows(scope.role);
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("contract_templates").select("*"),
+        scope,
+        { ownerColumns: ["created_by"], hasSoftDelete: true },
+      );
 
-      let query = supabase
-        .from("contract_templates")
-        .select("*")
-        .eq("organization_id", requiredOrganizationId)
-        .is("deleted_at", null)
-        .order("name");
-
-      if (!isTenantWideReader && userId) {
-        query = query.or(`created_by.eq.${userId},is_public.eq.true`);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await scopedQuery.order("name");
       if (error) throw error;
       return (data ?? []) as ContractTemplate[];
     },
@@ -226,9 +218,9 @@ export function useContracts() {
     enabled,
     queryFn: async () => {
       const scopedQuery = applyModuleReadScope(
-        supabase.from("contracts").select("*"),
+        supabase.from("contracts").select("*, accounts(name), contacts(first_name, last_name)"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -248,7 +240,7 @@ export function useContract(id: string) {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contracts").select("*").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.single();
@@ -578,7 +570,7 @@ export function useContractScans(contractId: string) {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contract_scans").select("*").eq("contract_id", contractId),
         scope,
-        { ownerColumns: ["created_by"], hasSoftDelete: false },
+        { ownerColumns: ["created_by"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -685,3 +677,69 @@ export function useDeleteContractScan() {
 }
 
 
+
+// ===== DASHBOARD STATS =====
+export function useCLMDashboardStats() {
+  const { scope, enabled, tenantId, userId } = useModuleScope();
+
+  return useQuery({
+    queryKey: ["clm_dashboard_stats", tenantId, userId],
+    enabled,
+    queryFn: async (): Promise<CLMDashboardStats> => {
+      const contractsQuery = applyModuleReadScope(
+        supabase.from("contracts").select("*"),
+        scope,
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
+      );
+
+      const templatesQuery = applyModuleReadScope(
+        supabase.from("contract_templates").select("id", { count: "exact", head: true }),
+        scope,
+        { ownerColumns: ["created_by"], hasSoftDelete: true },
+      );
+
+      const [contractsRes, templatesRes] = await Promise.all([
+        contractsQuery.order("created_at", { ascending: false }),
+        templatesQuery,
+      ]);
+
+      if (contractsRes.error) throw contractsRes.error;
+      if (templatesRes.error) throw templatesRes.error;
+
+      const contracts = (contractsRes.data ?? []) as Contract[];
+      const totalTemplates = templatesRes.count || 0;
+      const totalContracts = contracts.length;
+      
+      const draftContracts = contracts.filter((c) => c.status === "draft").length;
+      const pendingContracts = contracts.filter((c) => 
+        c.status === "pending_review" || 
+        c.status === "pending_approval" || 
+        c.status === "sent"
+      ).length;
+      const signedContracts = contracts.filter((c) => c.status === "signed").length;
+      const expiredContracts = contracts.filter((c) => c.status === "expired").length;
+      
+      const totalValue = contracts.reduce((sum, c) => sum + (c.value || 0), 0);
+      const signRate = totalContracts > 0 ? ((signedContracts / totalContracts) * 100).toFixed(1) : "0";
+
+      const contractsByStatus = contracts.reduce<Record<string, number>>((acc, c) => {
+        const status = c.status || "draft";
+        acc[status] = (acc[status] ?? 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        totalTemplates,
+        totalContracts,
+        draftContracts,
+        pendingContracts,
+        signedContracts,
+        expiredContracts,
+        totalValue,
+        signRate,
+        contractsByStatus,
+        recentContracts: contracts.slice(0, 5),
+      };
+    },
+  });
+}

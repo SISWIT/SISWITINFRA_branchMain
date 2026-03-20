@@ -14,11 +14,11 @@ import { useNavigate } from "react-router-dom";
 
 /* Map pathnames to readable page titles */
 const PAGE_TITLES: Record<string, string> = {
-  "/portal/overview": "Overview",
-  "/portal/quotes": "Quotes",
-  "/portal/contracts": "Contracts",
-  "/portal/documents": "Documents",
-  "/portal/signatures": "Signatures",
+  "overview": "Overview",
+  "quotes": "Quotes",
+  "contracts": "Contracts",
+  "documents": "Documents",
+  "pending-signatures": "Signatures",
 };
 
 function getInitials(email?: string | null, firstName?: string | null): string {
@@ -45,11 +45,10 @@ export function CustomerHeader({ onOpenSidebar }: CustomerHeaderProps) {
   const initials = getInitials(user?.email, user?.user_metadata?.first_name);
   const displayName = getDisplayName(user?.email, user?.user_metadata?.first_name);
 
-  /* Resolve current page title — walk up the path if exact match not found */
-  const pageTitle =
-    PAGE_TITLES[location.pathname] ??
-    PAGE_TITLES[Object.keys(PAGE_TITLES).find((k) => location.pathname.startsWith(k + "/")) ?? ""] ??
-    "Portal";
+  /* Resolve current page title using the subpath after /portal/ */
+  const portalPath = location.pathname.split("/portal/")[1] || "overview";
+  const baseSegment = portalPath.split("/")[0];
+  const pageTitle = PAGE_TITLES[baseSegment] ?? "Portal";
 
   const handleSignOut = async () => {
     await signOut();

@@ -1,3 +1,4 @@
+import { useParams, Link } from "react-router-dom";
 import { Users, Building2, Target, DollarSign, TrendingUp, FileText } from "lucide-react";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { useDashboardStats, useOpportunities } from "@/modules/crm/hooks/useCRM";
@@ -5,9 +6,10 @@ import { OpportunityPipeline } from "@/modules/crm/components/OpportunityPipelin
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
-const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
+const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-1))"];
 
 export default function CRMDashboard() {
+  const { tenantSlug } = useParams();
   const { data: stats } = useDashboardStats();
   const { data: opportunities = [] } = useOpportunities();
 
@@ -29,29 +31,45 @@ export default function CRMDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your sales overview.</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-xl md:text-3xl font-semibold">CRM Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Welcome back! Here's your sales overview.</p>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Total Leads" value={stats?.totalLeads || 0} icon={Users} />
-        <StatsCard title="Total Accounts" value={stats?.totalAccounts || 0} icon={Building2} />
-        <StatsCard title="Open Opportunities" value={stats?.openOpportunities || 0} icon={Target} />
-        <StatsCard
-          title="Pipeline Value"
-          value={formatCurrency(stats?.pipelineValue || 0)}
-          subtitle={`Expected: ${formatCurrency(stats?.expectedRevenue || 0)}`}
-          icon={DollarSign}
-        />
+        <Link to={`/${tenantSlug}/app/crm/leads`}>
+          <StatsCard title="Total Leads" value={stats?.totalLeads || 0} icon={Users} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/crm/accounts`}>
+          <StatsCard title="Total Accounts" value={stats?.totalAccounts || 0} icon={Building2} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/crm/opportunities`}>
+          <StatsCard title="Open Opportunities" value={stats?.openOpportunities || 0} icon={Target} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/crm/pipeline`}>
+          <StatsCard
+            title="Pipeline Value"
+            value={formatCurrency(stats?.pipelineValue || 0)}
+            subtitle={`Expected: ${formatCurrency(stats?.expectedRevenue || 0)}`}
+            icon={DollarSign}
+          />
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Won Deals" value={stats?.wonDeals || 0} icon={TrendingUp} />
-        <StatsCard title="Won Value" value={formatCurrency(stats?.wonValue || 0)} icon={DollarSign} />
+        <Link to={`/${tenantSlug}/app/crm/opportunities?filter=won`}>
+          <StatsCard title="Won Deals" value={stats?.wonDeals || 0} icon={TrendingUp} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/crm/opportunities?filter=won`}>
+          <StatsCard title="Won Value" value={formatCurrency(stats?.wonValue || 0)} icon={DollarSign} />
+        </Link>
         <StatsCard title="Win Rate" value={`${(stats?.winRate || 0).toFixed(1)}%`} icon={Target} />
-        <StatsCard title="Active Quotes" value={stats?.totalQuotes || 0} icon={FileText} />
+        <Link to={`/${tenantSlug}/app/crm/activities`}>
+          <StatsCard title="Active Activities" value={stats?.totalQuotes || 0} icon={FileText} />
+        </Link>
       </div>
 
       {/* Charts */}

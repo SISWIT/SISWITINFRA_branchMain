@@ -10,6 +10,7 @@ import { supabase } from "@/core/api/client";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { usePortalScope } from "@/workspaces/portal/hooks/usePortalScope";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground" },
@@ -21,19 +22,31 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function CustomerContractDetailPage() {
+  const { organizationId, contactId, accountId, isReady } = usePortalScope();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const { data: contract, isLoading } = useQuery({
-    queryKey: ["portal-contract", id],
-    enabled: !!id,
+    queryKey: ["portal-contract", id, organizationId],
+    enabled: !!id && isReady,
     queryFn: async () => {
-      if (!id) throw new Error("ID required");
-      const { data, error } = await supabase
+      if (!id || !organizationId) throw new Error("ID and Organization required");
+      
+      let query = supabase
         .from("contracts")
         .select("*, accounts:accounts(name)")
         .eq("id", id)
-        .single();
+        .eq("organization_id", organizationId);
+
+      if (contactId) {
+        query = query.eq("contact_id", contactId);
+      } else if (accountId) {
+        query = query.eq("account_id", accountId);
+      } else {
+        throw new Error("Unauthorized access: No valid scope");
+      }
+
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },

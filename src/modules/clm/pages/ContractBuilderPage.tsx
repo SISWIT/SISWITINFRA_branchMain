@@ -1,15 +1,15 @@
-import { getErrorMessage } from "@/core/utils/errors";
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { FileText, Save, Send, ArrowLeft, Building, User, Calendar, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
+import { useContractTemplates, useCreateContract } from "@/modules/clm/hooks/useCLM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { toast } from "sonner";
 import { Separator } from "@/ui/shadcn/separator";
@@ -17,11 +17,12 @@ import { Badge } from "@/ui/shadcn/badge";
 
 
 export default function ContractBuilderPage() {
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const queryClient = useQueryClient();
   const { user } = useAuth();
   const quoteId = searchParams.get("quote_id");
+
 
   const [contractData, setContractData] = useState({
     name: "",
@@ -64,31 +65,17 @@ export default function ContractBuilderPage() {
       }));
     }
   }, [quote]);
-  const { data: templates } = useQuery({
-    queryKey: ["contract-templates", user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from("contract_templates")
-        .select("*")
-        .or(`created_by.eq.${user.id},is_public.eq.true`)
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Use standardized hooks
+  const { data: templates } = useContractTemplates();
+  const createContract = useCreateContract();
 
+  // Legacy manual queries for accounts/contacts (keeping for now to avoid cross-module complexity, but scoping to current user/tenant)
   const { data: accounts } = useQuery({
-    queryKey: ["accounts-list", user?.id],
-    enabled: !!user?.id,
+    queryKey: ["accounts-list", tenantSlug],
     queryFn: async () => {
-      if (!user?.id) return [];
       const { data, error } = await supabase
         .from("accounts")
         .select("id, name")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("name");
       if (error) throw error;
       return data;
@@ -96,15 +83,13 @@ export default function ContractBuilderPage() {
   });
 
   const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", contractData.account_id, user?.id],
-    enabled: !!contractData.account_id && !!user?.id,
+    queryKey: ["contacts-list", contractData.account_id],
+    enabled: !!contractData.account_id,
     queryFn: async () => {
-      if (!user?.id) return [];
       const { data, error } = await supabase
         .from("contacts")
         .select("id, first_name, last_name")
         .eq("account_id", contractData.account_id)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
         .order("first_name");
       if (error) throw error;
       return data;
@@ -123,35 +108,18 @@ export default function ContractBuilderPage() {
     }
   };
 
-  // Create contract mutation
-  const createContractMutation = useMutation({
-    mutationFn: async (status: "draft" | "pending_review" | "pending_approval" | "approved" | "sent" | "signed" | "expired" | "cancelled") => {
-      const { data, error } = await supabase
-        .from("contracts")
-        .insert([{
-          name: contractData.name,
-          account_id: contractData.account_id || null,
-          contact_id: contractData.contact_id || null,
-          quote_id: contractData.quote_id || null,
-          template_id: contractData.template_id || null,
-          start_date: contractData.start_date || null,
-          end_date: contractData.end_date || null,
-          value: contractData.value,
-          content: contractData.content,
-          status,
-        }])
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (contract: { id: string }) => {
-      queryClient.invalidateQueries({ queryKey: ["contracts-list"] });
-      toast.success("Contract created successfully");
-      navigate(`/dashboard/clm/contracts/${contract.id}`);
-    },
-    onError: (error: unknown) => toast.error("Failed to create contract: " + getErrorMessage(error)),
-  });
+  const handleCreate = (status: any) => {
+    createContract.mutate({
+      ...contractData,
+      status,
+      value: contractData.value || 0,
+    }, {
+      onSuccess: (data) => {
+        toast.success("Contract created successfully");
+        navigate(`/${tenantSlug}/app/clm/contracts/${data.id}`);
+      }
+    });
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
@@ -173,10 +141,10 @@ export default function ContractBuilderPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
+          <Button variant="outline" onClick={() => handleCreate("draft")} disabled={createContract.isPending || !contractData.name}>
             <Save className="h-4 w-4 mr-2" />Save Draft
           </Button>
-          <Button onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
+          <Button onClick={() => handleCreate("pending_review")} disabled={createContract.isPending || !contractData.name}>
             <Send className="h-4 w-4 mr-2" />Submit for Review
           </Button>
         </div>
@@ -330,10 +298,10 @@ export default function ContractBuilderPage() {
               <Separator />
 
               <div className="space-y-2">
-                <Button className="w-full" onClick={() => createContractMutation.mutate("pending_review")} disabled={createContractMutation.isPending || !contractData.name}>
+                <Button className="w-full" onClick={() => handleCreate("pending_review")} disabled={createContract.isPending || !contractData.name}>
                   <Send className="h-4 w-4 mr-2" />Submit for Review
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => createContractMutation.mutate("draft")} disabled={createContractMutation.isPending || !contractData.name}>
+                <Button variant="outline" className="w-full" onClick={() => handleCreate("draft")} disabled={createContract.isPending || !contractData.name}>
                   <Save className="h-4 w-4 mr-2" />Save as Draft
                 </Button>
               </div>

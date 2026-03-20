@@ -1,41 +1,26 @@
-import { Package, Truck, BarChart3, DollarSign, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { 
+  Package, 
+  Truck, 
+  BarChart3, 
+  DollarSign, 
+  AlertCircle, 
+  CheckCircle2, 
+  Clock 
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
-import { Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { Badge } from "@/ui/shadcn/badge";
-
-// Simplified types to avoid deep type instantiation errors
-interface SimpleInventoryItem {
-  id: string;
-  quantity_on_hand: number;
-  reorder_level: number | null;
-  products: { unit_price: number } | null;
-}
-
-interface SimpleProductionOrder {
-  id: string;
-  status: string;
-}
-
-interface SimplePurchaseOrder {
-  id: string;
-  status: string;
-  total_amount: number | null;
-  order_number?: string;
-  po_number?: string;
-  accounts: { name: string } | null;
-}
-
-interface SimpleFinancialRecord {
-  id: string;
-  transaction_type: string;
-  amount: number;
-}
+import { 
+  useInventoryItems,
+  usePurchaseOrders,
+  useProductionOrders,
+  useFinancialRecords,
+} from "@/modules/erp/hooks/useERP";
+import type { PurchaseOrder } from "@/core/types/erp";
+import { PURCHASE_ORDER_STATUS_COLORS } from "@/core/types/erp";
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -46,94 +31,62 @@ const COLORS = [
   "hsl(var(--destructive))",
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending: "bg-warning/15 text-warning",
-  planned: "bg-info/15 text-info",
-  in_progress: "bg-info/15 text-info",
-  ordered: "bg-primary/15 text-primary",
-  completed: "bg-success/15 text-success",
-  received: "bg-success/15 text-success",
-  cancelled: "bg-destructive/15 text-destructive",
-};
-
 export default function ERPDashboard() {
-  const { user } = useAuth();
-  const { data: stats } = useQuery({
-    queryKey: ["erp-stats", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      // 1. Fetch Inventory with Product details - UPDATED: Filter by user
-      const { data: inventoryData } = await supabase
-        .from("inventory_items")
-        .select(`*, products(unit_price)`)
-        .eq("created_by", user.id);
+  const { tenantSlug } = useParams();
+  
+  // Scoped hook calls
+  const inventoryQuery = useInventoryItems();
+  const procurementQuery = usePurchaseOrders();
+  const productionQuery = useProductionOrders();
+  const financeQuery = useFinancialRecords();
 
-      // 2. Fetch Purchase Orders with Vendor names - UPDATED: Filter by user
-      const { data: purchaseOrdersData } = await supabase
-        .from("purchase_orders")
-        .select(`*, accounts(name)`)
-        .eq("created_by", user.id)
-        .order('created_at', { ascending: false });
+  const isLoading = 
+    inventoryQuery.isLoading || 
+    procurementQuery.isLoading || 
+    productionQuery.isLoading || 
+    financeQuery.isLoading;
 
-      // 3. Fetch Production Orders - UPDATED: Filter by user
-      const { data: productionOrdersData } = await supabase
-        .from("production_orders")
-        .select("*")
-        .eq("created_by", user.id);
+  // --- Calculations ---
+  const inventory = inventoryQuery.data || [];
+  const production = productionQuery.data || [];
+  const procurement = procurementQuery.data || [];
+  const finance = financeQuery.data || [];
 
-      // 4. Fetch Financial Records - UPDATED: Filter by user
-      const { data: financialRecordsData } = await supabase
-        .from("financial_records")
-        .select("*")
-        .eq("created_by", user.id);
+  const totalInventory = inventory.length;
+  // Use 'status' directly from the mapped InventoryItem
+  const lowStockItems = inventory.filter(item => item.status === "low_stock" || item.status === "out_of_stock").length;
+  
+  const inventoryValue = inventory.reduce((sum, item) => {
+    return sum + ((item.unit_cost || 0) * (item.quantity_on_hand || 0));
+  }, 0);
 
-      // Type Casting
-      const inventory = (inventoryData || []) as SimpleInventoryItem[];
-      const production = (productionOrdersData || []) as SimpleProductionOrder[];
-      const procurement = (purchaseOrdersData || []) as SimplePurchaseOrder[];
-      const finance = (financialRecordsData || []) as SimpleFinancialRecord[];
+  const totalRevenue = finance
+    .filter(r => r.type === "income")
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-      // --- Calculations ---
-      const totalInventory = inventory.length;
-      // Using 'quantity_on_hand' vs 'reorder_level'
-      const lowStockItems = inventory.filter(item => item.quantity_on_hand <= (item.reorder_level || 0)).length;
-      
-      const inventoryValue = inventory.reduce((sum, item) => {
-        const price = item.products?.unit_price || 0;
-        return sum + (price * item.quantity_on_hand);
-      }, 0);
+  const totalProcurementValue = procurement
+    .filter(po => po.status === "approved" || po.status === "pending")
+    .reduce((sum, po) => sum + Number(po.total || 0), 0);
 
-      const totalRevenue = finance
-        .filter(r => r.transaction_type === "income")
-        .reduce((sum, r) => sum + Number(r.amount), 0);
+  const productionByStatus = {
+    planned: production.filter(po => po.status === "planned").length,
+    in_progress: production.filter(po => po.status === "in_progress").length,
+    completed: production.filter(po => po.status === "completed").length,
+    cancelled: production.filter(po => po.status === "cancelled").length,
+  };
 
-      const totalProcurementValue = procurement
-        .filter(po => po.status === "ordered" || po.status === "pending")
-        .reduce((sum, po) => sum + Number(po.total_amount || 0), 0);
-
-      const productionByStatus = {
-        planned: production.filter(po => po.status === "planned").length,
-        in_progress: production.filter(po => po.status === "in_progress").length,
-        completed: production.filter(po => po.status === "completed").length,
-        cancelled: production.filter(po => po.status === "cancelled").length,
-      };
-
-      return {
-        totalInventory,
-        lowStockItems,
-        inventoryValue,
-        totalProcurementValue,
-        totalProduction: production.length,
-        completedProduction: productionByStatus.completed,
-        pendingProduction: productionByStatus.planned + productionByStatus.in_progress,
-        totalRevenue,
-        productionByStatus,
-        recentOrders: procurement.slice(0, 5),
-      };
-    },
-  });
+  const dashboardStats = {
+    totalInventory,
+    lowStockItems,
+    inventoryValue,
+    totalProcurementValue,
+    totalProduction: production.length,
+    completedProduction: productionByStatus.completed,
+    pendingProduction: productionByStatus.planned + productionByStatus.in_progress,
+    totalRevenue,
+    productionByStatus,
+    recentOrders: procurement.slice(0, 5),
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", { 
@@ -144,12 +97,18 @@ export default function ERPDashboard() {
     }).format(value);
   };
 
-  const productionStatusData = stats?.productionByStatus
-    ? Object.entries(stats.productionByStatus).map(([status, count]) => ({
-        name: status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1),
-        value: count,
-      }))
-    : [];
+  const productionStatusData = Object.entries(productionByStatus).map(([status, count]) => ({
+    name: status.replace(/_/g, " ").charAt(0).toUpperCase() + status.replace(/_/g, " ").slice(1),
+    value: count,
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -163,30 +122,29 @@ export default function ERPDashboard() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/dashboard/erp/inventory">Manage Inventory</Link>
+              <Link to={`/${tenantSlug}/app/erp/inventory`}>Manage Inventory</Link>
             </Button>
             
-            {/* FIX 1: Point to main page, not /new (since we use a Sheet now) */}
             <Button size="sm" asChild>
-              <Link to="/dashboard/erp/procurement">View Purchase Orders</Link>
+              <Link to={`/${tenantSlug}/app/erp/procurement`}>View Purchase Orders</Link>
             </Button>
           </div>
         </div>
 
         {/* Top Row Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Inventory Items" value={stats?.totalInventory || 0} icon={Package} />
-          <StatsCard title="Inventory Value" value={formatCurrency(stats?.inventoryValue || 0)} icon={BarChart3} />
-          <StatsCard title="Low Stock Alert" value={stats?.lowStockItems || 0} icon={AlertCircle} />
-          <StatsCard title="Total Income" value={formatCurrency(stats?.totalRevenue || 0)} icon={DollarSign} />
+          <StatsCard title="Inventory Items" value={dashboardStats.totalInventory} icon={Package} />
+          <StatsCard title="Inventory Value" value={formatCurrency(dashboardStats.inventoryValue)} icon={BarChart3} />
+          <StatsCard title="Low Stock Alert" value={dashboardStats.lowStockItems} icon={AlertCircle} />
+          <StatsCard title="Total Income" value={formatCurrency(dashboardStats.totalRevenue)} icon={DollarSign} />
         </div>
 
         {/* Secondary Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Production Orders" value={stats?.totalProduction || 0} icon={BarChart3} />
-          <StatsCard title="Completed" value={stats?.completedProduction || 0} icon={CheckCircle2} />
-          <StatsCard title="Active/Planned" value={stats?.pendingProduction || 0} icon={Clock} />
-          <StatsCard title="Procurement Pipeline" value={formatCurrency(stats?.totalProcurementValue || 0)} icon={Truck} />
+          <StatsCard title="Production Orders" value={dashboardStats.totalProduction} icon={BarChart3} />
+          <StatsCard title="Completed" value={dashboardStats.completedProduction} icon={CheckCircle2} />
+          <StatsCard title="Active/Planned" value={dashboardStats.pendingProduction} icon={Clock} />
+          <StatsCard title="Procurement Pipeline" value={formatCurrency(dashboardStats.totalProcurementValue)} icon={Truck} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -205,7 +163,6 @@ export default function ERPDashboard() {
                       outerRadius={100} 
                       paddingAngle={2} 
                       dataKey="value" 
-                      // Simple label to avoid overlap issues
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {productionStatusData.map((_, index) => (
@@ -224,20 +181,17 @@ export default function ERPDashboard() {
             <CardHeader><CardTitle>Recent Purchase Orders</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {stats?.recentOrders?.length ? (
-                  stats.recentOrders.map((order: SimplePurchaseOrder) => (
+                {dashboardStats.recentOrders.length ? (
+                  dashboardStats.recentOrders.map((order: PurchaseOrder) => (
                     <div key={order.id} className="flex items-center justify-between p-3 rounded-lg border">
                       <div>
-                        <p className="font-medium">{order.accounts?.name || "Unknown Vendor"}</p>
-                        
-                        {/* FIX 2: Handle both potential column names */}
+                        <p className="font-medium">{order.supplier?.name || "Unknown Vendor"}</p>
                         <p className="text-xs text-muted-foreground">
-                            {order.order_number || order.po_number || "No ID"}
+                            {order.po_number || "No ID"}
                         </p>
-                        
-                        <p className="text-sm font-semibold">{formatCurrency(order.total_amount || 0)}</p>
+                        <p className="text-sm font-semibold">{formatCurrency(order.total || 0)}</p>
                       </div>
-                      <Badge className={STATUS_COLORS[order.status] || "bg-secondary text-secondary-foreground"}>
+                      <Badge className={(order.status && PURCHASE_ORDER_STATUS_COLORS[order.status]) || "bg-secondary text-secondary-foreground"}>
                         {order.status}
                       </Badge>
                     </div>

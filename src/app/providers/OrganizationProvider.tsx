@@ -13,6 +13,7 @@ import {
   type OrganizationMembership,
   type OrganizationSubscription,
 } from "@/core/types/organization";
+import { pickMembership } from "@/core/auth/membership";
 
 function mapOrganization(row: Record<string, unknown>): Organization {
   return {
@@ -67,6 +68,7 @@ function mapMembership(row: Record<string, unknown>): OrganizationMembership {
     department: row.department ? String(row.department) : null,
     account_state: String(row.account_state ?? "active"),
     is_active: Boolean(row.is_active),
+    created_at: row.created_at ? String(row.created_at) : null,
     organization: relatedOrg ? mapOrganization(relatedOrg) : null,
   };
 }
@@ -123,7 +125,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
         const membershipsResult = await unsafeSupabase
           .from("organization_memberships")
-          .select("id, organization_id, user_id, email, role, department, account_state, is_active, organization:organizations(*)")
+          .select("id, organization_id, user_id, email, role, department, account_state, is_active, created_at, organization:organizations(*)")
           .eq("user_id", userId)
           .eq("is_active", true);
 
@@ -145,14 +147,21 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const primary = rows[0]?.organization;
+        const preferredOrgId = localStorage.getItem("preferred_organization_id");
+        let primaryMembership = rows.find(m => m.organization_id === preferredOrgId) as OrganizationMembership | undefined;
+        
+        if (!primaryMembership) {
+          primaryMembership = pickMembership(rows);
+        }
+
+        const primary = primaryMembership?.organization;
         if (!primary) {
           setOrganization(null);
           setSubscription(null);
           return;
         }
 
-        setOrganization(primary);
+        setOrganization(primary as Organization);
         setSubscription(await fetchSubscriptionByOrganization(primary.id));
       } catch {
         if (currentFetch !== fetchCount.current) return;
@@ -191,6 +200,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       }
 
       setOrganization(membership.organization);
+      localStorage.setItem("preferred_organization_id", organizationId);
       setSubscription(await fetchSubscriptionByOrganization(organizationId));
     },
     [fetchSubscriptionByOrganization, memberships],
@@ -234,10 +244,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   );
 
   const enabledModules: ModuleType[] = useMemo(() => {
-    if (!subscription) {
-      return [];
-    }
-
+    if (!subscription) return [];
     return [
       ...(subscription.module_crm ? (["crm"] as const) : []),
       ...(subscription.module_clm ? (["clm"] as const) : []),
@@ -253,6 +260,16 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     await fetchOrganizationData(user.id);
   }, [fetchOrganizationData, user?.id]);
 
+  const updateOrganization = useCallback(async (updates: Partial<Organization>) => {
+    if (!organization?.id) return;
+    const { error } = await unsafeSupabase
+      .from("organizations")
+      .update(updates)
+      .eq("id", organization.id);
+    if (error) throw error;
+    await refreshOrganization();
+  }, [organization?.id, refreshOrganization, unsafeSupabase]);
+
   const value: OrganizationContextType = {
     organization,
     organizationLoading,
@@ -264,6 +281,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     switchOrganization,
     switchOrganizationBySlug,
     refreshOrganization,
+    updateOrganization,
   };
 
   return <OrganizationContext.Provider value={value}>{children}</OrganizationContext.Provider>;

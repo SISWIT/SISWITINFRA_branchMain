@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/ui/shadcn/tooltip";
 import { Toaster } from "@/ui/feedback/toaster";
 import { Toaster as Sonner } from "@/ui/feedback/sonner";
@@ -33,11 +33,7 @@ import {
 } from "@/core/utils/routes";
 import { isPlatformRole, isTenantUserRole } from "@/core/types/roles";
 
-const queryClient = new QueryClient(); // W-05: shared instance for app-wide query cache
-
-export function clearAllCaches() {
-  queryClient.clear();
-}
+import { queryClient } from "@/core/utils/cache";
 
 const Auth = lazy(() => import("../workspaces/auth/pages/Auth"));
 const SignUp = lazy(() => import("../workspaces/auth/pages/SignUp"));
@@ -95,7 +91,11 @@ const PendingSignaturesPage = lazy(() => import("../modules/documents/pages/Pend
 const DocumentESignPage = lazy(() => import("../modules/documents/pages/DocumentESignPage"));
 
 const CLMDashboard = lazy(() => import("../modules/clm/pages/CLMDashboard"));
-const ContractsPage = lazy(() => import("../modules/clm/pages/ContractsPage"));
+const ContractsListPage = lazy(() => import("../modules/clm/pages/ContractsListPage"));
+const ContractBuilderPage = lazy(() => import("../modules/clm/pages/ContractBuilderPage"));
+const ContractDetailPage = lazy(() => import("../modules/clm/pages/ContractDetailPage"));
+const ContractScanPage = lazy(() => import("../modules/clm/pages/ContractScanPage"));
+const ESignaturePage = lazy(() => import("../modules/clm/pages/ESignaturePage"));
 const TemplatesPage = lazy(() => import("../modules/clm/pages/TemplatesPage"));
 
 const CRMLayout = lazy(() => import("../modules/crm/pages/CRMLayout"));
@@ -207,14 +207,6 @@ function AppRoutes() {
         <Route path="/auth/verify-success" element={<VerifySuccess />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route
-          path="/auth/pending-approval"
-          element={
-            <PendingApprovalRoute>
-              <PendingApproval />
-            </PendingApprovalRoute>
-          }
-        />
-        <Route
           path="/pending-approval"
           element={
             <PendingApprovalRoute>
@@ -319,8 +311,13 @@ function AppRoutes() {
           <Route path="cpq/quotes/:id/edit" element={<QuoteBuilderPage />} />
 
           <Route path="clm" element={<CLMDashboard />} />
-          <Route path="clm/contracts" element={<ContractsPage />} />
+          <Route path="clm/contracts" element={<ContractsListPage />} />
+          <Route path="clm/contracts/new" element={<ContractBuilderPage />} />
+          <Route path="clm/contracts/:id" element={<ContractDetailPage />} />
+          <Route path="clm/contracts/:id/edit" element={<ContractBuilderPage />} />
           <Route path="clm/templates" element={<TemplatesPage />} />
+          <Route path="clm/scan" element={<ContractScanPage />} />
+          <Route path="clm/esign/:id" element={<ESignaturePage />} />
 
           <Route path="crm" element={<CRMLayout />} />
           <Route path="crm/leads" element={<LeadsPage />} />

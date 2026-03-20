@@ -35,6 +35,8 @@ export interface Contract {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  accounts?: { name: string } | null;
+  contacts?: { first_name: string | null; last_name: string | null } | null;
 }
 
 export interface ESignature {
@@ -82,3 +84,17 @@ export const ESIGNATURE_STATUS_COLORS: Record<ESignatureStatus, string> = {
   rejected: 'bg-destructive/15 text-destructive',
   expired: 'bg-secondary text-secondary-foreground',
 };
+
+export interface CLMDashboardStats {
+  totalContracts: number;
+  totalTemplates: number;
+  draftContracts: number;
+  pendingContracts: number;
+  signedContracts: number;
+  expiredContracts: number;
+  totalValue: number;
+  signRate: string;
+  contractsByStatus: Record<string, number>;
+  recentContracts: Contract[];
+}
+

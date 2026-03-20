@@ -5,14 +5,12 @@ import { Card, CardContent } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Badge } from "@/ui/shadcn/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
-import { Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
+import { useContracts, useUpdateContract, useDeleteContract } from "@/modules/clm/hooks/useCLM";
+import type { Contract } from "@/core/types/clm";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -26,56 +24,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: Lucide
 };
 
 export default function ContractsListPage() {
+  const { tenantSlug } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
-  const { data: contracts, isLoading } = useQuery({
-    queryKey: ["contracts-list", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("contracts")
-        .select("*, accounts(name), contacts(first_name, last_name), quotes(quote_number)")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: contracts = [], isLoading } = useContracts();
+  const updateContract = useUpdateContract();
+  const deleteContract = useDeleteContract();
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const updates: { status: string; signed_date?: string } = { status };
-      if (status === "signed") {
-        updates.signed_date = new Date().toISOString();
-      }
-      const { error } = await supabase.from("contracts").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts-list"] });
-      toast.success("Contract status updated");
-    },
-    onError: (error) => toast.error("Failed to update: " + error.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contracts").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts-list"] });
-      toast.success("Contract deleted");
-    },
-    onError: (error) => toast.error("Failed to delete: " + error.message),
-  });
-
-  const filteredContracts = contracts?.filter((contract) => {
+  const filteredContracts = contracts.filter((contract: Contract) => {
     const matchesSearch =
       contract.contract_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contract.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,10 +55,10 @@ export default function ContractsListPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link to="/dashboard/clm/scan"><Upload className="h-4 w-4 mr-2" />Scan Contract</Link>
+            <Link to={`/${tenantSlug}/app/clm/scan`}><Upload className="h-4 w-4 mr-2" />Scan Contract</Link>
           </Button>
           <Button asChild>
-            <Link to="/dashboard/clm/contracts/new"><Plus className="h-4 w-4 mr-2" />Create Contract</Link>
+            <Link to={`/${tenantSlug}/app/clm/contracts/new`}><Plus className="h-4 w-4 mr-2" />Create Contract</Link>
           </Button>
         </div>
       </div>
@@ -159,7 +117,7 @@ export default function ContractsListPage() {
                   const statusConfig = STATUS_CONFIG[contract.status || "draft"] || STATUS_CONFIG.draft;
                   const StatusIcon = statusConfig.icon;
                   return (
-                    <TableRow key={contract.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
+                    <TableRow key={contract.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}`)}>
                       <TableCell className="font-medium">{contract.contract_number || "—"}</TableCell>
                       <TableCell>{contract.name}</TableCell>
                       <TableCell>{contract.accounts?.name || "—"}</TableCell>
@@ -178,28 +136,28 @@ export default function ContractsListPage() {
                             <Button variant="ghost" size="sm">Actions</Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}`)}>
+                            <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}`)}>
                               <Eye className="h-4 w-4 mr-2" />View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/edit`)}>
+                            <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}/edit`)}>
                               <Edit className="h-4 w-4 mr-2" />Edit
                             </DropdownMenuItem>
                             {contract.status === "approved" && (
-                              <DropdownMenuItem onClick={() => navigate(`/dashboard/clm/contracts/${contract.id}/sign`)}>
+                              <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}/sign`)}>
                                 <PenTool className="h-4 w-4 mr-2" />Send for Signature
                               </DropdownMenuItem>
                             )}
                             {contract.status === "draft" && (
-                              <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "pending_review" })}>
+                              <DropdownMenuItem onClick={() => updateContract.mutate({ id: contract.id, status: "pending_review" })}>
                                 <Send className="h-4 w-4 mr-2" />Submit for Review
                               </DropdownMenuItem>
                             )}
                             {contract.status === "pending_review" && (
-                              <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: contract.id, status: "approved" })}>
+                              <DropdownMenuItem onClick={() => updateContract.mutate({ id: contract.id, status: "approved" })}>
                                 <CheckCircle className="h-4 w-4 mr-2" />Approve
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(contract.id)}>
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteContract.mutate(contract.id)}>
                               <Trash2 className="h-4 w-4 mr-2" />Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>

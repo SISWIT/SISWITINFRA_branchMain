@@ -32,7 +32,7 @@ interface CustomerQuote {
 }
 
 export default function CustomerQuotesPage() {
-  const { organizationId, organizationLoading, portalEmail, isReady } = usePortalScope();
+  const { organizationId, organizationLoading, portalEmail, contactId, accountId, isReady } = usePortalScope();
   const [searchQuery, setSearchQuery] = useState("");
   const [quotes, setQuotes] = useState<CustomerQuote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,15 +47,24 @@ export default function CustomerQuotesPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("quotes")
         .select("*, accounts:accounts(name)")
-        .eq("organization_id", organizationId)
-        .eq("customer_email", portalEmail)
-        .order("created_at", { ascending: false });
+        .eq("organization_id", organizationId);
+        
+      if (contactId) {
+        query = query.eq("contact_id", contactId);
+      } else if (accountId) {
+        query = query.eq("account_id", accountId);
+      } else {
+        // Force empty result if no ID scope is available
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (!error && data) {
-        setQuotes(data as any);
+        setQuotes(data as unknown as CustomerQuote[]);
       }
       setIsLoading(false);
     };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Upload, FileText, AlertTriangle, CheckCircle, Clock, ArrowLeft, Sparkles, Shield, Calendar, DollarSign, Users, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
@@ -19,6 +19,7 @@ interface ScanResult {
 }
 
 export default function ContractScanPage() {
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
@@ -266,7 +267,7 @@ export default function ContractScanPage() {
                     <p className="text-sm text-muted-foreground">Ready to proceed with this contract?</p>
                     <div className="flex gap-2">
                       <Button variant="outline">Download Report</Button>
-                      <Button onClick={() => navigate("/dashboard/clm/contracts/new")}>Create Contract</Button>
+                      <Button onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/new`)}>Create Contract</Button>
                     </div>
                   </div>
                 </CardContent>

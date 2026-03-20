@@ -36,7 +36,15 @@ import {
   TableHeader,
   TableRow,
 } from "../../../ui/shadcn/table";
-import { useOrganizationDashboard } from "../hooks/useOrganizationDashboard";
+import { 
+  useOrganizationDashboard,
+  type DashboardChartItem,
+  type DashboardLead,
+  type DashboardContract,
+  type DashboardOpportunity,
+  type DashboardActivity,
+  type DashboardAuditLog
+} from "../hooks/useOrganizationDashboard";
 
 interface KPIItem {
   label: string;
@@ -83,7 +91,7 @@ export default function OrganizationAdminDashboard() {
     const sevenDaysAgo = subDays(new Date(), 7);
 
     // Count Leads
-    dashboardData.charts.leads?.forEach((lead: any) => {
+    dashboardData.charts.leads?.forEach((lead: DashboardChartItem) => {
       if (!lead.created_at) return;
       const d = new Date(lead.created_at);
       if (isAfter(d, sevenDaysAgo)) {
@@ -94,7 +102,7 @@ export default function OrganizationAdminDashboard() {
     });
 
     // Count Contracts
-    dashboardData.charts.contracts?.forEach((contract: any) => {
+    dashboardData.charts.contracts?.forEach((contract: DashboardChartItem) => {
       if (!contract.created_at) return;
       const d = new Date(contract.created_at);
       if (isAfter(d, sevenDaysAgo)) {
@@ -112,7 +120,7 @@ export default function OrganizationAdminDashboard() {
     const statuses: Record<string, number> = {};
     if (!dashboardData?.charts) return [{ name: "No Leads", value: 1, color: "hsl(var(--muted))" }];
 
-    dashboardData.charts.leads?.forEach((lead: any) => {
+    dashboardData.charts.leads?.forEach((lead: DashboardChartItem) => {
       const st = lead.status || "New";
       statuses[st] = (statuses[st] || 0) + 1;
     });
@@ -353,10 +361,10 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {lists.opportunities.length > 0 ? lists.opportunities.map((opp: any) => (
+            {lists.opportunities.length > 0 ? lists.opportunities.map((opp: DashboardOpportunity) => (
               <article key={opp.id} className="rounded-xl border border-border/70 bg-background/80 p-3">
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold leading-tight truncate" title={opp.name}>{opp.name}</h3>
+                  <h3 className="text-base font-semibold leading-tight truncate" title={opp.name ?? undefined}>{opp.name}</h3>
                   <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg shrink-0">
                     <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                   </Button>
@@ -383,11 +391,11 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {lists.contracts.length > 0 ? lists.contracts.map((contract: any) => (
+            {lists.contracts.length > 0 ? lists.contracts.map((contract: DashboardContract) => (
               <article key={contract.id} className="space-y-2.5 rounded-xl border border-border/70 bg-background/70 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate" title={contract.name}>{contract.name}</p>
+                    <p className="text-sm font-medium truncate" title={contract.name ?? undefined}>{contract.name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{contract.status}</p>
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
@@ -413,7 +421,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            {lists.activities.length > 0 ? lists.activities.map((activity: any, index: number) => {
+            {lists.activities.length > 0 ? lists.activities.map((activity: DashboardActivity, index: number) => {
               const dateStr = activity.start_time ? format(new Date(activity.start_time), "h:mm a") : "Time TBD";
               // Rotate through tones
               const tones = ["bg-chart-2/20", "bg-primary/15", "bg-chart-3/20", "bg-chart-4/20"];
@@ -423,7 +431,7 @@ export default function OrganizationAdminDashboard() {
                 <article key={activity.id} className="grid grid-cols-[56px_1fr] items-start gap-2.5">
                   <p className="pt-1 text-xs text-muted-foreground">{dateStr}</p>
                   <div className={cn("rounded-xl border border-border/50 px-3 py-2.5 text-foreground", tone)}>
-                    <p className="text-sm font-semibold leading-snug line-clamp-2" title={activity.subject}>{activity.subject}</p>
+                    <p className="text-sm font-semibold leading-snug line-clamp-2" title={activity.subject ?? undefined}>{activity.subject}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground capitalize">{activity.type}</p>
                   </div>
                 </article>
@@ -464,18 +472,18 @@ export default function OrganizationAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lists.leads.map((lead: any) => (
+                  {lists.leads.map((lead: DashboardLead) => (
                     <TableRow key={lead.id}>
                       <TableCell>
                         <div className="max-w-[150px] truncate">
-                          <p className="font-medium truncate" title={`${lead.first_name || ""} ${lead.last_name || ""}`.trim()}>
+                          <p className="font-medium truncate" title={lead.first_name || lead.last_name ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : undefined}>
                             {lead.first_name || lead.last_name ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : "Unnamed Lead"}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate" title={lead.email || ""}>{lead.email || "No email"}</p>
+                          <p className="text-xs text-muted-foreground truncate" title={lead.email ?? undefined}>{lead.email || "No email"}</p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="truncate max-w-[120px] inline-block" title={lead.company || ""}>{lead.company || "-"}</span>
+                        <span className="truncate max-w-[120px] inline-block" title={lead.company ?? undefined}>{lead.company || "-"}</span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {lead.created_at ? format(new Date(lead.created_at), "MMM dd, yyyy") : "-"}
@@ -501,7 +509,7 @@ export default function OrganizationAdminDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 overflow-y-auto">
-            {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: any) => (
+            {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: DashboardAuditLog) => (
               <article key={log.id} className="rounded-xl border border-border/70 bg-background/75 p-3">
                 <p className="text-sm leading-relaxed">
                   <span className="font-medium">{log.user_id ? "A user" : "System"}</span> {log.action} <span className="font-medium">{log.entity_type}</span>

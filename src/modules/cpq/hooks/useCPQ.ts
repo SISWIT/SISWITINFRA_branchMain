@@ -250,7 +250,7 @@ export function useQuotes() {
           .from("quotes")
           .select("*, accounts(id, name), contacts(id, first_name, last_name, email, phone), opportunities(id, name)"),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -278,7 +278,7 @@ export function useQuote(id: string) {
           .select("*, accounts(id, name, billing_address, billing_city, billing_state, billing_zip, billing_country), contacts(id, first_name, last_name, email, phone), opportunities(id, name)")
           .eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       );
 
       const { data, error } = await scopedQuery.single();
@@ -388,7 +388,7 @@ export function useUpdateQuote() {
         const { data: currentQuote } = await applyModuleReadScope(
           supabase.from("quotes").select("status").eq("id", id),
           scope,
-          { ownerColumns: ["owner_id"], hasSoftDelete: false },
+          { ownerColumns: ["owner_id"], hasSoftDelete: true },
         ).single();
 
         if (currentQuote) {
@@ -463,7 +463,7 @@ export function useDeleteQuote() {
       const quoteAccessResult = await applyModuleReadScope(
         supabase.from("quotes").select("id").eq("id", id),
         scope,
-        { ownerColumns: ["owner_id"], hasSoftDelete: false },
+        { ownerColumns: ["owner_id"], hasSoftDelete: true },
       ).maybeSingle();
       if (quoteAccessResult.error || !quoteAccessResult.data) {
         throw new Error("Quote not found or not accessible");

@@ -1,14 +1,12 @@
 import { FileText, FileCheck, FileClock, FileX, PenTool, TrendingUp, Clock, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { format } from "date-fns";
 import { Badge } from "@/ui/shadcn/badge";
+import { useCLMDashboardStats } from "@/modules/clm/hooks/useCLM";
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -30,47 +28,9 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-secondary text-secondary-foreground",
 };
 
-interface RecentContract {
-  id: string;
-  name: string;
-  contract_number: string | null;
-  status: string | null;
-  created_at: string | null;
-  value: number | null;
-}
-
 export default function CLMDashboard() {
-  const { user } = useAuth();
-  const { data: stats } = useQuery({
-    queryKey: ["clm-stats", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const [contractsRes, templatesRes] = await Promise.all([
-        supabase.from("contracts").select("*").or(`owner_id.eq.${user.id},created_by.eq.${user.id}`),
-        supabase.from("contract_templates").select("*", { count: "exact" }).or(`created_by.eq.${user.id},is_public.eq.true`),
-      ]);
-
-      const contracts = (contractsRes.data ?? []) as RecentContract[];
-      const totalTemplates = templatesRes.count || 0;
-      const totalContracts = contracts.length;
-      const draftContracts = contracts.filter((c) => c.status === "draft").length;
-      const pendingContracts = contracts.filter((c) => c.status === "pending_review" || c.status === "pending_approval" || c.status === "sent").length;
-      const signedContracts = contracts.filter((c) => c.status === "signed").length;
-      const expiredContracts = contracts.filter((c) => c.status === "expired").length;
-      const totalValue = contracts.reduce((sum, c) => sum + (c.value || 0), 0);
-      const signRate = totalContracts > 0 ? ((signedContracts / totalContracts) * 100).toFixed(1) : "0";
-
-      const contractsByStatus = {
-        draft: draftContracts,
-        pending: pendingContracts,
-        signed: signedContracts,
-        expired: expiredContracts,
-      };
-
-      return { totalTemplates, totalContracts, draftContracts, pendingContracts, signedContracts, expiredContracts, totalValue, signRate, contractsByStatus, recentContracts: contracts.slice(0, 5) };
-    },
-  });
+  const { tenantSlug } = useParams();
+  const { data: stats } = useCLMDashboardStats();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -78,7 +38,7 @@ export default function CLMDashboard() {
 
   const statusData = stats?.contractsByStatus
     ? Object.entries(stats.contractsByStatus).map(([status, count]) => ({
-      name: status.charAt(0).toUpperCase() + status.slice(1),
+      name: status.charAt(0).toUpperCase() + status.slice(1).replace("_", " "),
       value: count,
     }))
     : [];
@@ -105,8 +65,8 @@ export default function CLMDashboard() {
             className="w-full sm:w-auto"
             asChild
           >
-            <Link to="/dashboard/clm/templates">
-              Manage Products
+            <Link to={`/${tenantSlug}/app/clm/templates`}>
+              Manage Templates
             </Link>
           </Button>
 
@@ -115,8 +75,8 @@ export default function CLMDashboard() {
             className="w-full sm:w-auto"
             asChild
           >
-            <Link to="/dashboard/clm/contracts/new">
-              Create Quote
+            <Link to={`/${tenantSlug}/app/clm/contracts/new`}>
+              Create Contract
             </Link>
           </Button>
         </div>
@@ -125,17 +85,31 @@ export default function CLMDashboard() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Total Contracts" value={stats?.totalContracts || 0} icon={FileText} />
-        <StatsCard title="Contract Templates" value={stats?.totalTemplates || 0} icon={FileCheck} />
-        <StatsCard title="Contract Value" value={formatCurrency(stats?.totalValue || 0)} icon={TrendingUp} />
+        <Link to={`/${tenantSlug}/app/clm/contracts`}>
+          <StatsCard title="Total Contracts" value={stats?.totalContracts || 0} icon={FileText} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/clm/templates`}>
+          <StatsCard title="Templates" value={stats?.totalTemplates || 0} icon={FileCheck} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/clm/contracts`}>
+          <StatsCard title="Contract Value" value={formatCurrency(stats?.totalValue || 0)} icon={TrendingUp} />
+        </Link>
         <StatsCard title="Sign Rate" value={`${stats?.signRate || 0}%`} icon={PenTool} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Draft Contracts" value={stats?.draftContracts || 0} icon={Clock} />
-        <StatsCard title="Pending Signature" value={stats?.pendingContracts || 0} icon={FileClock} />
-        <StatsCard title="Signed Contracts" value={stats?.signedContracts || 0} icon={CheckCircle2} />
-        <StatsCard title="Expired Contracts" value={stats?.expiredContracts || 0} icon={FileX} />
+        <Link to={`/${tenantSlug}/app/clm/contracts?status=draft`}>
+          <StatsCard title="Draft Contracts" value={stats?.draftContracts || 0} icon={Clock} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/clm/contracts?status=pending`}>
+          <StatsCard title="Pending Review" value={stats?.pendingContracts || 0} icon={FileClock} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/clm/contracts?status=signed`}>
+          <StatsCard title="Signed Contracts" value={stats?.signedContracts || 0} icon={CheckCircle2} />
+        </Link>
+        <Link to={`/${tenantSlug}/app/clm/contracts?status=expired`}>
+          <StatsCard title="Expired Contracts" value={stats?.expiredContracts || 0} icon={FileX} />
+        </Link>
       </div>
 
       {/* Charts */}
@@ -215,27 +189,27 @@ export default function CLMDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-                <Link to="/dashboard/clm/contracts/new">
+                <Link to={`/${tenantSlug}/app/clm/contracts/new`}>
                   <FileText className="h-6 w-6" />
                   <span>New Contract</span>
                 </Link>
               </Button>
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-                <Link to="/dashboard/clm/templates">
+                <Link to={`/${tenantSlug}/app/clm/templates`}>
                   <FileCheck className="h-6 w-6" />
                   <span>Templates</span>
                 </Link>
               </Button>
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-                <Link to="/dashboard/clm/contracts">
+                <Link to={`/${tenantSlug}/app/clm/contracts`}>
                   <FileClock className="h-6 w-6" />
                   <span>All Contracts</span>
                 </Link>
               </Button>
               <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-                <Link to="/dashboard/clm/pending">
+                <Link to={`/${tenantSlug}/app/clm/scan`}>
                   <PenTool className="h-6 w-6" />
-                  <span>Pending Signatures</span>
+                  <span>Scan Contract</span>
                 </Link>
               </Button>
             </div>

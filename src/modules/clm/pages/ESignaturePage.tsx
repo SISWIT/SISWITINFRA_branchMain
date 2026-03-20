@@ -22,7 +22,7 @@ interface Signer {
 
 export default function ESignaturePage() {
   const navigate = useNavigate();
-  useParams();
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
 
   const [signers, setSigners] = useState<Signer[]>([
     { id: "1", name: "", email: "", role: "signer", order: 1, status: "pending" },
@@ -66,7 +66,7 @@ export default function ESignaturePage() {
 
     // Simulate sending
     toast.success(`Signature request sent to ${validSigners.length} signer(s)`);
-    navigate("/dashboard/clm/contracts");
+    navigate(`/${tenantSlug}/app/clm/contracts`);
   };
 
   // Audit trail - will be fetched from database in production

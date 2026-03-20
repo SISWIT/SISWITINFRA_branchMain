@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/ui/feedback/use-toast";
+import { supabase } from "@/core/api/client";
 import contactSupport from "@/assets/contact-support.png";
 
 const contactInfo = [
@@ -55,24 +56,44 @@ const Contact = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const { error } = await (supabase
+        .from("contact_inquiries" as any)
+        .insert([{
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          interest: formData.interest,
+          message: formData.message,
+        }]) as any);
 
-    toast({
-      title: "Message sent!",
-      description: "We'll get back to you within 24 hours.",
-    });
+      if (error) throw error;
 
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      company: "",
-      phone: "",
-      message: "",
-      interest: "demo",
-    });
-    setIsSubmitting(false);
+      toast({
+        title: "Message sent!",
+        description: "We'll get back to you within 24 hours.",
+      });
+
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        company: "",
+        phone: "",
+        message: "",
+        interest: "demo",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: "Failed to send message: " + err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (

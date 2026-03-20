@@ -128,7 +128,7 @@ const PortalDashboard = () => {
   const { user } = useAuth();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { organizationId, organizationLoading, portalEmail, userId, isReady } = usePortalScope();
+  const { organizationId, organizationLoading, portalEmail, contactId, accountId, userId, isReady } = usePortalScope();
 
   const [dataLoading, setDataLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ quotes: 0, contracts: 0, documents: 0, pendingSignatures: 0 });
@@ -151,29 +151,31 @@ const PortalDashboard = () => {
           return;
         }
 
+        const withScope = (query: any) => {
+          if (contactId) return query.eq("contact_id", contactId);
+          if (accountId) return query.eq("account_id", accountId);
+          // If neither ID is available, we must NOT fall back to email for primary data objects
+          // to prevent cross-org leaks. We return a query that will yield no results.
+          return query.eq("id", "00000000-0000-0000-0000-000000000000");
+        };
+
         /* ── Stats ── */
         const [quotesRes, contractsRes, docsRes] = await Promise.all([
-          portalEmail
-            ? supabase.from("quotes").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("customer_email", portalEmail)
-            : Promise.resolve({ count: 0 }),
-          portalEmail
-            ? supabase.from("contracts").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("customer_email", portalEmail)
-            : Promise.resolve({ count: 0 }),
+          withScope(supabase.from("quotes").select("id", { count: "exact", head: true }).eq("organization_id", organizationId)),
+          withScope(supabase.from("contracts").select("id", { count: "exact", head: true }).eq("organization_id", organizationId)),
           supabase.from("auto_documents").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("created_by", userId),
         ]);
 
         let pendingCount = 0;
-        if (portalEmail) {
-          const { data: userContracts } = await supabase
-            .from("contracts").select("id")
-            .eq("organization_id", organizationId).eq("customer_email", portalEmail);
-          const contractIds = userContracts?.map((c) => c.id) ?? [];
-          if (contractIds.length > 0) {
-            const pendingRes = await supabase
-              .from("contract_esignatures").select("id", { count: "exact", head: true })
-              .in("contract_id", contractIds).eq("signer_email", portalEmail).eq("status", "pending");
-            pendingCount = pendingRes.count ?? 0;
-          }
+        if (portalEmail && organizationId) {
+          const { count } = await supabase
+            .from("contract_esignatures")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organizationId)
+            .eq("signer_email", portalEmail)
+            .eq("status", "pending");
+          
+          pendingCount = count ?? 0;
         }
 
         setStats({
@@ -187,12 +189,13 @@ const PortalDashboard = () => {
         const activityItems: ActivityItem[] = [];
 
         if (portalEmail) {
-          const { data: recentQuotes } = await supabase
-            .from("quotes").select("id, name, quote_number, status, created_at")
-            .eq("organization_id", organizationId).eq("customer_email", portalEmail)
-            .order("created_at", { ascending: false }).limit(3);
+          const { data: recentQuotes } = await withScope(
+            supabase.from("quotes").select("id, name, quote_number, status, created_at")
+              .eq("organization_id", organizationId)
+          ).order("created_at", { ascending: false }).limit(3);
 
-          recentQuotes?.forEach((q) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          recentQuotes?.forEach((q: any) => {
             activityItems.push({
               id: `q-${q.id}`,
               type: "quote",
@@ -203,12 +206,13 @@ const PortalDashboard = () => {
             });
           });
 
-          const { data: recentContracts } = await supabase
-            .from("contracts").select("id, name, contract_number, status, created_at")
-            .eq("organization_id", organizationId).eq("customer_email", portalEmail)
-            .order("created_at", { ascending: false }).limit(3);
+          const { data: recentContracts } = await withScope(
+            supabase.from("contracts").select("id, name, contract_number, status, created_at")
+              .eq("organization_id", organizationId)
+          ).order("created_at", { ascending: false }).limit(3);
 
-          recentContracts?.forEach((c) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          recentContracts?.forEach((c: any) => {
             activityItems.push({
               id: `c-${c.id}`,
               type: "contract",
@@ -230,7 +234,7 @@ const PortalDashboard = () => {
     };
 
     if (!organizationLoading) void fetchAll();
-  }, [organizationId, organizationLoading, portalEmail, userId]);
+  }, [organizationId, organizationLoading, portalEmail, userId, accountId, contactId]);
 
   if (organizationLoading || dataLoading || !isReady) {
     return (

@@ -67,14 +67,12 @@ function MobileIconBtn({
   active,
   title,
   className,
-  asChild,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   active?: boolean;
   title?: string;
   className?: string;
-  asChild?: boolean;
 }) {
   return (
     <button
