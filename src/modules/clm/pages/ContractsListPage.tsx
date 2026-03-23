@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
 import { useContracts, useUpdateContract, useDeleteContract } from "@/modules/clm/hooks/useCLM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import type { Contract } from "@/core/types/clm";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
@@ -32,6 +33,7 @@ export default function ContractsListPage() {
   const { data: contracts = [], isLoading } = useContracts();
   const updateContract = useUpdateContract();
   const deleteContract = useDeleteContract();
+  const { canDelete } = useCRUD();
 
   const filteredContracts = contracts.filter((contract: Contract) => {
     const matchesSearch =
@@ -157,9 +159,11 @@ export default function ContractsListPage() {
                                 <CheckCircle className="h-4 w-4 mr-2" />Approve
                               </DropdownMenuItem>
                             )}
+                            {canDelete() && (
                             <DropdownMenuItem className="text-destructive" onClick={() => deleteContract.mutate(contract.id)}>
                               <Trash2 className="h-4 w-4 mr-2" />Delete
                             </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

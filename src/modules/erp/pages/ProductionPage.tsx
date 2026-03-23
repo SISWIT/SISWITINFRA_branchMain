@@ -15,6 +15,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
+import { useCRUD } from "@/core/rbac/usePermissions";
 
 // UI Components
 import { Button } from "@/ui/shadcn/button";
@@ -93,6 +94,7 @@ export default function ProductionPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canDelete } = useCRUD();
 
   // 1. FETCH DATA - UPDATED: Filter by current user
   const { data: orders, isLoading } = useQuery({
@@ -336,12 +338,14 @@ export default function ProductionPage() {
                               <Pencil className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
+                            {canDelete() && (
                             <DropdownMenuItem
                               className="text-red-600 focus:text-red-600 focus:bg-red-50"
                               onClick={() => setOrderToDelete(order as unknown as ProductionOrderRow)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useContacts, useCreateContact, useUpdateContact, useDeleteContact, useAccounts } from "@/modules/crm/hooks/useCRM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
@@ -41,6 +42,7 @@ export default function ContactsPage() {
   const createContact = useCreateContact();
   const updateContact = useUpdateContact();
   const deleteContact = useDeleteContact();
+  const { canDelete } = useCRUD();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
@@ -169,6 +171,7 @@ export default function ContactsPage() {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
+            {canDelete() && (
             <DropdownMenuItem
               onClick={() => deleteContact.mutate(contact.id)}
               className="text-destructive"
@@ -176,6 +179,7 @@ export default function ContactsPage() {
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),

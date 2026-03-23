@@ -5,6 +5,7 @@ import {
   useUpdateContract,
   useDeleteContract
 } from "@/modules/clm/hooks/useCLM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { useAccounts } from "@/modules/crm/hooks/useCRM";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
@@ -99,6 +100,7 @@ export default function ContractsPage() {
   const createContract = useCreateContract();
   const updateContract = useUpdateContract();
   const deleteContract = useDeleteContract();
+  const { canDelete } = useCRUD();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ContractRow | null>(null);
@@ -235,6 +237,7 @@ export default function ContractsPage() {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
+            {canDelete() && (
             <DropdownMenuItem
               onClick={() => deleteContract.mutate(row.id)}
               className="text-destructive"
@@ -242,6 +245,7 @@ export default function ContractsPage() {
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),

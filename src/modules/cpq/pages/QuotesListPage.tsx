@@ -6,10 +6,21 @@ import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Badge } from "@/ui/shadcn/badge";
 import { useQuotes, useUpdateQuoteStatus, useDeleteQuote } from "@/modules/cpq/hooks/useCPQ";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/shadcn/alert-dialog";
 import type { QuoteStatus } from "@/core/types/cpq";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
@@ -30,6 +41,8 @@ export default function QuotesListPage() {
   const { data: quotes, isLoading } = useQuotes();
   const updateStatusMutation = useUpdateQuoteStatus();
   const deleteMutation = useDeleteQuote();
+  const { canDelete } = useCRUD();
+  const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
 
   const filteredQuotes = quotes?.filter((quote) => {
     const matchesSearch =
@@ -44,9 +57,7 @@ export default function QuotesListPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this quote?")) {
-      deleteMutation.mutate(id);
-    }
+    setQuoteToDelete(id);
   };
 
   const handleStatusChange = (id: string, newStatus: QuoteStatus) => {
@@ -55,6 +66,29 @@ export default function QuotesListPage() {
 
   return (
     <div className="space-y-6">
+        {/* Delete AlertDialog */}
+        <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The quote will be permanently deleted.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (quoteToDelete) deleteMutation.mutate(quoteToDelete);
+                  setQuoteToDelete(null);
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Quotes</h1>
@@ -159,9 +193,11 @@ export default function QuotesListPage() {
                                   <Send className="h-4 w-4 mr-2" />Mark as Sent
                                 </DropdownMenuItem>
                               )}
+                              {canDelete() && (
                               <DropdownMenuItem onClick={() => handleDelete(quote.id)} className="text-destructive">
                                 <Trash2 className="h-4 w-4 mr-2" />Delete
                               </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Package, Plus, Search, Edit, Trash2, IndianRupee } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Badge } from "@/ui/shadcn/badge";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/modules/cpq/hooks/useCPQ";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +14,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/ui/shadcn/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/shadcn/alert-dialog";
+import { Switch } from "@/ui/shadcn/switch";
 import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
 import {
@@ -39,6 +52,8 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   // Controlled form state for dialog (ensures values are submitted reliably)
   const [formName, setFormName] = useState("");
   const [formSku, setFormSku] = useState("");
@@ -46,10 +61,11 @@ export default function ProductsPage() {
   const [formUnitPrice, setFormUnitPrice] = useState<string>("");
   const [formDescription, setFormDescription] = useState<string>("");
 
-  const { data: products, isLoading } = useProducts();
+  const { data: products, isLoading } = useProducts({ includeInactive: showInactive });
   const createMutation = useCreateProduct();
   const updateMutation = useUpdateProduct();
   const deleteMutation = useDeleteProduct();
+  const { canDelete } = useCRUD();
 
   // Sync controlled form state when dialog opens or editingProduct changes
   useEffect(() => {
@@ -85,11 +101,17 @@ export default function ProductsPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const parsedPrice = parseFloat(formUnitPrice || "0");
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+
     const product = {
       name: formName,
       sku: formSku,
       description: formDescription,
-      unit_price: parseFloat(formUnitPrice || "0"),
+      unit_price: parsedPrice,
       category: formCategory,
       is_active: true,
     };
@@ -255,6 +277,18 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        {/* Inactive Toggle */}
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+            id="show-inactive"
+          />
+          <label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer">
+            Show inactive products
+          </label>
+        </div>
+
         {/* Products Grid */}
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -343,19 +377,41 @@ export default function ProductsPage() {
                       <Edit className="h-3.5 w-3.5 mr-1" />
                       Edit
                     </Button>
-                      {/* compact square delete button for mobile */}
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => {
-                        if (confirm(`Delete ${product.name}? This action cannot be undone.`)) {
-                          deleteMutation.mutate(product.id);
-                        }
-                      }}
+                    {canDelete() && (
+                    <AlertDialog
+                      open={productToDelete?.id === product.id}
+                      onOpenChange={(open) => !open && setProductToDelete(null)}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => setProductToDelete(product)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Delete {product.name}? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                              deleteMutation.mutate(product.id);
+                              setProductToDelete(null);
+                            }}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    )}
                   </div>
                 </CardContent>
               </Card>

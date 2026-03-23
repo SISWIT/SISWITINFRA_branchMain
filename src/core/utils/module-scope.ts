@@ -19,6 +19,12 @@ interface ReadScopeOptions {
   ownerColumns?: string[];
   includeSoftDeleted?: boolean;
   hasSoftDelete?: boolean;
+  tenantIdColumn?: string;
+}
+
+interface MutationScopeOptions {
+  ownerColumns?: string[];
+  tenantIdColumn?: string;
 }
 
 interface CreatePayloadOptions {
@@ -60,8 +66,9 @@ export function applyModuleReadScope<TQuery extends ScopedQuery<TQuery>>(
   const ownerColumns = options.ownerColumns ?? ["owner_id"];
   const hasSoftDelete = options.hasSoftDelete ?? true;
   const includeSoftDeleted = options.includeSoftDeleted ?? false;
+  const tenantIdColumn = options.tenantIdColumn ?? "organization_id";
 
-  let scoped = query.eq("organization_id", organizationId);
+  let scoped = query.eq(tenantIdColumn, organizationId);
   if (hasSoftDelete && !includeSoftDeleted) {
     scoped = scoped.is("deleted_at", null);
   }
@@ -79,10 +86,23 @@ export function applyModuleReadScope<TQuery extends ScopedQuery<TQuery>>(
 export function applyModuleMutationScope<TQuery extends ScopedQuery<TQuery>>(
   query: TQuery,
   scope: ModuleScopeContext,
-  ownerColumns: string[] = ["owner_id"],
+  options: string[] | MutationScopeOptions = ["owner_id"],
 ): TQuery {
   const { organizationId, userId } = requireOrganizationScope(scope);
-  let scoped = query.eq("organization_id", organizationId);
+  
+  let ownerColumns: string[];
+  let tenantIdColumn = "organization_id";
+  
+  if (Array.isArray(options)) {
+    ownerColumns = options;
+  } else {
+    ownerColumns = options.ownerColumns ?? ["owner_id"];
+    if (options.tenantIdColumn) {
+      tenantIdColumn = options.tenantIdColumn;
+    }
+  }
+
+  let scoped = query.eq(tenantIdColumn, organizationId);
 
   if (!canReadAllTenantRows(scope.role) && isOwnerScopedRole(scope.role) && ownerColumns.length > 0) {
     const ownerFilter = ownerColumns.map((column) => `${column}.eq.${userId}`).join(",");

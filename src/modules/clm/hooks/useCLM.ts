@@ -74,7 +74,7 @@ export function useContractTemplates() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("contract_templates").select("*"),
         scope,
-        { ownerColumns: ["created_by"], hasSoftDelete: true },
+        { ownerColumns: ["created_by"], hasSoftDelete: false, tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.order("name");
@@ -138,7 +138,7 @@ export function useUpdateContractTemplate() {
           .update({ ...updates, updated_at: new Date().toISOString() })
           .eq("id", id),
         scope,
-        ["created_by"],
+        { ownerColumns: ["created_by"], tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.select().single();
@@ -174,7 +174,7 @@ export function useDeleteContractTemplate() {
       const accessQuery = applyModuleMutationScope(
         supabase.from("contract_templates").select("id").eq("id", id),
         scope,
-        ["created_by"],
+        { ownerColumns: ["created_by"], tenantIdColumn: "tenant_id" },
       );
 
       const accessResult = await accessQuery.maybeSingle();
@@ -695,7 +695,7 @@ export function useCLMDashboardStats() {
       const templatesQuery = applyModuleReadScope(
         supabase.from("contract_templates").select("id", { count: "exact", head: true }),
         scope,
-        { ownerColumns: ["created_by"], hasSoftDelete: true },
+        { ownerColumns: ["created_by"], hasSoftDelete: false, tenantIdColumn: "tenant_id" },
       );
 
       const [contractsRes, templatesRes] = await Promise.all([

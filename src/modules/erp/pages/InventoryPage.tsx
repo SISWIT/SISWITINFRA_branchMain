@@ -76,7 +76,6 @@ export default function InventoryPage() {
             category
           )
         `)
-        .eq("created_by", user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -89,7 +88,7 @@ export default function InventoryPage() {
     mutationFn: async (newItem: InventoryFormData) => {
       const { data, error } = await supabase
         .from("inventory_items")
-        .insert([{ ...newItem, created_by: user?.id }])
+        .insert([newItem])
         .select();
       if (error) throw error;
       return data;

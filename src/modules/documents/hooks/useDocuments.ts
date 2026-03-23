@@ -121,7 +121,7 @@ export function useDocumentTemplates() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("document_templates").select("*"),
         scope,
-        { ownerColumns: [], hasSoftDelete: true },
+        { ownerColumns: [], hasSoftDelete: false, tenantIdColumn: "tenant_id" },
       );
 
       const query = scopedQuery

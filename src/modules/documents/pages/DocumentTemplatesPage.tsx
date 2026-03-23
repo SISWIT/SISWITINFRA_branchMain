@@ -20,6 +20,16 @@ import {
   DialogTitle,
 } from "@/ui/shadcn/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/shadcn/alert-dialog";
+import {
   useAutoDocuments,
   useCreateDocumentTemplate,
   useDeleteDocumentTemplate,
@@ -27,6 +37,7 @@ import {
   useUpdateDocumentTemplate,
 } from "@/modules/documents/hooks/useDocuments";
 import type { DocumentTemplate, DocumentType } from "@/core/types/documents";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { toast } from "sonner";
 import { Clock, Copy, Edit, FileStack, FileText, MoreVertical, Plus, Search, Trash2, User } from "lucide-react";
 
@@ -47,12 +58,14 @@ const DocumentTemplatesPage = () => {
   const createTemplateMutation = useCreateDocumentTemplate();
   const updateTemplateMutation = useUpdateDocumentTemplate();
   const deleteTemplateMutation = useDeleteDocumentTemplate();
+  const { canDelete } = useCRUD();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<"all" | DocumentType>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptyFormState);
+  const [templateToDeleteId, setTemplateToDeleteId] = useState<string | null>(null);
 
   const usageByTemplate = useMemo(() => {
     return documents.reduce<Record<string, number>>((accumulator, document) => {
@@ -145,14 +158,17 @@ const DocumentTemplatesPage = () => {
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
-    const shouldDelete = globalThis.confirm("Delete this template? This action cannot be undone.");
-    if (!shouldDelete) {
-      return;
-    }
+    setTemplateToDeleteId(templateId);
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!templateToDeleteId) return;
     try {
-      await deleteTemplateMutation.mutateAsync(templateId);
+      await deleteTemplateMutation.mutateAsync(templateToDeleteId);
     } catch {
       // Error toast is handled in the mutation hook.
+    } finally {
+      setTemplateToDeleteId(null);
     }
   };
 
@@ -175,6 +191,27 @@ const DocumentTemplatesPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Delete AlertDialog */}
+      <AlertDialog open={!!templateToDeleteId} onOpenChange={(open) => !open && setTemplateToDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this template? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteTemplate}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Document Templates</h1>
@@ -257,10 +294,12 @@ const DocumentTemplatesPage = () => {
                       <Copy className="mr-2 h-4 w-4" />
                       Duplicate
                     </DropdownMenuItem>
+                    {canDelete() && (
                     <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTemplate(template.id)}>
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

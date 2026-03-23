@@ -6,6 +6,7 @@ import {
   useDeleteOpportunity,
   useAccounts
 } from "@/modules/crm/hooks/useCRM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
 import {
@@ -80,6 +81,7 @@ export default function OpportunitiesPage() {
   const createOpp = useCreateOpportunity();
   const updateOpp = useUpdateOpportunity();
   const deleteOpp = useDeleteOpportunity();
+  const { canDelete } = useCRUD();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOpp, setEditingOpp] = useState<OpportunityRow | null>(null);
@@ -207,6 +209,7 @@ export default function OpportunitiesPage() {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
+            {canDelete() && (
             <DropdownMenuItem
               onClick={() => deleteOpp.mutate(row.id)}
               className="text-destructive"
@@ -214,6 +217,7 @@ export default function OpportunitiesPage() {
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),

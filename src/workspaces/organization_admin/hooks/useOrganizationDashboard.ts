@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../../core/api/client";
-import { useTenant } from "../../../core/tenant/useTenant";
+import { useOrganization } from "../../organization/hooks/useOrganization";
 
 export interface DashboardKPIs {
     leads: number;
@@ -29,8 +29,8 @@ export interface DashboardActivity {
     id: string;
     subject: string | null;
     type: string | null;
-    start_time: string | null;
-    assigned_to_id: string | null;
+    due_date: string | null;
+    owner_id: string | null;
 }
 
 export interface DashboardLead {
@@ -74,8 +74,8 @@ export interface DashboardData {
 }
 
 export function useOrganizationDashboard() {
-    const { tenant } = useTenant();
-    const tenantId = tenant?.id;
+    const { organization } = useOrganization();
+    const tenantId = organization?.id;
 
     return useQuery<DashboardData>({
         queryKey: ["organization-dashboard", tenantId],
@@ -115,9 +115,9 @@ export function useOrganizationDashboard() {
                     .limit(4),
 
                 supabase.from("activities")
-                    .select("id, subject, type, start_time, assigned_to_id")
+                    .select("id, subject, type, due_date, owner_id")
                     .eq("tenant_id", tenantId)
-                    .order("start_time", { ascending: false })
+                    .order("due_date", { ascending: false })
                     .limit(4),
 
                 supabase.from("leads")
@@ -128,7 +128,7 @@ export function useOrganizationDashboard() {
 
                 supabase.from("audit_logs")
                     .select("id, action, entity_type, created_at, user_id")
-                    .eq("tenant_id", tenantId)
+                    .eq("organization_id", tenantId)
                     .order("created_at", { ascending: false })
                     .limit(5),
 

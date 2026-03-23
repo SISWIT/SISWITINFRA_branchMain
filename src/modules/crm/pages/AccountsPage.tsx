@@ -7,6 +7,7 @@ import {
   useUpdateAccount,
   useDeleteAccount,
 } from "@/modules/crm/hooks/useCRM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 
 import { DataTable } from "@/modules/crm/components/DataTable";
 
@@ -68,6 +69,7 @@ export default function AccountsPage() {
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
+  const { canDelete } = useCRUD();
 
   // ui state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -242,12 +244,14 @@ export default function AccountsPage() {
               <FileText className="mr-2 h-4 w-4" /> Create Quote
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            {canDelete() && (
             <DropdownMenuItem
               onClick={() => deleteAccount.mutate(acc.id)}
               className="text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),

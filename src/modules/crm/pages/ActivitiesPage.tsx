@@ -4,7 +4,8 @@ import {
   useCreateActivity, 
   useUpdateActivity, 
   useDeleteActivity 
-} from "@/modules/crm/hooks/useCRM"; // Ensure these hooks exist or create them similar to useAccounts
+} from "@/modules/crm/hooks/useCRM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
 import {
@@ -84,6 +85,7 @@ export default function ActivitiesPage() {
   const createActivity = useCreateActivity();
   const updateActivity = useUpdateActivity();
   const deleteActivity = useDeleteActivity();
+  const { canDelete } = useCRUD();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ActivityRow | null>(null);
@@ -234,6 +236,7 @@ export default function ActivitiesPage() {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
+            {canDelete() && (
             <DropdownMenuItem
               onClick={() => deleteActivity.mutate(row.id)}
               className="text-destructive"
@@ -241,6 +244,7 @@ export default function ActivitiesPage() {
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),

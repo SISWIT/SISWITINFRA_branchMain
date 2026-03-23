@@ -71,20 +71,25 @@ function calculateQuoteTotals(
 }
 
 // ===== PRODUCTS =====
-export function useProducts() {
+export function useProducts(options?: { includeInactive?: boolean }) {
   const { scope, enabled, tenantId } = useModuleScope();
+  const includeInactive = options?.includeInactive ?? false;
 
   return useQuery({
-    queryKey: ["products", tenantId],
+    queryKey: ["products", tenantId, includeInactive],
     enabled,
     queryFn: async () => {
       const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select("*")
-        .eq("organization_id", requiredOrganizationId)
-        .eq("is_active", true)
-        .order("name");
+        .eq("organization_id", requiredOrganizationId);
+
+      if (!includeInactive) {
+        query = query.eq("is_active", true);
+      }
+
+      const { data, error } = await query.order("name");
 
       if (error) throw error;
       return (data ?? []).map((item) => ({

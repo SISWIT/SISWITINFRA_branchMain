@@ -2,13 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../../core/api/client";
 
 export interface PlatformStats {
-  totalTenants: number;
+  totalOrganizations: number;
   totalUsers: number;
   mrr: number;
   activeSessions: number;
 }
 
-export interface PlatformRecentTenant {
+export interface PlatformRecentOrganization {
   name: string;
   slug: string;
   plan: string;
@@ -18,7 +18,7 @@ export interface PlatformRecentTenant {
 
 export interface PlatformDashboardData {
   stats: PlatformStats;
-  recentTenants: PlatformRecentTenant[];
+  recentOrganizations: PlatformRecentOrganization[];
 }
 
 export function usePlatformDashboard() {
@@ -26,15 +26,15 @@ export function usePlatformDashboard() {
     queryKey: ["platform-dashboard"],
     queryFn: async (): Promise<PlatformDashboardData> => {
       const [
-        tenantsCount,
+        organizationsCount,
         usersCount,
-        tenantsData,
+        organizationsData,
         subscriptionsData
       ] = await Promise.all([
-        supabase.from("tenants").select("*", { count: "exact", head: true }),
+        supabase.from("organizations").select("*", { count: "exact", head: true }),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("tenants")
-          .select("company_name, name, slug, plan_type, status, max_users")
+        supabase.from("organizations")
+          .select("name, slug, status, max_users")
           .order("created_at", { ascending: false })
           .limit(4),
         supabase.from("organization_subscriptions").select("plan_type, status")
@@ -59,22 +59,23 @@ export function usePlatformDashboard() {
       }, 0);
 
       const stats: PlatformStats = {
-        totalTenants: tenantsCount.count || 0,
+        totalOrganizations: organizationsCount.count || 0,
         totalUsers: usersCount.count || 0,
         mrr: mrr,
-        activeSessions: 12 + Math.floor(Math.random() * 20) // Simulated active sessions since not in DB
+        activeSessions: 0 // Requires real session tracking; do not fake
       };
 
-      const recentTenants: PlatformRecentTenant[] = (tenantsData.data || []).map(t => ({
-        name: t.company_name || t.name || "Unnamed Tenant",
-        slug: t.slug || "",
-        plan: t.plan_type || "Starter",
-        status: t.status || "active",
-        users: t.max_users || 0
+      const recentOrganizations: PlatformRecentOrganization[] = (organizationsData.data || []).map(org => ({
+        name: org.name || "Unnamed Organization",
+        slug: org.slug || "",
+        plan: "Starter",
+        status: org.status || "active",
+        users: org.max_users || 0
       }));
 
-      return { stats, recentTenants };
+      return { stats, recentOrganizations };
     },
-    refetchInterval: 60000, // Refetch every minute
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 }

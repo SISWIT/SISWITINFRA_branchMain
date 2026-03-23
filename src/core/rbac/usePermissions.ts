@@ -39,7 +39,7 @@ export function usePermissions() {
   const isPlatformAdmin = isPlatformRole(userRole);
   const isTenantAdmin = userRole === "admin";
   const isManager = userRole === "manager";
-  const isUser = userRole === "employee" || userRole === "user";
+  const isUser = userRole === "employee";
   const isClient = userRole === "client";
 
   /**
@@ -210,7 +210,7 @@ export function useCRUD() {
    */
   const canCreate = (): boolean => {
     if (!user || !userRole) return false;
-    return isPlatformAdmin || ["admin", "manager", "employee", "user"].includes(userRole);
+    return isPlatformAdmin || ["admin", "manager", "employee"].includes(userRole);
   };
 
   /**
@@ -218,7 +218,7 @@ export function useCRUD() {
    */
   const canRead = (): boolean => {
     if (!user || !userRole) return false;
-    return isPlatformAdmin || ["admin", "manager", "employee", "user", "client"].includes(userRole);
+    return isPlatformAdmin || ["admin", "manager", "employee", "client"].includes(userRole);
   };
 
   /**
@@ -241,7 +241,7 @@ export function useCRUD() {
   const canDelete = (): boolean => {
     if (!user || !userRole) return false;
     if (isPlatformAdmin) return true;
-    return userRole === "admin" || userRole === "manager";
+    return userRole === "owner" || userRole === "admin" || userRole === "manager";
   };
 
   return {

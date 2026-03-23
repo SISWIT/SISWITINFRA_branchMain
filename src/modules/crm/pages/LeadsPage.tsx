@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLeads, useCreateLead, useUpdateLead, useDeleteLead } from "@/modules/crm/hooks/useCRM";
+import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Badge } from "@/ui/shadcn/badge";
 import { Button } from "@/ui/shadcn/button";
@@ -19,6 +20,7 @@ export default function LeadsPage() {
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
+  const { canDelete } = useCRUD();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -45,7 +47,7 @@ export default function LeadsPage() {
         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => openEditDialog(lead)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => deleteLead.mutate(lead.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+          {canDelete() && <DropdownMenuItem onClick={() => deleteLead.mutate(lead.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>}
         </DropdownMenuContent>
       </DropdownMenu>
     )},

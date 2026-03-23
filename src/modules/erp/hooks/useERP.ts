@@ -207,7 +207,7 @@ export function useSuppliers() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("suppliers").select("*"),
         scope,
-        { ownerColumns: ["created_by"], hasSoftDelete: false },
+        { ownerColumns: ["created_by"], hasSoftDelete: false, tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.neq("is_active", false).order("name");
@@ -293,7 +293,7 @@ export function useUpdateSupplier() {
       const scopedQuery = applyModuleMutationScope(
         supabase.from("suppliers").update(payload).eq("id", id),
         scope,
-        ["created_by"],
+        { ownerColumns: ["created_by"], tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.select().single();
@@ -329,7 +329,7 @@ export function useDeleteSupplier() {
       const access = await applyModuleMutationScope(
         supabase.from("suppliers").select("id").eq("id", id),
         scope,
-        ["created_by"],
+        { ownerColumns: ["created_by"], tenantIdColumn: "tenant_id" },
       ).maybeSingle();
 
       if (access.error || !access.data) {
@@ -373,7 +373,7 @@ export function useInventoryItems() {
       const scopedQuery = applyModuleReadScope(
         supabase.from("inventory_items").select("*, product:products(*)"),
         scope,
-        { ownerColumns: [], hasSoftDelete: false },
+        { ownerColumns: [], hasSoftDelete: false, tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
@@ -474,7 +474,7 @@ export function useUpdateInventoryItem() {
       const scopedQuery = applyModuleMutationScope(
         supabase.from("inventory_items").update(payload).eq("id", id),
         scope,
-        [],
+        { ownerColumns: [], tenantIdColumn: "tenant_id" },
       );
 
       const { data, error } = await scopedQuery.select("*, product:products(*)").single();
@@ -510,7 +510,7 @@ export function useDeleteInventoryItem() {
       const access = await applyModuleMutationScope(
         supabase.from("inventory_items").select("id").eq("id", id),
         scope,
-        [],
+        { ownerColumns: [], tenantIdColumn: "tenant_id" },
       ).maybeSingle();
 
       if (access.error || !access.data) {

@@ -24,12 +24,12 @@ export default function PlatformAdminDashboard() {
     );
   }
 
-  const { stats: platformStats, recentTenants } = data;
+  const { stats: platformStats, recentOrganizations } = data;
 
   const stats = [
     {
-      title: "Total Tenants",
-      value: platformStats.totalTenants.toString(),
+      title: "Total Organizations",
+      value: platformStats.totalOrganizations.toString(),
       change: "Live",
       icon: Building2,
       href: "/platform/tenants",
@@ -82,7 +82,7 @@ export default function PlatformAdminDashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Tenants</CardTitle>
+            <CardTitle>Recent Organizations</CardTitle>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/platform/tenants">
                 View All <ArrowRight className="ml-2 h-4 w-4" />
@@ -91,29 +91,29 @@ export default function PlatformAdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentTenants.map((tenant) => (
+              {recentOrganizations.map((org) => (
                 <div
-                  key={tenant.name}
+                  key={org.name}
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div>
-                    <p className="font-medium">{tenant.name}</p>
+                    <p className="font-medium">{org.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {tenant.plan} - {tenant.users} users
+                      {org.plan} - {org.users} users
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <div
                       className={`rounded-full px-2 py-1 text-xs ${
-                        tenant.status === "active"
+                        org.status === "active"
                           ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                           : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
                       }`}
                     >
-                      {tenant.status}
+                      {org.status}
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/${tenant.slug}/app/dashboard`}>Impersonate</Link>
+                      <Link to={`/${org.slug}/app/dashboard`}>Impersonate</Link>
                     </Button>
                   </div>
                 </div>
