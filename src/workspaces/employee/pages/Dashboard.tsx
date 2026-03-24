@@ -112,7 +112,7 @@ const buildQuickActions = (routes: ReturnType<typeof buildDashboardRoutes>): Qui
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
-  const { organizationId, scope } = useModuleScope();
+  const { organizationId } = useModuleScope();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();

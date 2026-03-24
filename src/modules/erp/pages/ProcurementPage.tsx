@@ -82,6 +82,7 @@ const STATUS_STYLES: Record<string, string> = {
   received: "bg-emerald-100 text-emerald-700 border-emerald-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
 };
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 export default function ProcurementPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,6 +203,8 @@ export default function ProcurementPage() {
 
   return (
     <div className="space-y-6">
+      <PlanLimitBanner resource="suppliers" className="mb-4" />
+      <PlanLimitBanner resource="purchase_orders" className="mb-4" />
       {/* Header Section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">

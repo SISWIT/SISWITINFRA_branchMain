@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/ui/shadcn/select";
 import type { Product } from "@/core/types/cpq";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 const categories = [
   "CPQ",
@@ -141,6 +142,7 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="products" className="mb-4" />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl md:text-3xl font-semibold">

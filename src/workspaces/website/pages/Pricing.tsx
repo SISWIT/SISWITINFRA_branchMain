@@ -7,64 +7,123 @@ import { useState } from "react";
 
 const plans = [
   {
-    name: "Starter",
-    // Added ERP to description
-    description: "Perfect for small teams getting started with CPQ, CLM, CRM, and ERP.",
-    price: { monthly: 49, annually: 39 },
+    name: "Foundation",
+    description: "Perfect for small teams getting started with CRM, CPQ, CLM, Documents, and ERP.",
+    price: { monthly: 799, annually: 799 },
     popular: false,
     features: [
-      { name: "Up to 10 users", included: true },
-      { name: "CPQ Basic", included: true },
-      { name: "CLM Basic", included: true },
-      { name: "CRM Basic", included: true },
-      // Added ERP Basic feature
-      { name: "ERP Basic", included: true },
-      { name: "5,000 records", included: true },
+      { name: "Up to 5 users", included: true },
+      { name: "CRM (Contacts, Accounts, Leads, Opportunities)", included: true },
+      { name: "CPQ (Products, Quotes)", included: true },
+      { name: "CLM (Contracts, Templates, E-signatures)", included: true },
+      { name: "Documents (Auto Documents, Templates)", included: true },
+      { name: "ERP (Suppliers, Purchase Orders)", included: true },
+      { name: "500 contacts", included: true },
+      { name: "100 accounts", included: true },
+      { name: "200 leads", included: true },
+      { name: "100 opportunities", included: true },
+      { name: "50 products", included: true },
+      { name: "50 quotes/month", included: true },
+      { name: "100 documents", included: true },
+      { name: "10 document templates", included: true },
+      { name: "10 e-signatures/month", included: true },
+      { name: "1GB storage", included: true },
+      { name: "1,000 API calls/day", included: true },
       { name: "Email support", included: true },
       { name: "Basic integrations", included: true },
       { name: "Standard reports", included: true },
-      { name: "API access", included: false },
       { name: "Custom workflows", included: false },
       { name: "Advanced analytics", included: false },
       { name: "Dedicated support", included: false },
     ],
   },
   {
-    name: "Professional",
-    description: "For growing teams that need advanced features and integrations.",
-    price: { monthly: 99, annually: 79 },
+    name: "Growth",
+    description: "For growing teams that need advanced features and higher limits.",
+    price: { monthly: 1399, annually: 1399 },
     popular: true,
     features: [
-      { name: "Up to 50 users", included: true },
-      { name: "CPQ Advanced", included: true },
-      { name: "CLM Advanced", included: true },
-      { name: "CRM Advanced", included: true },
-      // Added ERP Advanced feature
-      { name: "ERP Advanced", included: true },
-      { name: "50,000 records", included: true },
+      { name: "Up to 25 users", included: true },
+      { name: "CRM (Contacts, Accounts, Leads, Opportunities)", included: true },
+      { name: "CPQ (Products, Quotes)", included: true },
+      { name: "CLM (Contracts, Templates, E-signatures)", included: true },
+      { name: "Documents (Auto Documents, Templates)", included: true },
+      { name: "ERP (Suppliers, Purchase Orders)", included: true },
+      { name: "5,000 contacts", included: true },
+      { name: "1,000 accounts", included: true },
+      { name: "2,000 leads", included: true },
+      { name: "1,000 opportunities", included: true },
+      { name: "500 products", included: true },
+      { name: "500 quotes/month", included: true },
+      { name: "1,000 documents", included: true },
+      { name: "100 document templates", included: true },
+      { name: "100 e-signatures/month", included: true },
+      { name: "10GB storage", included: true },
+      { name: "10,000 API calls/day", included: true },
       { name: "Priority support", included: true },
       { name: "All integrations", included: true },
       { name: "Advanced reports", included: true },
-      { name: "API access", included: true },
       { name: "Custom workflows", included: true },
       { name: "Advanced analytics", included: false },
       { name: "Dedicated support", included: false },
     ],
   },
   {
+    name: "Commercial",
+    description: "For established businesses needing comprehensive features and higher capacity.",
+    price: { monthly: 2299, annually: 2299 },
+    popular: false,
+    features: [
+      { name: "Up to 100 users", included: true },
+      { name: "CRM (Contacts, Accounts, Leads, Opportunities)", included: true },
+      { name: "CPQ (Products, Quotes)", included: true },
+      { name: "CLM (Contracts, Templates, E-signatures)", included: true },
+      { name: "Documents (Auto Documents, Templates)", included: true },
+      { name: "ERP (Suppliers, Purchase Orders)", included: true },
+      { name: "50,000 contacts", included: true },
+      { name: "10,000 accounts", included: true },
+      { name: "20,000 leads", included: true },
+      { name: "10,000 opportunities", included: true },
+      { name: "5,000 products", included: true },
+      { name: "5,000 quotes/month", included: true },
+      { name: "10,000 documents", included: true },
+      { name: "1,000 document templates", included: true },
+      { name: "1,000 e-signatures/month", included: true },
+      { name: "100GB storage", included: true },
+      { name: "100,000 API calls/day", included: true },
+      { name: "24/7 support", included: true },
+      { name: "Custom integrations", included: true },
+      { name: "Custom reports", included: true },
+      { name: "Full API access", included: true },
+      { name: "Custom workflows", included: true },
+      { name: "Advanced analytics", included: true },
+      { name: "Dedicated support", included: false },
+    ],
+  },
+  {
     name: "Enterprise",
-    description: "For large organizations with complex requirements and compliance needs.",
-    price: { monthly: null, annually: null },
+    description: "For large organizations with unlimited needs and premium support.",
+    price: { monthly: 3799, annually: 3799 },
     popular: false,
     features: [
       { name: "Unlimited users", included: true },
-      { name: "CPQ Enterprise", included: true },
-      { name: "CLM Enterprise", included: true },
-      { name: "CRM Enterprise", included: true },
-      // Added ERP Enterprise feature
-      { name: "ERP Enterprise", included: true },
-      { name: "Unlimited records", included: true },
-      { name: "24/7 support", included: true },
+      { name: "CRM (Contacts, Accounts, Leads, Opportunities)", included: true },
+      { name: "CPQ (Products, Quotes)", included: true },
+      { name: "CLM (Contracts, Templates, E-signatures)", included: true },
+      { name: "Documents (Auto Documents, Templates)", included: true },
+      { name: "ERP (Suppliers, Purchase Orders)", included: true },
+      { name: "Unlimited contacts", included: true },
+      { name: "Unlimited accounts", included: true },
+      { name: "Unlimited leads", included: true },
+      { name: "Unlimited opportunities", included: true },
+      { name: "Unlimited products", included: true },
+      { name: "Unlimited quotes/month", included: true },
+      { name: "Unlimited documents", included: true },
+      { name: "Unlimited document templates", included: true },
+      { name: "Unlimited e-signatures/month", included: true },
+      { name: "500GB storage", included: true },
+      { name: "Unlimited API calls/day", included: true },
+      { name: "24/7 Priority support", included: true },
       { name: "Custom integrations", included: true },
       { name: "Custom reports", included: true },
       { name: "Full API access", included: true },
@@ -156,15 +215,15 @@ const Pricing = () => {
 
         {/* Pricing Cards */}
         {/* Kept large padding and flex center to maintain focus on cards */}
-        <section className="min-h-screen flex flex-col justify-center py-20">
+        <section className="py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {plans.map((plan) => (
                 <div
                   key={plan.name}
-                  className={`relative bg-card rounded-2xl p-8 border flex flex-col ${
+                  className={`relative bg-card rounded-2xl p-6 border flex flex-col ${
                     plan.popular
-                      ? "border-primary shadow-glow scale-105 z-10"
+                      ? "border-primary shadow-glow scale-[1.02] z-10"
                       : "border-border shadow-card"
                   } hover:shadow-card-hover transition-all duration-300`}
                 >
@@ -174,36 +233,30 @@ const Pricing = () => {
                     </div>
                   )}
 
-                  <h3 className="text-2xl font-bold text-foreground mb-2">
+                  <h3 className="text-xl font-bold text-foreground mb-2">
                     {plan.name}
                   </h3>
-                  {/* Added min-h to description to prevent minor misalignments if text length varies significantly */}
-                  <p className="text-muted-foreground text-sm mb-6 min-h-[40px]">
+                  <p className="text-muted-foreground text-sm mb-4">
                     {plan.description}
                   </p>
 
-                  {/* Added fixed minimum height and flex-col/justify-end here. 
-                      This forces the price container to be the same height on all cards,
-                      aligning the buttons immediately below. */}
-                  <div className="mb-8 min-h-[8rem] flex flex-col justify-end">
+                  <div className="mb-6 flex flex-col justify-end">
                     {plan.price.monthly ? (
                       <>
                         <div>
-                          <span className="text-5xl font-bold text-foreground">
-                            ₹{isAnnual ? plan.price.annually : plan.price.monthly}
+                          <span className="text-4xl font-bold text-foreground">
+                            ₹{plan.price.monthly}
                           </span>
                           <span className="text-muted-foreground ml-1">
-                            /user/month
+                            /month
                           </span>
                         </div>
-                        {isAnnual && (
-                          <p className="text-sm text-primary mt-1">
-                            Billed annually
-                          </p>
-                        )}
+                        <p className="text-sm text-primary mt-1">
+                          Billed annually
+                        </p>
                       </>
                     ) : (
-                      <span className="text-3xl font-bold text-foreground pb-2">
+                      <span className="text-2xl font-bold text-foreground pb-2">
                         Custom Pricing
                       </span>
                     )}
@@ -212,7 +265,7 @@ const Pricing = () => {
                   <Link to="/contact">
                     <Button
                       variant={plan.popular ? "hero" : "outline"}
-                      className="w-full mb-8"
+                      className="w-full mb-6"
                     >
                       {plan.price.monthly
                         ? "Start Free Trial"

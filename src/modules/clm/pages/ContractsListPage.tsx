@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useContracts, useUpdateContract, useDeleteContract } from "@/modules/clm/hooks/useCLM";
 import { useCRUD } from "@/core/rbac/usePermissions";
 import type { Contract } from "@/core/types/clm";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -50,6 +51,7 @@ export default function ContractsListPage() {
 
   return (
     <div className="space-y-6">
+      <PlanLimitBanner resource="contracts" className="mb-4" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Contracts</h1>

@@ -22,6 +22,7 @@ import {
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
 import { safeWriteAuditLog } from "@/core/utils/audit";
+import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 
 type SupplierRow = Database["public"]["Tables"]["suppliers"]["Row"];
 type SupplierInsert = Database["public"]["Tables"]["suppliers"]["Insert"];
@@ -221,9 +222,17 @@ export function useSuppliers() {
 export function useCreateSupplier() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (supplier: Omit<Partial<Supplier>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("suppliers");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Supplier limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const payload = buildModuleCreatePayload<SupplierInsert>(
         {
           name: supplier.name || "",
@@ -245,6 +254,11 @@ export function useCreateSupplier() {
 
       const { data, error } = await supabase.from("suppliers").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("suppliers").catch((err) => {
+        console.error("Failed to increment suppliers usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "supplier_create",
@@ -323,6 +337,7 @@ export function useUpdateSupplier() {
 export function useDeleteSupplier() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -343,6 +358,11 @@ export function useDeleteSupplier() {
         organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete supplier");
+
+      decrementUsage("suppliers").catch((err) => {
+        console.error("Failed to decrement suppliers usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "supplier_delete",
@@ -602,9 +622,17 @@ export function usePurchaseOrder(id: string) {
 export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (po: Omit<Partial<PurchaseOrder>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("purchase_orders");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Purchase order limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const payload = buildModuleCreatePayload<PurchaseOrderInsert>(
         {
           po_number: po.po_number || `PO-${Date.now()}`,
@@ -625,6 +653,11 @@ export function useCreatePurchaseOrder() {
 
       const { data, error } = await supabase.from("purchase_orders").insert(payload).select("*, supplier:suppliers(*)").single();
       if (error) throw error;
+
+      incrementUsage("purchase_orders").catch((err) => {
+        console.error("Failed to increment purchase_orders usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "purchase_order_create",
@@ -704,6 +737,7 @@ export function useUpdatePurchaseOrder() {
 export function useDeletePurchaseOrder() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -726,6 +760,11 @@ export function useDeletePurchaseOrder() {
         organizationId: tenantId || "",
       });
       if (!deleted) throw new Error("Failed to delete purchase order");
+
+      decrementUsage("purchase_orders").catch((err) => {
+        console.error("Failed to decrement purchase_orders usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "purchase_order_delete",

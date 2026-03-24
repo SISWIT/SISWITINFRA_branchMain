@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/core/api/client";
 import type { Database } from "@/core/api/types";
 import { useModuleScope } from "@/core/hooks/useModuleScope";
+import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import type {
   Account,
   Activity,
@@ -362,9 +363,17 @@ export function useLeads() {
 export function useCreateLead() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (lead: Omit<Partial<Lead>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("leads");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Lead limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const payload = buildModuleCreatePayload<LeadInsert>(
         {
           first_name: lead.first_name || "",
@@ -382,6 +391,11 @@ export function useCreateLead() {
 
       const { data, error } = await supabase.from("leads").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("leads").catch((err) => {
+        console.error("Failed to increment leads usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "lead_create",
@@ -458,6 +472,7 @@ export function useUpdateLead() {
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -477,6 +492,11 @@ export function useDeleteLead() {
         ["owner_id"],
       );
       if (deleteError) throw deleteError;
+
+      decrementUsage("leads").catch((err) => {
+        console.error("Failed to decrement leads usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "lead_delete",
@@ -521,9 +541,17 @@ export function useAccounts() {
 export function useCreateAccount() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (account: Omit<Partial<Account>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("accounts");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Account limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const payload = buildModuleCreatePayload<AccountInsert>(
         {
           name: account.name || "",
@@ -545,6 +573,11 @@ export function useCreateAccount() {
 
       const { data, error } = await supabase.from("accounts").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("accounts").catch((err) => {
+        console.error("Failed to increment accounts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "account_create",
@@ -625,6 +658,7 @@ export function useUpdateAccount() {
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -644,6 +678,11 @@ export function useDeleteAccount() {
         ["owner_id"],
       );
       if (deleteError) throw deleteError;
+
+      decrementUsage("accounts").catch((err) => {
+        console.error("Failed to decrement accounts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "account_delete",
@@ -692,9 +731,17 @@ export function useContacts(accountId?: string) {
 export function useCreateContact() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (contact: Omit<Partial<Contact>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("contacts");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Contact limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const payload = buildModuleCreatePayload<ContactInsert>(
         {
           first_name: contact.first_name || "",
@@ -716,6 +763,11 @@ export function useCreateContact() {
 
       const { data, error } = await supabase.from("contacts").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("contacts").catch((err) => {
+        console.error("Failed to increment contacts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "contact_create",
@@ -796,6 +848,7 @@ export function useUpdateContact() {
 export function useDeleteContact() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -815,6 +868,11 @@ export function useDeleteContact() {
         ["owner_id"],
       );
       if (deleteError) throw deleteError;
+
+      decrementUsage("contacts").catch((err) => {
+        console.error("Failed to decrement contacts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "contact_delete",
@@ -863,9 +921,17 @@ export function useOpportunities(accountId?: string) {
 export function useCreateOpportunity() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (opportunity: Omit<Partial<Opportunity>, "id" | "created_at" | "updated_at" | "expected_revenue">) => {
+      const limitCheck = await checkLimit("opportunities");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Opportunity limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const amount = opportunity.amount ?? 0;
       const probability = opportunity.probability ?? 0;
 
@@ -889,6 +955,11 @@ export function useCreateOpportunity() {
 
       const { data, error } = await supabase.from("opportunities").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("opportunities").catch((err) => {
+        console.error("Failed to increment opportunities usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "opportunity_create",
@@ -978,6 +1049,7 @@ export function useUpdateOpportunity() {
 export function useDeleteOpportunity() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -997,6 +1069,11 @@ export function useDeleteOpportunity() {
         ["owner_id"],
       );
       if (deleteError) throw deleteError;
+
+      decrementUsage("opportunities").catch((err) => {
+        console.error("Failed to decrement opportunities usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       void safeWriteAuditLog({
         action: "opportunity_delete",

@@ -31,6 +31,7 @@ export interface DashboardActivity {
     type: string | null;
     due_date: string | null;
     owner_id: string | null;
+    created_at: string | null;
 }
 
 export interface DashboardLead {
@@ -115,7 +116,7 @@ export function useOrganizationDashboard() {
                     .limit(4),
 
                 supabase.from("activities")
-                    .select("id, subject, type, due_date, owner_id")
+                    .select("id, subject, type, due_date, owner_id, created_at")
                     .eq("tenant_id", tenantId)
                     .order("due_date", { ascending: false })
                     .limit(4),

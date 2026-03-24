@@ -1,9 +1,8 @@
 // src/core/hooks/usePlanLimits.ts
 // React hook for checking and enforcing plan limits.
-// Author: Solanki
 
 import { useCallback, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import type {
@@ -42,12 +41,33 @@ interface UsePlanLimitsReturn {
   refreshUsage: () => void;
 }
 
+// Legacy plan type mapping: old values -> new values
+function mapLegacyPlanType(planType: string | null | undefined): PlanType {
+  if (!planType) return "foundation";
+  
+  // Map legacy plan types to new ones
+  switch (planType.toLowerCase()) {
+    case "starter":
+      return "foundation";
+    case "professional":
+      return "growth";
+    case "enterprise":
+      return "enterprise";
+    case "foundation":
+    case "growth":
+    case "commercial":
+      return planType as PlanType;
+    default:
+      return "foundation";
+  }
+}
+
 export function usePlanLimits(): UsePlanLimitsReturn {
   const { organization, subscription } = useOrganization();
   const queryClient = useQueryClient();
 
   const organizationId = organization?.id ?? null;
-  const planType: PlanType = (subscription?.plan_type as PlanType) ?? (organization?.plan_type as PlanType) ?? "foundation";
+  const planType: PlanType = mapLegacyPlanType(subscription?.plan_type) ?? mapLegacyPlanType(organization?.plan_type) ?? "foundation";
 
   // Fetch all usage data for the organization
   const { data: usageData, isLoading } = useQuery({
@@ -57,8 +77,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     queryFn: async () => {
       if (!organizationId) return {};
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_organization_usage", {
+      const { data, error } = await supabase.rpc("get_organization_usage", {
         p_organization_id: organizationId,
       });
 
@@ -67,7 +86,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         return {};
       }
 
-      return (data as Record<string, UsageEntry>) ?? {};
+      return (data as unknown as Record<string, UsageEntry>) ?? {};
     },
   });
 
@@ -79,8 +98,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         return { allowed: false, current_count: 0, max_allowed: 0, remaining: 0 };
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("check_plan_limit", {
+      const { data, error } = await supabase.rpc("check_plan_limit", {
         p_organization_id: organizationId,
         p_resource_type: resource,
       });
@@ -91,7 +109,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         return { allowed: true, current_count: 0, max_allowed: 999999999, remaining: 999999999 };
       }
 
-      return data as PlanLimitCheckResult;
+      return data as unknown as PlanLimitCheckResult;
     },
     [organizationId],
   );
@@ -102,8 +120,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
         return { success: false, error: "No organization", current_count: 0, max_allowed: 0 };
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("increment_usage", {
+      const { data, error } = await supabase.rpc("increment_usage", {
         p_organization_id: organizationId,
         p_resource_type: resource,
         p_amount: amount,
@@ -117,7 +134,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       // Invalidate cache so UI updates
       void queryClient.invalidateQueries({ queryKey: ["organization_usage", organizationId] });
 
-      return data as UsageIncrementResult;
+      return data as unknown as UsageIncrementResult;
     },
     [organizationId, queryClient],
   );
@@ -126,8 +143,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     async (resource: ResourceType, amount = 1): Promise<void> => {
       if (!organizationId) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)("decrement_usage", {
+      const { error } = await supabase.rpc("decrement_usage", {
         p_organization_id: organizationId,
         p_resource_type: resource,
         p_amount: amount,
@@ -199,3 +215,22 @@ export function usePlanLimits(): UsePlanLimitsReturn {
     refreshUsage,
   };
 }
+
+export function useUpgradePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ organizationId, newPlan }: { organizationId: string; newPlan: PlanType }) => {
+      const { data, error } = await supabase.rpc("upgrade_organization_plan" as any, {
+        p_organization_id: organizationId,
+        p_new_plan: newPlan,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organization"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-limits"] });
+    },
+  });
+}
+

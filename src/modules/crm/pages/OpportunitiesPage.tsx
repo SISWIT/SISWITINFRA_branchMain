@@ -35,6 +35,7 @@ import {
 } from "@/ui/shadcn/dropdown-menu";
 import { format } from "date-fns";
 import { Badge } from "@/ui/shadcn/badge";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 // Exactly matches Schema Enums
 export type OpportunityStage = 
@@ -226,6 +227,7 @@ export default function OpportunitiesPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="opportunities" className="mb-4" />
         <div>
           <h1 className="text-3xl font-bold">Opportunities</h1>
           <p className="text-muted-foreground">Manage your deals</p>

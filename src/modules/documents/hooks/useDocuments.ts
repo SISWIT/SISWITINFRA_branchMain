@@ -15,6 +15,7 @@ import { enqueueDocumentPdfJob, enqueueEmailSendJob, enqueueReminderJob, safeEnq
 import { softDeleteRecord } from "@/core/utils/soft-delete";
 import { safeWriteAuditLog } from "@/core/utils/audit";
 import { applyModuleReadScope, buildModuleCreatePayload, type ModuleScopeContext } from "@/core/utils/module-scope";
+import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { isPlatformRole } from "@/core/types/roles";
 
 type DocumentESignatureWithDocument = DocumentESignature & {
@@ -146,6 +147,7 @@ export function useCreateDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user, role } = useAuth();
   const { organization } = useOrganization();
+  const { checkLimit, incrementUsage } = usePlanLimits();
   const scope: ModuleScopeContext = {
     organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
@@ -154,6 +156,15 @@ export function useCreateDocumentTemplate() {
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<DocumentTemplate>, "id" | "created_at" | "updated_at">) => {
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("document_templates");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Document template limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
+
       const payload = buildModuleCreatePayload<DocumentTemplateInsert>(
         {
           name: template.name || "",
@@ -177,6 +188,13 @@ export function useCreateDocumentTemplate() {
       if (error) {
         throw error;
       }
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("document_templates").catch((err) => {
+        console.error("Failed to increment document_templates usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "document_template_created",
@@ -247,6 +265,7 @@ export function useDeleteDocumentTemplate() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { organization } = useOrganization();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -259,6 +278,13 @@ export function useDeleteDocumentTemplate() {
       if (!ok) {
         throw new Error("Failed to soft-delete template");
       }
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("document_templates").catch((err) => {
+        console.error("Failed to decrement document_templates usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "document_template_soft_deleted",
@@ -352,6 +378,7 @@ export function useCreateAutoDocument() {
   const queryClient = useQueryClient();
   const { user, role } = useAuth();
   const { organization } = useOrganization();
+  const { checkLimit, incrementUsage } = usePlanLimits();
   const scope: ModuleScopeContext = {
     organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
@@ -363,6 +390,15 @@ export function useCreateAutoDocument() {
       if (!organization?.id) {
         throw new Error("Organization context is required");
       }
+
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("documents");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Document limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
 
       const payload = buildModuleCreatePayload<AutoDocumentInsert>(
         {
@@ -392,6 +428,13 @@ export function useCreateAutoDocument() {
       if (error) {
         throw error;
       }
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("documents").catch((err) => {
+        console.error("Failed to increment documents usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       void safeEnqueueJob(enqueueDocumentPdfJob, {
         organizationId: organization.id,
@@ -471,6 +514,7 @@ export function useDeleteAutoDocument() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { organization } = useOrganization();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -483,6 +527,13 @@ export function useDeleteAutoDocument() {
       if (!ok) {
         throw new Error("Failed to soft-delete document");
       }
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("documents").catch((err) => {
+        console.error("Failed to decrement documents usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "document_soft_deleted",

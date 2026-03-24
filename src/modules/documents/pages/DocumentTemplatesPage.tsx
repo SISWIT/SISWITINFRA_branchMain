@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { Clock, Copy, Edit, FileStack, FileText, MoreVertical, Plus, Search, Trash2, User } from "lucide-react";
 
 const templateTypes: DocumentType[] = ["proposal", "invoice", "agreement", "report", "policy", "manual", "other"];
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 const emptyFormState = {
   name: "",
@@ -191,6 +192,7 @@ const DocumentTemplatesPage = () => {
 
   return (
     <div className="space-y-6">
+      <PlanLimitBanner resource="document_templates" className="mb-4" />
       {/* Delete AlertDialog */}
       <AlertDialog open={!!templateToDeleteId} onOpenChange={(open) => !open && setTemplateToDeleteId(null)}>
         <AlertDialogContent>

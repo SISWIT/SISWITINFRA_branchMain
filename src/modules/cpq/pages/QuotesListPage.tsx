@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/ui/shadcn/alert-dialog";
 import type { QuoteStatus } from "@/core/types/cpq";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: Clock },
@@ -66,6 +67,7 @@ export default function QuotesListPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="quotes" className="mb-4" />
         {/* Delete AlertDialog */}
         <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
           <AlertDialogContent>

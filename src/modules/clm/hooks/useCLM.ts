@@ -16,6 +16,7 @@ import {
 } from "@/core/utils/module-scope";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
 import { safeWriteAuditLog } from "@/core/utils/audit";
+import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { enqueueContractExpiryAlert, enqueueEmailSendJob, enqueueReminderJob, safeEnqueueJob } from "@/core/utils/jobs";
 
 type ContractTemplateInsert = Database["public"]["Tables"]["contract_templates"]["Insert"] & {
@@ -87,9 +88,19 @@ export function useContractTemplates() {
 export function useCreateContractTemplate() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<ContractTemplate>, "id" | "created_at" | "updated_at">) => {
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("contract_templates");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Contract template limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
+
       const payload = buildModuleCreatePayload<ContractTemplateInsert>(
         {
           name: template.name || "",
@@ -104,6 +115,13 @@ export function useCreateContractTemplate() {
 
       const { data, error } = await supabase.from("contract_templates").insert(payload).select().single();
       if (error) throw error;
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("contract_templates").catch((err) => {
+        console.error("Failed to increment contract_templates usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "contract_template_create",
@@ -168,6 +186,7 @@ export function useUpdateContractTemplate() {
 export function useDeleteContractTemplate() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -190,6 +209,13 @@ export function useDeleteContractTemplate() {
       });
 
       if (!deleted) throw new Error("Failed to delete template");
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("contract_templates").catch((err) => {
+        console.error("Failed to decrement contract_templates usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "contract_template_delete",
@@ -253,9 +279,19 @@ export function useContract(id: string) {
 export function useCreateContract() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (contract: Omit<Partial<Contract>, "id" | "created_at" | "updated_at">) => {
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("contracts");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Contract limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
+
       const payload = buildModuleCreatePayload<ContractInsert>(
         {
           name: contract.name || "",
@@ -277,6 +313,13 @@ export function useCreateContract() {
 
       const { data, error } = await supabase.from("contracts").insert(payload).select().single();
       if (error) throw error;
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("contracts").catch((err) => {
+        console.error("Failed to increment contracts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       if (tenantId && data.end_date) {
         const endDate = new Date(data.end_date);
@@ -370,6 +413,7 @@ export function useUpdateContract() {
 export function useDeleteContract() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -392,6 +436,13 @@ export function useDeleteContract() {
       });
 
       if (!deleted) throw new Error("Failed to delete contract");
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("contracts").catch((err) => {
+        console.error("Failed to decrement contracts usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "contract_delete",
@@ -441,9 +492,17 @@ export function useESignatures(contractId: string) {
 export function useCreateESignature() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (sig: Omit<Partial<ESignature>, "id" | "created_at" | "updated_at">) => {
+      const limitCheck = await checkLimit("esignatures");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `E-signature limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+
       const contractId = sig.contract_id || "";
       await ensureContractAccessible(contractId, scope);
 
@@ -460,6 +519,11 @@ export function useCreateESignature() {
 
       const { data, error } = await supabase.from("contract_esignatures").insert(payload).select().single();
       if (error) throw error;
+
+      incrementUsage("esignatures").catch((err) => {
+        console.error("Failed to increment esignatures usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
 
       if (tenantId && sig.recipient_email) {
         void safeEnqueueJob(enqueueEmailSendJob, {

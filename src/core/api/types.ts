@@ -2476,6 +2476,51 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_limits: {
+        Row: {
+          created_at: string
+          id: string
+          max_allowed: number
+          organization_id: string
+          period: string | null
+          resource_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_allowed?: number
+          organization_id: string
+          period?: string | null
+          resource_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_allowed?: number
+          organization_id?: string
+          period?: string | null
+          resource_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_limits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_limits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_super_admins: {
         Row: {
           created_at: string
@@ -3383,6 +3428,57 @@ export type Database = {
           },
         ]
       }
+      usage_tracking: {
+        Row: {
+          created_at: string
+          current_count: number
+          id: string
+          last_incremented_at: string | null
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          resource_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_count?: number
+          id?: string
+          last_incremented_at?: string | null
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          resource_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_count?: number
+          id?: string
+          last_incremented_at?: string | null
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          resource_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_tracking_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_tracking_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       admin_pending_approvals: {
@@ -3747,6 +3843,10 @@ export type Database = {
         Args: { p_organization_id: string; p_user_id?: string }
         Returns: boolean
       }
+      check_plan_limit: {
+        Args: { p_organization_id: string; p_resource_type: string }
+        Returns: Json
+      }
       claim_pending_invitations: { Args: never; Returns: number }
       create_client_signup_membership: {
         Args: { p_organization_id: string; p_user_id: string }
@@ -3767,6 +3867,14 @@ export type Database = {
         Returns: undefined
       }
       current_app_role: { Args: never; Returns: string }
+      decrement_usage: {
+        Args: {
+          p_amount?: number
+          p_organization_id: string
+          p_resource_type: string
+        }
+        Returns: undefined
+      }
       enqueue_background_job: {
         Args: {
           p_available_at?: string
@@ -3814,6 +3922,10 @@ export type Database = {
         }[]
       }
       get_inventory_value: { Args: never; Returns: number }
+      get_organization_usage: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       get_revenue_mtd: {
         Args: { end_date: string; start_date: string }
         Returns: number
@@ -3823,6 +3935,14 @@ export type Database = {
         Returns: string
       }
       hash_invitation_token: { Args: { p_token: string }; Returns: string }
+      increment_usage: {
+        Args: {
+          p_amount?: number
+          p_organization_id: string
+          p_resource_type: string
+        }
+        Returns: Json
+      }
       recompute_quote_totals: {
         Args: { p_quote_id: string }
         Returns: undefined
@@ -3839,6 +3959,10 @@ export type Database = {
           org_code: string
           slug: string
         }[]
+      }
+      seed_plan_limits_for_organization: {
+        Args: { p_organization_id: string; p_plan_type?: string }
+        Returns: undefined
       }
     }
     Enums: {

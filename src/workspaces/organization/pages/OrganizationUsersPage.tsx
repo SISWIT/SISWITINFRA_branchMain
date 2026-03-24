@@ -4,6 +4,7 @@ import { Input } from "@/ui/shadcn/input";
 import { Button } from "@/ui/shadcn/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Label } from "@/ui/shadcn/label";
+import type { Database } from "@/core/api/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,7 +90,7 @@ export default function OrganizationUsersPage() {
     try {
       const { error } = await supabase
         .from("organization_memberships")
-        .update({ role: editRole })
+        .update({ role: editRole as Database["public"]["Enums"]["app_role"] })
         .eq("id", memberToEdit.id);
 
       if (error) throw error;
@@ -118,7 +119,9 @@ export default function OrganizationUsersPage() {
         payload.role = member.role;
       }
 
-      const { error } = await supabase.from(table).insert([payload]);
+      const { error } = await supabase
+        .from(table as "employee_invitations" | "client_invitations")
+        .insert([payload as Database["public"]["Tables"]["employee_invitations"]["Insert"]]);
       if (error) throw error;
       toast.success(`Invitation resent to ${member.email}.`);
     } catch (err: unknown) {

@@ -14,6 +14,7 @@ import {
   requireOrganizationScope,
 } from "@/core/utils/module-scope";
 import { safeWriteAuditLog } from "@/core/utils/audit";
+import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
 type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
@@ -103,9 +104,19 @@ export function useProducts(options?: { includeInactive?: boolean }) {
 export function useCreateProduct() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (product: Omit<Partial<Product>, "id" | "created_at" | "updated_at">) => {
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("products");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Product limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan to create more products.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
+
       const payload = buildModuleCreatePayload<ProductInsert>(
         {
           name: product.name || "",
@@ -122,6 +133,13 @@ export function useCreateProduct() {
 
       const { data, error } = await supabase.from("products").insert(payload).select().single();
       if (error) throw error;
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("products").catch((err) => {
+        console.error("Failed to increment products usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "product_create",
@@ -201,6 +219,7 @@ export function useUpdateProduct() {
 export function useDeleteProduct() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -220,6 +239,13 @@ export function useDeleteProduct() {
         [],
       );
       if (deleteError) throw deleteError;
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("products").catch((err) => {
+        console.error("Failed to decrement products usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "product_delete",
@@ -298,9 +324,19 @@ export function useQuote(id: string) {
 export function useCreateQuote() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { checkLimit, incrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (quote: Omit<Partial<Quote>, "id" | "created_at" | "updated_at"> & { items?: QuoteItem[] }) => {
+      // --- PLAN LIMIT CHECK ---
+      const limitCheck = await checkLimit("quotes");
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Quote limit reached (${limitCheck.current_count}/${limitCheck.max_allowed}). Please upgrade your plan.`
+        );
+      }
+      // --- END PLAN LIMIT CHECK ---
+
       const { items, ...quoteData } = quote;
 
       // Compute totals from items safely
@@ -333,6 +369,13 @@ export function useCreateQuote() {
 
       const { data, error } = await supabase.from("quotes").insert(payload).select().single();
       if (error) throw error;
+
+      // --- INCREMENT USAGE ---
+      incrementUsage("quotes").catch((err) => {
+        console.error("Failed to increment quotes usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END INCREMENT USAGE ---
 
       if (items && items.length > 0) {
         const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
@@ -458,6 +501,7 @@ export function useUpdateQuote() {
 export function useDeleteQuote() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { decrementUsage } = usePlanLimits();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -488,6 +532,13 @@ export function useDeleteQuote() {
         ["owner_id"],
       );
       if (deleteError) throw deleteError;
+
+      // --- DECREMENT USAGE ---
+      decrementUsage("quotes").catch((err) => {
+        console.error("Failed to decrement quotes usage:", err);
+        toast.error("Failed to update usage tracking. Please contact support.");
+      });
+      // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
         action: "quote_delete",

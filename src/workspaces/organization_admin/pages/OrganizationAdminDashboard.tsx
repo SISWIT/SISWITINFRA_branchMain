@@ -444,7 +444,7 @@ export default function OrganizationAdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-2.5">
             {lists.activities.length > 0 ? lists.activities.map((activity: DashboardActivity, index: number) => {
-              const dateStr = activity.start_time ? format(new Date(activity.start_time), "h:mm a") : "Time TBD";
+              const dateStr = activity.created_at ? format(new Date(activity.created_at), "h:mm a") : "Time TBD";
               // Rotate through tones
               const tones = ["bg-chart-2/20", "bg-primary/15", "bg-chart-3/20", "bg-chart-4/20"];
               const tone = tones[index % tones.length];

@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/ui/shadcn/dropdown-menu";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 // matches accounts table
 export interface AccountRow {
@@ -260,6 +261,7 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="accounts" className="mb-4" />
         <div>
           <h1 className="text-3xl font-bold">Accounts</h1>
           <p className="text-muted-foreground">

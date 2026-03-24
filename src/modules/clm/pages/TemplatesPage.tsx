@@ -35,6 +35,7 @@ import {
 } from "@/ui/shadcn/dropdown-menu";
 import { Badge } from "@/ui/shadcn/badge";
 import { ContractTemplate } from "@/core/types/clm";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 export default function TemplatesPage() {
   const { data: templates = [], isLoading } = useContractTemplates();
@@ -155,6 +156,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="contract_templates" className="mb-4" />
         <div>
           <h1 className="text-3xl font-bold">Contract Templates</h1>
           <p className="text-muted-foreground">Create reusable templates for your legal agreements</p>

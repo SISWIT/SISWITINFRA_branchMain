@@ -151,7 +151,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         let primaryMembership = rows.find(m => m.organization_id === preferredOrgId) as OrganizationMembership | undefined;
         
         if (!primaryMembership) {
-          primaryMembership = pickMembership(rows);
+          primaryMembership = pickMembership(rows) || undefined;
         }
 
         const primary = primaryMembership?.organization;

@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/shadcn/dropdown-menu";
 import { format } from "date-fns";
-
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 // Schema-aligned Interface
 export interface ContactRow {
   id: string;
@@ -188,6 +188,7 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-6">
+        <PlanLimitBanner resource="contacts" className="mb-4" />
         <div>
           <h1 className="text-3xl font-bold">Contacts</h1>
           <p className="text-muted-foreground">Manage your contacts</p>

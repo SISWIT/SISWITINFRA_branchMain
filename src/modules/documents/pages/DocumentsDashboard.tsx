@@ -5,6 +5,7 @@ import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { useAutoDocuments, useDocumentESignatures } from "@/modules/documents/hooks/useDocuments";
 import { DOCUMENT_STATUS_COLORS } from "@/core/types/documents";
 import { ArrowRight, CheckCircle2, FilePlus, FileStack, FileText, History, Send, Zap } from "lucide-react";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 
 const quickActions = [
   {
@@ -60,6 +61,7 @@ const DocumentsDashboard = () => {
 
   return (
     <div className="space-y-8">
+      <PlanLimitBanner resource="documents" className="mb-4" />
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Document Automation</h1>
