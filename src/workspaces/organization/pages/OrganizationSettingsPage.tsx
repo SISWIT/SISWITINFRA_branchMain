@@ -57,8 +57,8 @@ export default function OrganizationSettingsPage() {
         <p className="mt-1 text-sm text-muted-foreground">Manage your organization profile and branding.</p>
       </section>
 
-      <section className="org-panel space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
+      <section className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-2">
             <label className="text-sm font-medium">Organization Name</label>
             <Input 

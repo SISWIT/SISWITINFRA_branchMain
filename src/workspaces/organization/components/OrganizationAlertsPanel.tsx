@@ -1,6 +1,8 @@
-import { AlertTriangle, BellRing, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, BellRing, ShieldAlert, X, Shield } from "lucide-react";
 import type { ComponentType } from "react";
 import { Button } from "@/ui/shadcn/button";
+import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { cn } from "@/core/utils/utils";
 import type { OrganizationOwnerAlert } from "@/workspaces/organization/hooks/useOrganizationOwnerData";
 
 interface OrganizationAlertsPanelProps {
@@ -9,68 +11,76 @@ interface OrganizationAlertsPanelProps {
   title?: string;
 }
 
-function alertStyles(severity: OrganizationOwnerAlert["severity"]): {
+function getAlertConfig(severity: OrganizationOwnerAlert["severity"]): {
   icon: ComponentType<{ className?: string }>;
-  badgeClass: string;
+  color: string;
 } {
-  if (severity === "critical") {
-    return {
-      icon: ShieldAlert,
-      badgeClass: "bg-destructive/15 text-destructive",
-    };
+  switch (severity) {
+    case "critical":
+      return { icon: ShieldAlert, color: "text-destructive" };
+    case "warning":
+      return { icon: AlertTriangle, color: "text-amber-500" };
+    default:
+      return { icon: BellRing, color: "text-blue-500" };
   }
-  if (severity === "warning") {
-    return {
-      icon: AlertTriangle,
-      badgeClass: "bg-warning/15 text-warning",
-    };
-  }
-  return {
-    icon: BellRing,
-    badgeClass: "bg-info/15 text-info",
-  };
 }
 
-export function OrganizationAlertsPanel({ alerts, onDismiss, title = "Alerts" }: OrganizationAlertsPanelProps) {
+export function OrganizationAlertsPanel({ alerts, onDismiss, title = "System Alerts" }: OrganizationAlertsPanelProps) {
+  const { organization } = useOrganization();
+  const primaryColor = organization?.primary_color || "var(--primary)";
+
   return (
-    <section className="org-panel h-full">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-semibold">{title}</h3>
+    <section className="p-8 h-full bg-card/40 backdrop-blur-md rounded-[2rem] border border-border/40 shadow-xl">
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-bold tracking-tight">{title}</h3>
+          <p className="text-sm text-muted-foreground font-medium mt-1">Required administrative actions</p>
+        </div>
+        <div 
+          className="h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg"
+          style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+        >
+          <Shield className="h-6 w-6" />
+        </div>
       </div>
+
       {alerts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No active alerts.</p>
+        <div className="rounded-[1.5rem] border border-dashed border-border/40 bg-background/20 p-10 text-center">
+          <p className="text-sm text-muted-foreground font-medium">System status is operational.</p>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {alerts.map((alert) => {
-            const { icon: Icon, badgeClass } = alertStyles(alert.severity);
+            const config = getAlertConfig(alert.severity);
+            const Icon = config.icon;
+            
             return (
               <article
                 key={alert.id}
-                className="rounded-xl border border-border/70 bg-background/75 px-3.5 py-3"
+                className="group relative flex items-start gap-4 rounded-2xl border border-border/20 bg-background/40 p-4 transition-all hover:bg-background/60 hover:shadow-md"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 gap-3">
-                    <span className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${badgeClass}`}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{alert.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{alert.description}</p>
-                    </div>
-                  </div>
-                  {onDismiss ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={() => onDismiss(alert.id)}
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="sr-only">Dismiss alert</span>
-                    </Button>
-                  ) : null}
+                <div className={cn(
+                  "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center bg-card shadow-sm border border-border/10",
+                  config.color
+                )}>
+                  <Icon className="h-5 w-5" />
                 </div>
+                
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold group-hover:text-primary transition-colors">{alert.title}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground/80 mt-1 leading-relaxed">{alert.description}</p>
+                </div>
+
+                {onDismiss && (
+                  <Button
+                    onClick={() => onDismiss(alert.id)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </article>
             );
           })}

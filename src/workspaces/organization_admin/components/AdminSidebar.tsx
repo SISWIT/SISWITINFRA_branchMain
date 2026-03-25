@@ -121,7 +121,8 @@ export function AdminSidebar({
   return (
     <aside 
       className={cn(
-        "flex flex-col bg-card border-r border-border/60 h-full transition-all duration-300 relative z-20",
+        "flex flex-col bg-card/60 backdrop-blur-xl border-r border-border/40 h-full transition-all duration-300 relative z-20",
+        "before:absolute before:inset-0 before:bg-purple-600/5 before:pointer-events-none before:z-[-1]",
         collapsed ? "w-16" : "w-64",
         className
       )}

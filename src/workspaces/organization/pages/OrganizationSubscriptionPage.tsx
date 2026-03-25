@@ -153,19 +153,19 @@ export default function OrganizationSubscriptionPage() {
       </header>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-[400px] mb-8">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            <span className="hidden sm:inline">Billing Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="invoices" className="flex items-center gap-2">
-            <Receipt className="h-4 w-4" />
-            <span className="hidden sm:inline">Invoices</span>
-          </TabsTrigger>
+        <TabsList className="flex gap-2 bg-muted/30 border border-border/40 rounded-2xl p-1.5 w-fit shadow-inner mb-10">
+          {(["overview", "billing", "invoices"] as const).map((tab) => (
+            <TabsTrigger 
+              key={tab}
+              value={tab} 
+              className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:border-border/20 data-[state=active]:shadow-md data-[state=active]:scale-105"
+            >
+              {tab === "overview" && <Activity className="mr-2 h-4 w-4" />}
+              {tab === "billing" && <CreditCard className="mr-2 h-4 w-4" />}
+              {tab === "invoices" && <Receipt className="mr-2 h-4 w-4" />}
+              <span className="hidden sm:inline capitalize">{tab}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         {!organization && !organizationLoading ? (
@@ -178,9 +178,9 @@ export default function OrganizationSubscriptionPage() {
             <TabsContent value="overview" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Plan Summary Card */}
-                <article className="org-panel flex flex-col justify-between">
+                <article className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl flex flex-col justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold mb-6">Current Plan</h2>
+                    <h2 className="text-xl font-bold tracking-tight mb-8">Current Plan</h2>
                     <div className="space-y-6">
                       <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
                         <p className="text-sm font-medium mb-4">Plan Capacity</p>
@@ -225,12 +225,12 @@ export default function OrganizationSubscriptionPage() {
                 </article>
 
                 {/* Modules Card */}
-                <article className="org-panel">
-                  <div className="flex items-center gap-2 mb-4">
-                    <ShieldCheck className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-semibold">Platform Modules</h2>
+                <article className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl">
+                  <div className="flex items-center gap-3 mb-4">
+                    <ShieldCheck className="h-6 w-6 text-primary" />
+                    <h2 className="text-xl font-bold tracking-tight">Platform Modules</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-6 leading-relaxed">Included features for your current organization profile.</p>
+                  <p className="text-sm text-muted-foreground font-medium mb-6 leading-relaxed">Included features for your current organization profile.</p>
                   
                   <div className="grid gap-3 sm:grid-cols-2">
                     {organizationLoading ? (
@@ -263,9 +263,9 @@ export default function OrganizationSubscriptionPage() {
               </div>
 
               {/* Detailed Usage */}
-              <section className="org-panel">
-                <h2 className="text-xl font-semibold mb-2">Resource Usage Details</h2>
-                <p className="text-sm text-muted-foreground mb-6">Real-time consumption snapshot across your organization.</p>
+              <section className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl">
+                <h2 className="text-xl font-bold tracking-tight mb-2">Resource Usage</h2>
+                <p className="text-sm text-muted-foreground font-medium mb-6">Real-time consumption snapshot across your organization.</p>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {usageLoading ? (
@@ -320,12 +320,12 @@ export default function OrganizationSubscriptionPage() {
             </TabsContent>
 
             <TabsContent value="billing" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-8 md:grid-cols-2">
                 {/* Billing Profile */}
-                <article className="org-panel">
-                  <div className="flex items-center gap-2 mb-6">
-                    <User className="h-5 w-5 text-primary" />
-                    <h2 className="text-lg font-semibold">Billing Details</h2>
+                <article className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl">
+                  <div className="flex items-center gap-3 mb-6">
+                    <User className="h-6 w-6 text-primary" />
+                    <h2 className="text-xl font-bold tracking-tight">Billing Details</h2>
                   </div>
 
                   {billingLoading ? (

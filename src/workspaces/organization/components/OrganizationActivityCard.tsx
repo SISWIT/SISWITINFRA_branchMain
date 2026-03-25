@@ -1,4 +1,6 @@
 import { Clock3 } from "lucide-react";
+import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { cn } from "@/core/utils/utils";
 
 interface ActivityItem {
   id: string;
@@ -12,45 +14,59 @@ interface OrganizationActivityCardProps {
   items: ActivityItem[];
 }
 
-function stateBadgeClass(state: string): string {
-  switch (state.toLowerCase()) {
-    case "accepted":
-    case "active":
-      return "bg-success/15 text-success";
-    case "expired":
-    case "rejected":
-      return "bg-destructive/15 text-destructive";
-    case "pending":
-      return "bg-warning/15 text-warning";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
-
 export function OrganizationActivityCard({ title, items }: OrganizationActivityCardProps) {
+  const { organization } = useOrganization();
+  const primaryColor = organization?.primary_color || "var(--primary)";
+
+  const getStateStyles = (state: string) => {
+    switch (state.toLowerCase()) {
+      case "accepted":
+      case "active":
+        return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      case "expired":
+      case "rejected":
+        return "bg-destructive/10 text-destructive border-destructive/20";
+      case "pending":
+        return "bg-amber-500/10 text-amber-500 border-amber-500/20";
+      default:
+        return "bg-muted text-muted-foreground border-border/40";
+    }
+  };
+
   return (
-    <section className="org-panel h-full">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">{title}</h3>
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-muted/50">
-          <Clock3 className="h-4 w-4 text-primary" />
-        </span>
+    <section className="p-8 h-full bg-card/40 backdrop-blur-md rounded-[2rem] border border-border/40 shadow-xl">
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-bold tracking-tight">{title}</h3>
+          <p className="text-sm text-muted-foreground font-medium mt-1">Recent timeline activity</p>
+        </div>
+        <div 
+          className="h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg"
+          style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+        >
+          <Clock3 className="h-6 w-6" />
+        </div>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No recent records.</p>
+        <div className="rounded-[1.5rem] border border-dashed border-border/40 bg-background/20 p-10 text-center">
+          <p className="text-sm text-muted-foreground font-medium">No recent activity found.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
             <article
               key={item.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-background/70 px-3 py-2.5"
+              className="group flex items-start justify-between gap-4 rounded-2xl border border-border/20 bg-background/40 p-4 transition-all hover:bg-background/60 hover:shadow-md"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{item.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold group-hover:text-primary transition-colors">{item.title}</p>
+                <p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-0.5">{item.subtitle}</p>
               </div>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${stateBadgeClass(item.state)}`}>
+              <span className={cn(
+                "shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider border",
+                getStateStyles(item.state)
+              )}>
                 {item.state}
               </span>
             </article>
@@ -60,4 +76,3 @@ export function OrganizationActivityCard({ title, items }: OrganizationActivityC
     </section>
   );
 }
-

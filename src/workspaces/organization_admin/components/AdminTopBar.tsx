@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   Check,
@@ -32,24 +32,31 @@ import { cn } from "@/core/utils/utils";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { NotificationBell } from "@/ui/notification-bell";
+import { tenantAppPath } from "@/core/utils/routes";
 
-interface OrganizationTopBarProps {
+interface AdminTopBarProps {
   onOpenSidebar: () => void;
 }
 
-const PAGES = [
-  { label: "Dashboard", path: "/organization/overview" },
-  { label: "User Management", path: "/organization/users" },
-  { label: "Invitations", path: "/organization/invitations" },
-  { label: "Client Approvals", path: "/organization/approvals" },
-  { label: "Plans and Billing", path: "/organization/plans" },
-  { label: "Alerts", path: "/organization/alerts" },
-  { label: "Settings", path: "/organization/settings" },
+const ADMIN_PAGES = [
+  { label: "Dashboard Overview", path: "dashboard" },
+  { label: "Team Management", path: "users" },
+  { label: "Billing & Subscription", path: "subscription" },
+  { label: "Lead Management", path: "crm/leads" },
+  { label: "Contact Management", path: "crm/contacts" },
+  { label: "Opportunity Management", path: "crm/opportunities" },
+  { label: "Contract Management (CLM)", path: "clm/contracts" },
+  { label: "Quote Management (CPQ)", path: "cpq/quotes" },
+  { label: "ERP Hub", path: "erp" },
+  { label: "Document Management", path: "documents" },
+  { label: "Invitations Control", path: "invitations" },
+  { label: "Alerts & Notifications", path: "alerts" },
+  { label: "System Settings", path: "settings" },
 ] as const;
 
 function getDisplayName(email: string | null | undefined): string {
-  if (!email) return "Owner";
-  return email.split("@")[0] || "Owner";
+  if (!email) return "Admin";
+  return email.split("@")[0] || "Admin";
 }
 
 function formatSelectedDate(date: Date): string {
@@ -60,10 +67,12 @@ function formatSelectedDate(date: Date): string {
   });
 }
 
-export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
-  const { user, signOut } = useAuth();
+export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
+  const { user, signOut, role } = useAuth();
   const { organization } = useOrganization();
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+  
   const displayName = getDisplayName(user?.email);
   const initials = displayName.slice(0, 2).toUpperCase();
   const primaryColor = organization?.primary_color || "var(--primary)";
@@ -74,8 +83,8 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return PAGES;
-    return PAGES.filter((p) => p.label.toLowerCase().includes(q));
+    if (!q) return ADMIN_PAGES;
+    return ADMIN_PAGES.filter((p) => p.label.toLowerCase().includes(q));
   }, [searchQuery]);
 
   useEffect(() => {
@@ -94,10 +103,10 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
   const [selectedModule, setSelectedModule] = useState<string>("All");
   const handleModuleSelect = useCallback((label: string, path?: string) => {
     setSelectedModule(label);
-    if (path) navigate(path);
-  }, [navigate]);
+    if (path) navigate(tenantAppPath(tenantSlug, path));
+  }, [navigate, tenantSlug]);
 
-  const orgCode = organization?.org_code ?? "ORG";
+  const orgCode = organization?.org_code ?? "ADMIN";
   const [copied, setCopied] = useState(false);
   async function handleCopyOrgCode() {
     try {
@@ -109,13 +118,13 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/auth/sign-in", { replace: true });
+    window.location.href = "/auth/sign-in";
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-purple-500/10 bg-card/60 backdrop-blur-2xl px-4 lg:px-8 py-3 overflow-hidden">
+    <header className="sticky top-0 z-40 w-full border-b border-purple-500/10 bg-card/60 backdrop-blur-2xl px-4 lg:px-8 py-3 overflow-visible">
       {/* Topbar Internal Glow */}
-      <div className="absolute inset-0 bg-purple-600/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-purple-600/5 pointer-events-none overflow-hidden" />
       
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 relative z-10">
         
@@ -143,7 +152,7 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
               onFocus={() => setSearchOpen(true)}
             />
             {searchOpen && (
-              <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl p-1 shadow-2xl animate-in fade-in zoom-in-95">
+              <div className="absolute left-0 top-full z-[100] mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl p-1 shadow-2xl animate-in fade-in zoom-in-95">
                 {searchResults.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted-foreground/60">No matching commands</p>
                 ) : (
@@ -155,7 +164,7 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
                           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            navigate(page.path);
+                            navigate(tenantAppPath(tenantSlug, page.path));
                             setSearchOpen(false);
                             setSearchQuery("");
                           }}
@@ -198,8 +207,8 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
             <DropdownMenuContent align="center" className="w-48 border-white/10 bg-card/95 backdrop-blur-xl">
               <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Modules</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/5" />
-              <DropdownMenuItem className="text-xs font-medium cursor-pointer" onSelect={() => handleModuleSelect("All")}>Overview</DropdownMenuItem>
-              {PAGES.map(p => (
+              <DropdownMenuItem className="text-xs font-medium cursor-pointer" onSelect={() => handleModuleSelect("All", "dashboard")}>Overview</DropdownMenuItem>
+              {ADMIN_PAGES.map(p => (
                 <DropdownMenuItem key={p.path} className="text-xs font-medium cursor-pointer" onSelect={() => handleModuleSelect(p.label, p.path)}>{p.label}</DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -219,9 +228,9 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
 
         {/* Right: Actions & Profile */}
         <div className="flex items-center gap-3">
-          <Link to="/organization/invitations" className="hidden sm:block">
+          <Link to={tenantAppPath(tenantSlug, "invitations")} className="hidden sm:block">
             <Button size="sm" className="h-8 rounded-full px-4 text-[11px] font-bold uppercase tracking-wider bg-primary hover:opacity-90 transition-opacity">
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Invite
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Admin Invite
             </Button>
           </Link>
           
@@ -233,14 +242,15 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 p-1 rounded-full hover:bg-white/5 transition-all">
                 <div 
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-lg border border-white/10 shrink-0"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-lg border border-white/10 shrink-0 relative"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {initials}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />
                 </div>
                 <div className="hidden md:block text-left mr-1">
                   <p className="text-xs font-bold leading-none">{displayName}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5 opacity-60">Organization Owner</p>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5 opacity-60 capitalize">{role || "Admin"}</p>
                 </div>
                 <ChevronDown className="h-3 w-3 text-muted-foreground/60 hidden md:block" />
               </button>
@@ -250,8 +260,8 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
                 <p className="text-xs font-bold">{displayName}</p>
                 <p className="text-[10px] text-muted-foreground font-medium truncate mt-0.5">{user?.email}</p>
               </div>
-              <DropdownMenuItem className="text-xs font-medium py-2 cursor-pointer focus:bg-white/5" onSelect={() => navigate("/organization/settings")}>
-                <Settings className="mr-2 h-3.5 w-3.5 opacity-60" /> Profile Settings
+              <DropdownMenuItem className="text-xs font-medium py-2 cursor-pointer focus:bg-white/5" onSelect={() => navigate(tenantAppPath(tenantSlug, "settings"))}>
+                <Settings className="mr-2 h-3.5 w-3.5 opacity-60" /> System Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem className="text-xs font-medium py-2 cursor-pointer text-destructive focus:bg-destructive/10" onSelect={handleSignOut}>

@@ -141,40 +141,40 @@ export default function OrganizationInvitationsPage() {
       {/* Page header */}
       <section className="space-y-1">
         <p className="text-[11px] font-medium tracking-widest uppercase text-muted-foreground">Organization</p>
-        <h1 className="text-4xl font-normal tracking-tight leading-tight">Invitations</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight leading-tight">Invitations</h1>
         <p className="text-sm text-muted-foreground max-w leading-relaxed pt-0.5">
           Invite team members for internal access, or onboard clients to the external portal.
         </p>
       </section>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-muted/50 border border-border/60 rounded-xl p-1 w-fit">
+      <div className="flex gap-2 bg-muted/20 border border-border/40 rounded-xl p-1 w-fit shadow-inner">
         {(["employee", "client", "history"] as Tab[]).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-150 capitalize",
+              "px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 capitalize",
               activeTab === tab
-                ? "bg-background text-foreground border border-border/60 shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-card text-foreground border border-border/20 shadow-md scale-105"
+                : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40"
             )}
           >
-            {tab === "employee" ? "Employee invite" : tab === "client" ? "Client invite" : "History"}
+            {tab === "employee" ? "Team invite" : tab === "client" ? "Client invite" : "History"}
           </button>
         ))}
       </div>
 
       {/* Employee invite tab */}
       {activeTab === "employee" && (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-2xl border border-border/70 bg-card/60 p-6 space-y-5">
-            <div className="space-y-1 pb-4 border-b border-border/50">
-              <p className="text-[11px] font-medium tracking-widest uppercase text-muted-foreground">Internal access</p>
-              <h2 className="font-serif text-2xl font-normal">Invite an employee</h2>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Grant workspace access for admins, managers, and staff with a role-scoped invitation link.
+        <div className="grid gap-8 xl:grid-cols-2">
+          <article className="rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md p-6 lg:p-8 space-y-6 shadow-xl">
+            <div className="space-y-2 pb-6 border-b border-border/20 text-center sm:text-left">
+              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground/60">Internal Onboarding</p>
+              <h2 className="text-3xl font-extrabold tracking-tight">Invite Team Member</h2>
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+                Grant detailed workspace access and define system roles for your new collaborators.
               </p>
             </div>
 
@@ -303,13 +303,13 @@ export default function OrganizationInvitationsPage() {
 
       {/* Client invite tab */}
       {activeTab === "client" && (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-2xl border border-border/70 bg-card/60 p-6 space-y-5">
-            <div className="space-y-1 pb-4 border-b border-border/50">
-              <p className="text-[11px] font-medium tracking-widest uppercase text-muted-foreground">External onboarding</p>
-              <h2 className="font-serif text-2xl font-normal">Invite a client</h2>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Send a portal onboarding invitation to a client's email with a time-limited link.
+        <div className="grid gap-8 xl:grid-cols-2">
+          <article className="rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md p-6 lg:p-8 space-y-6 shadow-xl">
+            <div className="space-y-2 pb-6 border-b border-border/20 text-center sm:text-left">
+              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground/60">External Onboarding</p>
+              <h2 className="text-3xl font-extrabold tracking-tight">Invite a Client</h2>
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+                Send a portal onboarding invitation with a secure, time-limited registration link.
               </p>
             </div>
 
@@ -489,15 +489,15 @@ export default function OrganizationInvitationsPage() {
       )}
 
       {/* Footer strip */}
-      <div className="rounded-2xl border border-border/70 bg-card/50 p-4">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-primary/10 p-2 text-primary flex-shrink-0">
-            <ShieldCheck className="h-4 w-4" />
+      <div className="rounded-3xl border border-border/40 bg-card/50 backdrop-blur-md p-6 shadow-lg">
+        <div className="flex items-start gap-4">
+          <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
+            <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-medium">Invitation behavior</p>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              Invitation links are copied to clipboard when available. If email sending is disabled or fails, share the copied link manually. All invitations expire automatically.
+            <p className="text-sm font-bold tracking-tight">System Policy: Invitation Security</p>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed font-medium">
+              Links are automatically generated and copied. For security, invitations expire after the set duration and cannot be reused once converted to a membership. Always verify the recipient email before dispatching.
             </p>
           </div>
         </div>

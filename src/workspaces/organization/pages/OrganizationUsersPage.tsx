@@ -146,16 +146,19 @@ export default function OrganizationUsersPage() {
         <p className="mt-1 text-sm text-muted-foreground">Review organization memberships by role and account state.</p>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {roleDistribution.map((role) => (
-          <article key={role.role} className="org-panel py-4">
-            <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{role.role}</p>
-            <p className="mt-2 font-mono text-3xl font-semibold">{role.count}</p>
+          <article 
+            key={role.role} 
+            className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-lg transition-transform hover:scale-[1.02]"
+          >
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{role.role}</p>
+            <p className="mt-2 font-mono text-3xl font-bold tracking-tight">{role.count}</p>
           </article>
         ))}
       </section>
 
-      <section className="org-panel space-y-4">
+      <section className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl space-y-6">
         <div className="grid gap-3 md:grid-cols-[1fr_180px_220px]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -194,7 +197,7 @@ export default function OrganizationUsersPage() {
             {filteredMembers.map((member) => (
               <article
                 key={member.id}
-                className="grid items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3.5 py-3 md:grid-cols-[1.5fr_120px_160px_100px_60px]"
+                className="grid items-center gap-4 rounded-2xl border border-border/20 bg-background/40 p-4 transition-all hover:bg-background/60 hover:shadow-md md:grid-cols-[1.5fr_120px_160px_100px_60px]"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{member.email}</p>

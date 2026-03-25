@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
-import type { ComponentType } from "react";
+import { useMemo } from "react";
+import { NavLink, useParams } from "react-router-dom";
 import {
   Bell,
   ChevronLeft,
@@ -12,12 +11,22 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  LineChart,
 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { cn } from "@/core/utils/utils";
 import { useAuth } from "@/core/auth/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+
+interface SidebarGroup {
+  label: string;
+  items: {
+    label: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[];
+}
 
 interface OrganizationSidebarProps {
   className?: string;
@@ -26,22 +35,6 @@ interface OrganizationSidebarProps {
   onCollapseToggle?: () => void;
   hideCollapseControl?: boolean;
 }
-
-interface SidebarItem {
-  label: string;
-  href: string;
-  icon: ComponentType<{ className?: string }>;
-}
-
-const sidebarItems: SidebarItem[] = [
-  { label: "Dashboard", href: "/organization/overview", icon: LayoutDashboard },
-  { label: "User Management", href: "/organization/users", icon: Users },
-  { label: "Invitations", href: "/organization/invitations", icon: MailPlus },
-  { label: "Client Approvals", href: "/organization/approvals", icon: ShieldCheck },
-  { label: "Subscription", href: "/organization/subscription", icon: CreditCard },
-  { label: "Alerts", href: "/organization/alerts", icon: Bell },
-  { label: "Settings", href: "/organization/settings", icon: Settings },
-];
 
 export function OrganizationSidebar({ 
   className, 
@@ -53,88 +46,138 @@ export function OrganizationSidebar({
   const { organization } = useOrganization();
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [logoFailed, setLogoFailed] = useState(false);
+  const { tenantSlug: _tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+
+  const primaryColor = organization?.primary_color || "var(--primary)";
+
+  const groups: SidebarGroup[] = useMemo(() => [
+    {
+      label: "Analytics",
+      items: [
+        { label: "Dashboard", href: `/organization/overview`, icon: LayoutDashboard },
+        { label: "Performance", href: `/organization/performance`, icon: LineChart },
+      ]
+    },
+    {
+      label: "Team Hub",
+      items: [
+        { label: "Members", href: `/organization/users`, icon: Users },
+        { label: "Invitations", href: `/organization/invitations`, icon: MailPlus },
+        { label: "Client Approvals", href: `/organization/approvals`, icon: ShieldCheck },
+      ]
+    },
+    {
+      label: "Control",
+      items: [
+        { label: "Subscription", href: `/organization/subscription`, icon: CreditCard },
+        { label: "Alerts", href: `/organization/alerts`, icon: Bell },
+        { label: "Settings", href: `/organization/settings`, icon: Settings },
+      ]
+    }
+  ], []);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth/sign-in", { replace: true });
   };
 
-  const organizationName = organization?.name?.trim() || "Organization";
-  const organizationSubtitle = organization?.org_code ?? organization?.slug ?? "Owner Workspace";
-  const organizationInitials = useMemo(() => {
-    const parts = organizationName
-      .split(" ")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .slice(0, 2);
-    if (parts.length === 0) return "OR";
-    return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
-  }, [organizationName]);
+  const organizationName = organization?.name || "Organization";
+  const initials = organizationName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
 
   return (
-    <aside className={cn("org-sidebar-panel flex h-full w-full flex-col", className)}>
-      <div className={cn("org-sidebar-brand", collapsed && "justify-center px-0")}>
-        {organization?.logo_url && !logoFailed ? (
-          <img
-            src={organization.logo_url}
-            alt={`${organizationName} logo`}
-            className="h-8 w-8 rounded-full border border-border/70 object-cover shrink-0"
-            onError={() => setLogoFailed(true)}
-          />
+    <aside 
+      className={cn(
+        "flex flex-col bg-card/60 backdrop-blur-xl border-r border-border/40 h-full transition-all duration-300 relative z-20",
+        "before:absolute before:inset-0 before:bg-purple-600/5 before:pointer-events-none before:z-[-1]",
+        collapsed ? "w-16" : "w-64",
+        className
+      )}
+      style={{ "--sidebar-accent": primaryColor } as React.CSSProperties}
+    >
+      {/* Brand Header */}
+      <div className="h-16 flex items-center px-4 border-b border-border/40 shrink-0">
+        {!collapsed ? (
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div 
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-white shrink-0 font-bold text-sm shadow-sm"
+              style={{ backgroundColor: primaryColor }}
+            >
+              {initials}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-sm truncate">{organizationName}</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Owner Workspace</span>
+            </div>
+          </div>
         ) : (
-          <div className="org-brand-icon shrink-0" aria-hidden>
-            {organizationInitials}
-          </div>
-        )}
-        {!collapsed && (
-          <div className="min-w-0 overflow-hidden">
-            <p className="truncate text-sm font-semibold leading-none">{organizationName}</p>
-            <p className="truncate text-xs text-muted-foreground">{organizationSubtitle}</p>
+          <div 
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-white mx-auto font-bold text-sm shadow-sm"
+            style={{ backgroundColor: primaryColor }}
+          >
+            {initials[0]}
           </div>
         )}
       </div>
 
-      <div className="mt-6 flex-1 space-y-2 overflow-y-auto pr-1">
-        {!collapsed && (
-          <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Menu
-          </p>
-        )}
-        <nav className="space-y-1.5">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                onClick={onNavigate}
-                title={collapsed ? item.label : undefined}
-                className={({ isActive }) => cn(
-                  "org-sidebar-link", 
-                  isActive && "org-sidebar-link-active",
-                  collapsed && "justify-center px-2"
-                )}
-              >
-                <Icon className={cn("h-4 w-4 shrink-0", collapsed && "mr-0")} />
-                {!collapsed && <span>{item.label}</span>}
-              </NavLink>
-            );
-          })}
-        </nav>
+      {/* Nav Content */}
+      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-6 scrollbar-none">
+        {groups.map((group) => (
+          <div key={group.label} className="space-y-1.5">
+            {!collapsed && (
+              <h3 className="px-3 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.2em] mb-2">
+                {group.label}
+              </h3>
+            )}
+            <nav className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.href}
+                    to={item.href}
+                    onClick={onNavigate}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-xl transition-all group relative",
+                      isActive 
+                        ? "bg-primary/10 text-primary font-semibold" 
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      collapsed && "justify-center px-0"
+                    )}
+                    style={({ isActive }) => ({ 
+                      backgroundColor: isActive ? `${primaryColor}15` : undefined,
+                      color: isActive ? primaryColor : undefined,
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn("h-4 w-4 shrink-0 transition-transform group-hover:scale-110")} />
+                        {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                        {isActive && !collapsed && (
+                          <div 
+                            className="absolute right-2 w-1 h-4 rounded-full"
+                            style={{ backgroundColor: primaryColor }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-auto pt-6 pb-2 border-t border-border/40 space-y-2">
+      {/* Footer */}
+      <div className="p-3 border-t border-border/40 space-y-2 mt-auto">
         {!hideCollapseControl && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onCollapseToggle}
-            className={cn("w-full text-muted-foreground hover:text-foreground", collapsed ? "justify-center px-2" : "justify-start")}
+            className={cn("w-full h-9 rounded-xl text-muted-foreground justify-start", collapsed && "justify-center px-0")}
           >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : (
               <>
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 <span>Collapse</span>
@@ -142,16 +185,14 @@ export function OrganizationSidebar({
             )}
           </Button>
         )}
-
         <Button
           variant="ghost"
           size="sm"
           onClick={handleSignOut}
           className={cn(
-            "w-full text-destructive hover:text-destructive hover:bg-destructive/10",
-            collapsed ? "justify-center px-2" : "justify-start",
+            "w-full h-9 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive justify-start",
+            collapsed && "justify-center px-0"
           )}
-          title={collapsed ? "Sign Out" : undefined}
         >
           <LogOut className={cn("h-4 w-4", !collapsed && "mr-2")} />
           {!collapsed && <span>Sign Out</span>}
