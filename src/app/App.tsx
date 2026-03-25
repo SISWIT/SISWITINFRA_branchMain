@@ -61,7 +61,7 @@ const OrganizationUsersPage = lazy(() => import("../workspaces/organization/page
 const OrganizationInvitationsPage = lazy(() => import("../workspaces/organization/pages/OrganizationInvitationsPage"));
 const OrganizationApprovalsPage = lazy(() => import("../workspaces/organization/pages/OrganizationApprovalsPage"));
 const OrganizationSubscriptionPage = lazy(() => import("../workspaces/organization/pages/OrganizationSubscriptionPage"));
-const OrganizationAlertsPage = lazy(() => import("../workspaces/organization/pages/OrganizationAlertsPage"));
+const OrganizationAlertsPage = lazy(() => import("../workspaces/organization_admin/pages/OrganizationAlertsPage"));
 const OrganizationSettingsPage = lazy(() => import("../workspaces/organization/pages/OrganizationSettingsPage"));
 
 const Dashboard = lazy(() => import("../workspaces/employee/pages/Dashboard"));
@@ -392,6 +392,7 @@ function AppRoutes() {
           <Route path="users" element={<OrganizationUsersPage />} />
           <Route path="subscription" element={<OrganizationSubscriptionPage />} />
           <Route path="invitations" element={<OrganizationInvitationsPage />} />
+          <Route path="alerts" element={<OrganizationAlertsPage />} />
           <Route path="approvals" element={<OrganizationApprovalsPage />} />
           <Route path="settings" element={<OrganizationSettingsPage />} />
         </Route>

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Briefcase,
   Bell,
+  Clock3,
   Activity,
   Layers,
   ArrowUpRight,
@@ -36,17 +37,17 @@ import {
   TableRow,
 } from "@/ui/shadcn/table";
 import { 
-  useOrganizationDashboard,
+  useOrganizationAdminDashboard,
   type DashboardChartItem,
   type DashboardAuditLog
-} from "../hooks/useOrganizationDashboard";
+} from "../hooks/useOrganizationAdminDashboard";
 
 export default function OrganizationAdminDashboard() {
   const { user } = useAuth();
   const { organization, memberships } = useOrganization();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { data: dashboardData, isLoading } = useOrganizationDashboard();
+  const { data: dashboardData, isLoading } = useOrganizationAdminDashboard();
 
   const primaryColor = organization?.primary_color || "var(--primary)";
   
@@ -122,7 +123,7 @@ export default function OrganizationAdminDashboard() {
       value: kpis.leads, 
       icon: Briefcase, 
       color: primaryColor,
-      trend: "+12.5%",
+      trend: `${dashboardData.trends.leads > 0 ? '+' : ''}${dashboardData.trends.leads}%`,
       subtext: "CRM Pipeline" 
     },
     { 
@@ -130,7 +131,7 @@ export default function OrganizationAdminDashboard() {
       value: kpis.contracts, 
       icon: ShieldCheck, 
       color: "#10b981", 
-      trend: "+4.2%",
+      trend: `${dashboardData.trends.contracts > 0 ? '+' : ''}${dashboardData.trends.contracts}%`,
       subtext: "CLM Active"
     },
     { 
@@ -138,16 +139,16 @@ export default function OrganizationAdminDashboard() {
       value: memberships?.length || 0, 
       icon: UsersIcon, 
       color: "#f59e0b", 
-      trend: "Stable",
+      trend: "Online",
       subtext: "Active Users"
     },
     { 
-      label: "Resource Health", 
-      value: "98%", 
-      icon: Activity, 
+      label: "Pending Invites", 
+      value: kpis.invitations, 
+      icon: Clock3, 
       color: "#6366f1", 
-      trend: "+1.2%",
-      subtext: "System Status"
+      trend: "Action Required",
+      subtext: "Onboarding"
     },
   ];
 
@@ -175,7 +176,7 @@ export default function OrganizationAdminDashboard() {
 
           <div className="flex flex-wrap items-center gap-4">
             <Button 
-              onClick={() => navigate(tenantAppPath(tenantSlug, "users"))} 
+              onClick={() => navigate(tenantAppPath(tenantSlug, "invitations"))} 
               className="h-12 rounded-2xl px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
               style={{ backgroundColor: primaryColor }}
             >

@@ -7,6 +7,7 @@ export interface DashboardKPIs {
     contracts: number;
     quotes: number;
     orders: number;
+    invitations: number;
 }
 
 export interface DashboardOpportunity {
@@ -72,14 +73,22 @@ export interface DashboardData {
         quotes: DashboardChartItem[];
         orders: DashboardChartItem[];
     };
+    trends: {
+        leads: number;
+        contracts: number;
+    };
 }
 
-export function useOrganizationDashboard() {
+/**
+ * useOrganizationAdminDashboard
+ * Aggregated hook for fetching performance metrics and administrative visibility data.
+ */
+export function useOrganizationAdminDashboard() {
     const { organization } = useOrganization();
     const tenantId = organization?.id;
 
     return useQuery<DashboardData>({
-        queryKey: ["organization-dashboard", tenantId],
+        queryKey: ["organization-admin-dashboard", tenantId],
         queryFn: async (): Promise<DashboardData> => {
             if (!tenantId) throw new Error("No tenant ID");
 
@@ -93,10 +102,14 @@ export function useOrganizationDashboard() {
                 activitiesResult,
                 leadsResult,
                 auditLogsResult,
-                allLeadsResult,
-                allContractsResult,
-                allQuotesResult,
-                allOrdersResult,
+                chartLeadsResult,
+                chartContractsResult,
+                chartQuotesResult,
+                chartOrdersResult,
+                trendLeadsResult,
+                trendContractsResult,
+                _membershipsResult,
+                invitationsResult,
             ] = await Promise.all([
                 supabase.from("leads").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId),
                 supabase.from("contracts").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId),
@@ -138,7 +151,39 @@ export function useOrganizationDashboard() {
                 supabase.from("contracts").select("status, created_at").eq("tenant_id", tenantId),
                 supabase.from("quotes").select("status, created_at").eq("tenant_id", tenantId),
                 supabase.from("purchase_orders").select("status, created_at").eq("tenant_id", tenantId),
+
+                // Fetch data for trends (last 7 days vs previous 7 days)
+                supabase.from("leads")
+                    .select("created_at")
+                    .eq("tenant_id", tenantId)
+                    .gte("created_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()),
+                
+                supabase.from("contracts")
+                    .select("created_at")
+                    .eq("tenant_id", tenantId)
+                    .gte("created_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()),
+
+                supabase.from("organization_memberships")
+                    .select("*", { count: "exact", head: true })
+                    .eq("organization_id", tenantId),
+                
+                supabase.from("tenant_invitations")
+                    .select("*", { count: "exact", head: true })
+                    .eq("organization_id", tenantId)
+                    .eq("status", "pending"),
             ]);
+
+            // Calculate trends
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const leadsTrendData = trendLeadsResult.data || [];
+            const currentLeads = leadsTrendData.filter(l => new Date(l.created_at!).getTime() > sevenDaysAgo).length;
+            const previousLeads = leadsTrendData.length - currentLeads;
+            const leadsTrend = previousLeads === 0 ? 0 : Math.round(((currentLeads - previousLeads) / previousLeads) * 100);
+
+            const contractsTrendData = trendContractsResult.data || [];
+            const currentContracts = contractsTrendData.filter(c => new Date(c.created_at!).getTime() > sevenDaysAgo).length;
+            const previousContracts = contractsTrendData.length - currentContracts;
+            const contractsTrend = previousContracts === 0 ? 0 : Math.round(((currentContracts - previousContracts) / previousContracts) * 100);
 
             return {
                 kpis: {
@@ -146,6 +191,7 @@ export function useOrganizationDashboard() {
                     contracts: contractsCountResult.count || 0,
                     quotes: quotesCountResult.count || 0,
                     orders: ordersCountResult.count || 0,
+                    invitations: invitationsResult.count || 0,
                 },
                 lists: {
                     opportunities: (opportunitiesResult.data || []) as unknown as DashboardOpportunity[],
@@ -155,14 +201,17 @@ export function useOrganizationDashboard() {
                     auditLogs: (auditLogsResult.data || []) as unknown as DashboardAuditLog[],
                 },
                 charts: {
-                    leads: (allLeadsResult.data || []) as unknown as DashboardChartItem[],
-                    contracts: (allContractsResult.data || []) as unknown as DashboardChartItem[],
-                    quotes: (allQuotesResult.data || []) as unknown as DashboardChartItem[],
-                    orders: (allOrdersResult.data || []) as unknown as DashboardChartItem[],
+                    leads: (chartLeadsResult.data || []) as unknown as DashboardChartItem[],
+                    contracts: (chartContractsResult.data || []) as unknown as DashboardChartItem[],
+                    quotes: (chartQuotesResult.data || []) as unknown as DashboardChartItem[],
+                    orders: (chartOrdersResult.data || []) as unknown as DashboardChartItem[],
+                },
+                trends: {
+                    leads: leadsTrend,
+                    contracts: contractsTrend,
                 }
             };
         },
         enabled: !!tenantId,
     });
 }
-
