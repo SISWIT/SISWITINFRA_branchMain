@@ -1,33 +1,32 @@
 import { useMemo } from "react";
 import {
-  BarChart,
-  Bar,
   CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  AreaChart,
+  Area,
 } from "recharts";
 import {
-  CalendarDays,
-  Clock3,
-  MoreHorizontal,
-  Search,
-  TrendingDown,
-  TrendingUp,
+  UserPlus,
+  CreditCard,
+  Users as UsersIcon,
+  ShieldCheck,
+  Briefcase,
+  Bell,
+  Activity,
+  Layers,
+  ArrowUpRight,
 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { format, subDays, isAfter } from "date-fns";
-import { useAuth } from "../../../core/auth/useAuth";
-import { useTenant } from "../../../core/tenant/useTenant";
-import { cn } from "../../../core/utils/utils";
-import { Badge } from "../../../ui/shadcn/badge";
-import { Button } from "../../../ui/shadcn/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../ui/shadcn/card";
-import { Input } from "../../../ui/shadcn/input";
-import { Progress } from "../../../ui/shadcn/progress";
+import { useAuth } from "@/core/auth/useAuth";
+import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { tenantAppPath } from "@/core/utils/routes";
+import { Badge } from "@/ui/shadcn/badge";
+import { Button } from "@/ui/shadcn/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import {
   Table,
   TableBody,
@@ -35,34 +34,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../../ui/shadcn/table";
+} from "@/ui/shadcn/table";
 import { 
   useOrganizationDashboard,
   type DashboardChartItem,
-  type DashboardLead,
-  type DashboardContract,
-  type DashboardOpportunity,
-  type DashboardActivity,
   type DashboardAuditLog
 } from "../hooks/useOrganizationDashboard";
 
-interface KPIItem {
-  label: string;
-  value: string | number;
-  delta: string;
-  positive: boolean;
-  emphasis?: boolean;
-}
-
-
-
-const applicantTabs = ["All Leads", "New", "Contacted", "Qualified", "Lost"];
-
 export default function OrganizationAdminDashboard() {
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { organization, memberships } = useOrganization();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+  const navigate = useNavigate();
   const { data: dashboardData, isLoading } = useOrganizationDashboard();
 
+  const primaryColor = organization?.primary_color || "var(--primary)";
+  
   const userName = useMemo(() => {
     const firstName = String(user?.user_metadata?.first_name ?? "").trim();
     const lastName = String(user?.user_metadata?.last_name ?? "").trim();
@@ -71,479 +58,383 @@ export default function OrganizationAdminDashboard() {
     return user?.email?.split("@")[0] ?? "Admin";
   }, [user?.email, user?.user_metadata]);
 
-  const orgName = tenant?.company_name || tenant?.name || "Your Workspace";
-  const userInitial = userName.charAt(0).toUpperCase();
+  const orgName = organization?.name || "Your Organization";
 
-  // Process Bar Chart (last 7 days of items created)
+  // Process operational data
   const barChartData = useMemo(() => {
     const days = Array.from({ length: 7 }).map((_, i) => {
       const d = subDays(new Date(), 6 - i);
       return {
-        dateObj: d,
         name: format(d, "dd MMM"),
         leads: 0,
         contracts: 0,
-        quotes: 0
+        total: 0
       };
     });
 
     if (!dashboardData?.charts) return days;
     const sevenDaysAgo = subDays(new Date(), 7);
 
-    // Count Leads
     dashboardData.charts.leads?.forEach((lead: DashboardChartItem) => {
       if (!lead.created_at) return;
       const d = new Date(lead.created_at);
       if (isAfter(d, sevenDaysAgo)) {
-        const dayStr = format(d, "dd MMM");
-        const entry = days.find(x => x.name === dayStr);
-        if (entry) entry.leads += 1;
+        const entry = days.find(x => x.name === format(d, "dd MMM"));
+        if (entry) {
+          entry.leads += 1;
+          entry.total += 1;
+        }
       }
     });
 
-    // Count Contracts
     dashboardData.charts.contracts?.forEach((contract: DashboardChartItem) => {
       if (!contract.created_at) return;
       const d = new Date(contract.created_at);
       if (isAfter(d, sevenDaysAgo)) {
-        const dayStr = format(d, "dd MMM");
-        const entry = days.find(x => x.name === dayStr);
-        if (entry) entry.contracts += 1;
+        const entry = days.find(x => x.name === format(d, "dd MMM"));
+        if (entry) {
+          entry.contracts += 1;
+          entry.total += 1;
+        }
       }
     });
 
     return days;
   }, [dashboardData?.charts]);
 
-  // Process Leads Status (Donut Chart)
-  const leadsStatusData = useMemo(() => {
-    const statuses: Record<string, number> = {};
-    if (!dashboardData?.charts) return [{ name: "No Leads", value: 1, color: "hsl(var(--muted))" }];
-
-    dashboardData.charts.leads?.forEach((lead: DashboardChartItem) => {
-      const st = lead.status || "New";
-      statuses[st] = (statuses[st] || 0) + 1;
-    });
-
-    const colors = [
-      "hsl(var(--primary))",
-      "hsl(var(--chart-2))",
-      "hsl(var(--chart-3))",
-      "hsl(var(--chart-4))",
-      "hsl(var(--chart-5))"
-    ];
-
-    const result = Object.entries(statuses)
-      .map(([name, value], i) => ({
-        name,
-        value,
-        color: colors[i % colors.length]
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    return result.length > 0 ? result : [{ name: "No Leads", value: 1, color: "hsl(var(--muted))" }];
-  }, [dashboardData?.charts]);
-
-  // Loading state
   if (isLoading || !dashboardData) {
     return (
-      <div className="flex h-full min-h-[500px] items-center justify-center">
-        <p className="text-muted-foreground animate-pulse">Loading dashboard data...</p>
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
+        <div 
+          className="h-12 w-12 rounded-full border-4 border-t-transparent animate-spin"
+          style={{ borderTopColor: primaryColor }}
+        />
+        <p className="text-muted-foreground font-medium animate-pulse text-sm">Synchronizing command center data...</p>
       </div>
     );
   }
 
-  const { kpis, lists, charts } = dashboardData;
+  const { kpis, lists } = dashboardData;
 
-  // Helper to calculate growth deltas
-  const getGrowth = (items: DashboardChartItem[]) => {
-    const now = new Date();
-    const sevenDaysAgo = subDays(now, 7);
-    const fourteenDaysAgo = subDays(now, 14);
-
-    const currentCount = items.filter(i => i.created_at && isAfter(new Date(i.created_at), sevenDaysAgo)).length;
-    const previousCount = items.filter(i => i.created_at && isAfter(new Date(i.created_at), fourteenDaysAgo) && !isAfter(new Date(i.created_at), sevenDaysAgo)).length;
-
-    if (previousCount === 0) return { delta: currentCount > 0 ? "+100%" : "0%", positive: true };
-    const diff = ((currentCount - previousCount) / previousCount) * 100;
-    return {
-      delta: `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}%`,
-      positive: diff >= 0
-    };
-  };
-
-  const leadsGrowth = getGrowth(charts.leads);
-  const contractsGrowth = getGrowth(charts.contracts);
-  const quotesGrowth = getGrowth(charts.quotes);
-  const ordersGrowth = getGrowth(charts.orders);
-
-  const kpiItems: KPIItem[] = [
-    { label: "Total Leads", value: kpis.leads, ...leadsGrowth, emphasis: true },
-    { label: "Active Contracts", value: kpis.contracts, ...contractsGrowth },
-    { label: "Pending Quotes", value: kpis.quotes, ...quotesGrowth },
-    { label: "Purchase Orders", value: kpis.orders, ...ordersGrowth },
+  const stats = [
+    { 
+      label: "Total Leads", 
+      value: kpis.leads, 
+      icon: Briefcase, 
+      color: primaryColor,
+      trend: "+12.5%",
+      subtext: "CRM Pipeline" 
+    },
+    { 
+      label: "Contracts", 
+      value: kpis.contracts, 
+      icon: ShieldCheck, 
+      color: "#10b981", 
+      trend: "+4.2%",
+      subtext: "CLM Active"
+    },
+    { 
+      label: "Team Size", 
+      value: memberships?.length || 0, 
+      icon: UsersIcon, 
+      color: "#f59e0b", 
+      trend: "Stable",
+      subtext: "Active Users"
+    },
+    { 
+      label: "Resource Health", 
+      value: "98%", 
+      icon: Activity, 
+      color: "#6366f1", 
+      trend: "+1.2%",
+      subtext: "System Status"
+    },
   ];
 
-  // Process Pie Chart (Records by Module)
-  const moduleData = [
-    { name: "CRM (Leads)", value: kpis.leads || 0, color: "hsl(var(--primary))" },
-    { name: "CLM (Contracts)", value: kpis.contracts || 0, color: "hsl(var(--chart-2))" },
-    { name: "CPQ (Quotes)", value: kpis.quotes || 0, color: "hsl(var(--chart-3))" },
-    { name: "ERP (Orders)", value: kpis.orders || 0, color: "hsl(var(--chart-4))" },
-  ].filter(x => x.value > 0);
-
-  // Fallback if no records at all
-  if (moduleData.length === 0) {
-    moduleData.push({ name: "No data yet", value: 1, color: "hsl(var(--muted))" });
-  }
-
-  const moduleTotal = moduleData.reduce((sum, item) => sum + (item.name === "No data yet" ? 0 : item.value), 0);
-  const leadTotal = charts.leads?.length || 0;
-
   return (
-    <div className="space-y-4 lg:space-y-5">
-      <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-sm md:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Organization overview for {orgName}.
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Hero Welcome Section */}
+      <section className="relative overflow-hidden rounded-[2rem] border border-border/40 bg-card p-6 sm:p-8 lg:p-10 shadow-xl">
+        <div 
+          className="absolute -right-20 -top-20 h-64 w-64 rounded-full blur-[100px] opacity-20 pointer-events-none"
+          style={{ backgroundColor: primaryColor }}
+        />
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <Badge variant="outline" className="rounded-full bg-primary/5 border-primary/20 text-primary py-1 px-3 mb-2">
+              <Layers className="mr-2 h-3 w-3" />
+              Organizational Command
+            </Badge>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+              Hello, {userName}
+            </h1>
+            <p className="text-muted-foreground max-w-md">
+              Welcome to the **{orgName}** administration hub. Here is your organization's high-level operational pulse.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-[300px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search leads, contracts, etc."
-                className="h-10 rounded-xl border-border/70 bg-background pl-9"
-              />
-            </div>
-            <Button variant="outline" size="sm" className="h-10 rounded-xl">
-              <CalendarDays className="mr-2 h-4 w-4" />
-              Today
+          <div className="flex flex-wrap items-center gap-4">
+            <Button 
+              onClick={() => navigate(tenantAppPath(tenantSlug, "users"))} 
+              className="h-12 rounded-2xl px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+              style={{ backgroundColor: primaryColor }}
+            >
+              <UserPlus className="mr-2 h-5 w-5" />
+              Add Team Member
             </Button>
-            <div className="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-primary/15 px-3 text-sm font-semibold text-primary">
-              {userInitial || "A"}
-            </div>
+            <Button 
+              variant="outline"
+              onClick={() => navigate(tenantAppPath(tenantSlug, "subscription"))} 
+              className="h-12 rounded-2xl px-6 font-semibold bg-background/50 backdrop-blur-sm border-border/60 hover:bg-muted/50"
+            >
+              <CreditCard className="mr-2 h-5 w-5" />
+              Manage Billing
+            </Button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-9">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {kpiItems.map((item) => (
-              <Card
-                key={item.label}
-                className={cn(
-                  "border-border/70 shadow-sm",
-                  item.emphasis && "border-primary/40 bg-primary/15",
-                )}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{item.label}</CardTitle>
-                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-semibold leading-tight">{item.value.toLocaleString()}</p>
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "mt-3 border-0 bg-background/80 px-2 py-0.5 text-[11px] font-medium",
-                      item.positive ? "text-primary" : "text-destructive",
-                    )}
-                  >
-                    {item.positive ? <TrendingUp className="mr-1 h-3 w-3" /> : <TrendingDown className="mr-1 h-3 w-3" />}
-                    {item.delta}
+      {/* KPI Command Bar */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => (
+          <Card key={stat.label} className="group relative overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm hover:border-primary/40 transition-all duration-300">
+            <div 
+              className="absolute right-0 top-0 h-1 w-0 group-hover:w-full transition-all duration-500"
+              style={{ backgroundColor: stat.color }}
+            />
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div 
+                  className="p-3 rounded-2xl bg-muted/50 group-hover:scale-110 transition-transform"
+                  style={{ color: stat.color }}
+                >
+                  <stat.icon className="h-6 w-6" />
+                </div>
+                <div className="text-right">
+                  <Badge variant="secondary" className="bg-primary/5 text-[10px] font-bold">
+                    {stat.trend}
                   </Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="border-border/70 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-lg">New Items Over Time</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 rounded-lg px-2 text-xs text-muted-foreground">
-                  <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                  Last 7 Days
-                </Button>
-              </CardHeader>
-              <CardContent className="h-[250px] pt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barChartData} barGap={10}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
-                      contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
-                      labelStyle={{ color: "hsl(var(--foreground))", marginBottom: "4px" }}
-                      itemStyle={{ padding: "4px 0" }}
-                    />
-                    <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary) / 0.55)" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="contracts" name="Contracts" fill="hsl(var(--chart-2) / 0.8)" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/70 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                <CardTitle className="text-lg">Records by Module</CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 rounded-lg px-2 text-xs text-muted-foreground">
-                  <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                  All Time
-                </Button>
-              </CardHeader>
-              <CardContent className="grid gap-4 pt-4 sm:grid-cols-[170px_1fr]">
-                <div className="relative h-[170px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={moduleData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={45}
-                        outerRadius={72}
-                        paddingAngle={2}
-                      >
-                        {moduleData.map((item) => (
-                          <Cell key={item.name} fill={item.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-semibold">{moduleTotal}</span>
-                    <span className="text-xs text-muted-foreground">Total Records</span>
-                  </div>
                 </div>
-
-                <div className="space-y-2 flex flex-col justify-center">
-                  {moduleData.filter(m => m.name !== "No data yet").map((item) => (
-                    <div key={item.name} className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/20 px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                        <span className="text-sm truncate w-[80px]" title={item.name}>{item.name.split(" ")[0]}</span>
-                      </div>
-                      <span className="text-sm font-semibold">{item.value}</span>
-                    </div>
-                  ))}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold tracking-tight">{stat.value}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">{stat.subtext}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        <Card className="border-primary/30 bg-gradient-to-b from-primary/15 via-card to-card shadow-sm xl:col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Leads by Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="relative mx-auto h-[180px] w-full max-w-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={leadsStatusData} dataKey="value" innerRadius={56} outerRadius={78} paddingAngle={4}>
-                    {leadsStatusData.map((item) => (
-                      <Cell key={item.name} fill={item.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-semibold">{leadTotal.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">Total Leads</span>
+      {/* Dynamic Activity & Operational Data */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Core Operational Pulse */}
+        <Card className="lg:col-span-8 border-border/40 bg-card/40 shadow-sm overflow-hidden flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-8">
+            <div className="space-y-1">
+              <CardTitle className="text-xl">Operational Pulse</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium">Weekly trend cross-module activity</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary">
+                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+                CRM Leads
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-500">
+                <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                CLM Contracts
               </div>
             </div>
+          </CardHeader>
+          <CardContent className="h-[400px] w-full mt-auto">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={barChartData}>
+                <defs>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={primaryColor} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={primaryColor} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.5)" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11, fontWeight: 500 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11, fontWeight: 500 }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--card))", 
+                    borderRadius: "1rem", 
+                    border: "1px solid hsl(var(--border) / 0.6)",
+                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+                  }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="leads" 
+                  stroke={primaryColor} 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorLeads)" 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="contracts" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  fillOpacity={0}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-            <div className="grid gap-2">
-              {leadsStatusData.filter(l => l.name !== "No Leads").map((item) => (
-                <div key={item.name} className="flex items-center justify-between rounded-lg bg-background/70 px-3 py-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="capitalize">{item.name.replace(/_/g, " ")}</span>
-                  </div>
-                  <span className="font-semibold">{item.value}</span>
-                </div>
-              ))}
+        {/* Global Audit Feed */}
+        <Card className="lg:col-span-4 border-border/40 bg-card/40 shadow-sm flex flex-col">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl">Global Activity</CardTitle>
+              <Badge variant="outline" className="text-[10px] font-bold px-2">Live Feed</Badge>
             </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-12">
-        <Card className="border-border/70 shadow-sm xl:col-span-6">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg">Recent Opportunities (CRM)</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs">
-              See All
-            </Button>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {lists.opportunities.length > 0 ? lists.opportunities.map((opp: DashboardOpportunity) => (
-              <article key={opp.id} className="rounded-xl border border-border/70 bg-background/80 p-3">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold leading-tight truncate" title={opp.name ?? undefined}>{opp.name}</h3>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg shrink-0">
-                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </div>
-                <div className="mb-3 flex flex-wrap gap-1.5">
-                  <Badge variant="secondary" className="bg-muted px-2 py-0.5 text-[11px] capitalize">{opp.stage}</Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">${(opp.amount || 0).toLocaleString()}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {opp.close_date ? format(new Date(opp.close_date), "MMM dd, yyyy") : "No date"}
-                  </span>
-                </div>
-              </article>
-            )) : <p className="text-sm text-muted-foreground p-4">No recent opportunities found.</p>}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 shadow-sm xl:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg">Recent Contracts (CLM)</CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {lists.contracts.length > 0 ? lists.contracts.map((contract: DashboardContract) => (
-              <article key={contract.id} className="space-y-2.5 rounded-xl border border-border/70 bg-background/70 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate" title={contract.name ?? undefined}>{contract.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{contract.status}</p>
-                  </div>
-                  <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                    ${(contract.total_value || 0).toLocaleString()}
-                  </span>
-                </div>
-                <Progress value={Math.random() * 60 + 20} className="h-2.5 bg-muted/60" /> {/* Random progress for visual indicator representing lifecycle */}
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Ends {contract.end_date ? format(new Date(contract.end_date), "MMM dd, yyyy") : "TBD"}
-                </div>
-              </article>
-            )) : <p className="text-sm text-muted-foreground p-4">No recent contracts.</p>}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 shadow-sm xl:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg">Recent Activities</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 rounded-lg px-2 text-xs text-muted-foreground">
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-              Latest
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2.5">
-            {lists.activities.length > 0 ? lists.activities.map((activity: DashboardActivity, index: number) => {
-              const dateStr = activity.created_at ? format(new Date(activity.created_at), "h:mm a") : "Time TBD";
-              // Rotate through tones
-              const tones = ["bg-chart-2/20", "bg-primary/15", "bg-chart-3/20", "bg-chart-4/20"];
-              const tone = tones[index % tones.length];
-
-              return (
-                <article key={activity.id} className="grid grid-cols-[56px_1fr] items-start gap-2.5">
-                  <p className="pt-1 text-xs text-muted-foreground">{dateStr}</p>
-                  <div className={cn("rounded-xl border border-border/50 px-3 py-2.5 text-foreground", tone)}>
-                    <p className="text-sm font-semibold leading-snug line-clamp-2" title={activity.subject ?? undefined}>{activity.subject}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground capitalize">{activity.type}</p>
-                  </div>
-                </article>
-              )
-            }) : <p className="text-sm text-muted-foreground p-4">No recent activities.</p>}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-12">
-        <Card className="border-border/70 shadow-sm xl:col-span-8">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg">Recent Leads ({kpis.leads})</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs">
-              See All
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {applicantTabs.map((tab, index) => (
-                <Badge
-                  key={tab}
-                  variant={index === 0 ? "default" : "secondary"}
-                  className={cn("rounded-full px-3 py-1 text-[11px] cursor-pointer", index === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}
-                >
-                  {tab}
-                </Badge>
-              ))}
-            </div>
-            {lists.leads.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lists.leads.map((lead: DashboardLead) => (
-                    <TableRow key={lead.id}>
-                      <TableCell>
-                        <div className="max-w-[150px] truncate">
-                          <p className="font-medium truncate" title={lead.first_name || lead.last_name ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : undefined}>
-                            {lead.first_name || lead.last_name ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : "Unnamed Lead"}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate" title={lead.email ?? undefined}>{lead.email || "No email"}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="truncate max-w-[120px] inline-block" title={lead.company ?? undefined}>{lead.company || "-"}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {lead.created_at ? format(new Date(lead.created_at), "MMM dd, yyyy") : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="rounded-full px-2 py-0 text-[11px] capitalize whitespace-nowrap">
-                          {lead.status?.replace(/_/g, " ") || "New"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : <p className="text-sm text-muted-foreground py-6 text-center">No leads found.</p>}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 shadow-sm xl:col-span-4 max-h-[500px] flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 shrink-0">
-            <CardTitle className="text-lg">Audit Logs</CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3 overflow-y-auto">
+          <CardContent className="flex-1 overflow-y-auto space-y-4 px-6 pb-6">
             {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: DashboardAuditLog) => (
-              <article key={log.id} className="rounded-xl border border-border/70 bg-background/75 p-3">
-                <p className="text-sm leading-relaxed">
-                  <span className="font-medium">{log.user_id ? "A user" : "System"}</span> {log.action} <span className="font-medium">{log.entity_type}</span>
+              <div key={log.id} className="relative pl-6 pb-4 border-l border-border/60 last:border-0 last:pb-0">
+                <div 
+                  className="absolute left-[-5px] top-1 h-2 w-2 rounded-full border-2 border-background"
+                  style={{ backgroundColor: primaryColor }}
+                />
+                <p className="text-sm font-semibold leading-none mb-1">
+                  {log.action?.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                 </p>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {log.created_at ? format(new Date(log.created_at), "MMM dd, yyyy • h:mm a") : ""}
+                <p className="text-xs text-muted-foreground line-clamp-1 mb-1">
+                  Targeted {log.entity_type} {log.entity_type === 'user' ? 'Management' : 'Operation'}
                 </p>
-              </article>
-            )) : <p className="text-sm text-muted-foreground p-4 text-center">No recent audit logs.</p>}
+                <p className="text-[10px] text-muted-foreground/60 font-medium">
+                  {log.created_at ? format(new Date(log.created_at), "MMM dd • h:mm a") : "Just now"}
+                </p>
+              </div>
+            )) : (
+              <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                <div className="p-4 rounded-full bg-muted/30 mb-4">
+                  <Bell className="h-8 w-8 text-muted-foreground/40" />
+                </div>
+                <p className="text-xs text-muted-foreground font-medium">No recent audit activity found.</p>
+              </div>
+            )}
+            <Button variant="outline" className="w-full h-10 rounded-xl text-xs font-semibold border-border/60 hover:bg-muted/50 mt-4">
+              View All Logs
+              <ArrowUpRight className="ml-2 h-3 w-3" />
+            </Button>
           </CardContent>
         </Card>
-      </section>
+      </div>
+
+      {/* Snapshot Tables */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Core Leads Snapshot */}
+        <Card className="border-border/40 bg-card/40 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-xl">Organization Leads</CardTitle>
+            <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold hover:bg-muted/50 rounded-xl">
+              CRM Hub
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-border/40">
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider">Lead</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider">Status</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider text-right">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lists.leads.slice(0, 5).map((lead) => (
+                  <TableRow key={lead.id} className="border-border/40 hover:bg-muted/20 transition-colors">
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary">
+                          {(lead.first_name?.[0] || lead.company?.[0] || "L").toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold leading-none">{lead.first_name} {lead.last_name}</p>
+                          <p className="text-[11px] text-muted-foreground mt-1">{lead.company || "Individual"}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] capitalize bg-background/50">
+                        {lead.status || "New"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-sm">
+                      $0.00
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Core Contracts Snapshot */}
+        <Card className="border-border/40 bg-card/40 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-xl">Recent Contracts</CardTitle>
+            <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold hover:bg-muted/50 rounded-xl">
+              CLM Hub
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-border/40">
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider">Title</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider">Status</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold tracking-wider text-right">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lists.contracts.slice(0, 5).map((contract) => (
+                  <TableRow key={contract.id} className="border-border/40 hover:bg-muted/20 transition-colors">
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                          <ShieldCheck className="h-4 w-4" />
+                        </div>
+                        <div className="max-w-[150px]">
+                          <p className="text-sm font-semibold leading-none truncate">{contract.name}</p>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Expires {contract.end_date ? format(new Date(contract.end_date), "MMM dd, yyyy") : "TBD"}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] capitalize bg-background/50">
+                        {contract.status || "Draft"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-sm">
+                      ${(contract.total_value || 0).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

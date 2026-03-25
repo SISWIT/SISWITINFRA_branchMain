@@ -389,7 +389,11 @@ function AppRoutes() {
           <Route path="erp/procurement" element={<ProcurementPage />} />
           <Route path="erp/production" element={<ProductionPage />} />
           <Route path="erp/finance" element={<FinancePage />} />
-          <Route path="settings" element={<Navigate to="dashboard" replace />} />
+          <Route path="users" element={<OrganizationUsersPage />} />
+          <Route path="subscription" element={<OrganizationSubscriptionPage />} />
+          <Route path="invitations" element={<OrganizationInvitationsPage />} />
+          <Route path="approvals" element={<OrganizationApprovalsPage />} />
+          <Route path="settings" element={<OrganizationSettingsPage />} />
         </Route>
 
         {/* Root organization slug convenience — W-06: guard against reserved segments */}
