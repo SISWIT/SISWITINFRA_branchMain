@@ -60,8 +60,7 @@ const OrganizationOverviewPage = lazy(() => import("../workspaces/organization/p
 const OrganizationUsersPage = lazy(() => import("../workspaces/organization/pages/OrganizationUsersPage"));
 const OrganizationInvitationsPage = lazy(() => import("../workspaces/organization/pages/OrganizationInvitationsPage"));
 const OrganizationApprovalsPage = lazy(() => import("../workspaces/organization/pages/OrganizationApprovalsPage"));
-const OrganizationPlansPage = lazy(() => import("../workspaces/organization/pages/OrganizationPlansPage"));
-const OrganizationBillingPage = lazy(() => import("../workspaces/organization/pages/OrganizationBillingPage"));
+const OrganizationSubscriptionPage = lazy(() => import("../workspaces/organization/pages/OrganizationSubscriptionPage"));
 const OrganizationAlertsPage = lazy(() => import("../workspaces/organization/pages/OrganizationAlertsPage"));
 const OrganizationSettingsPage = lazy(() => import("../workspaces/organization/pages/OrganizationSettingsPage"));
 
@@ -234,8 +233,9 @@ function AppRoutes() {
           <Route path="users" element={<OrganizationUsersPage />} />
           <Route path="invitations" element={<OrganizationInvitationsPage />} />
           <Route path="approvals" element={<OrganizationApprovalsPage />} />
-          <Route path="plans" element={<OrganizationPlansPage />} />
-          <Route path="billing" element={<OrganizationBillingPage />} />
+          <Route path="subscription" element={<OrganizationSubscriptionPage />} />
+          <Route path="plans" element={<Navigate to="/organization/subscription" replace />} />
+          <Route path="billing" element={<Navigate to="/organization/subscription" replace />} />
           <Route path="alerts" element={<OrganizationAlertsPage />} />
           <Route path="settings" element={<OrganizationSettingsPage />} />
         </Route>

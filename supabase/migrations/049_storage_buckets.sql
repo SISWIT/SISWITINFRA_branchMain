@@ -33,7 +33,7 @@ CREATE POLICY "documents_select_org_members" ON storage.objects
   FOR SELECT USING (
     bucket_id = 'documents'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships WHERE user_id = auth.uid()
     )
   );
 
@@ -42,8 +42,8 @@ CREATE POLICY "documents_insert_managers" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'documents'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles
-      WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships
+      WHERE user_id = auth.uid()
       AND role IN ('owner', 'admin', 'manager')
     )
   );
@@ -53,8 +53,8 @@ CREATE POLICY "documents_delete_admins" ON storage.objects
   FOR DELETE USING (
     bucket_id = 'documents'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles
-      WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships
+      WHERE user_id = auth.uid()
       AND role IN ('owner', 'admin')
     )
   );
@@ -68,7 +68,7 @@ CREATE POLICY "contract_scans_select_org_members" ON storage.objects
   FOR SELECT USING (
     bucket_id = 'contract-scans'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships WHERE user_id = auth.uid()
     )
   );
 
@@ -77,8 +77,8 @@ CREATE POLICY "contract_scans_insert_managers" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'contract-scans'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles
-      WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships
+      WHERE user_id = auth.uid()
       AND role IN ('owner', 'admin', 'manager')
     )
   );
@@ -88,8 +88,8 @@ CREATE POLICY "contract_scans_delete_admins" ON storage.objects
   FOR DELETE USING (
     bucket_id = 'contract-scans'
     AND (storage.foldername(name))[1] IN (
-      SELECT organization_id::text FROM public.profiles
-      WHERE id = auth.uid()
+      SELECT organization_id::text FROM public.organization_memberships
+      WHERE user_id = auth.uid()
       AND role IN ('owner', 'admin')
     )
   );

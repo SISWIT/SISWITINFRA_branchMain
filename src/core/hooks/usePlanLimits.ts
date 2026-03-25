@@ -118,21 +118,20 @@ export function usePlanLimits(): UsePlanLimitsReturn {
       // Notify if usage > 80%
       if (result.max_allowed > 0) {
         const percent = (result.current_count / result.max_allowed) * 100;
-        if (percent >= 80 && organizationId && (organization as any)?.owner_id) {
+        if (percent >= 80 && organizationId && organization?.owner_user_id) {
           notify({
-            userId: (organization as any).owner_id,
+            userId: organization.owner_user_id,
             organizationId: organizationId,
             type: percent >= 100 ? "plan_limit_reached" : "plan_limit_warning",
             title: percent >= 100 ? "Plan Limit Reached" : "Plan Limit Warning",
             message: `You are at ${percent.toFixed(0)}% of your ${resource} limit`,
-            link: "/organization/plans",
           });
         }
       }
 
       return result;
     },
-    [organizationId, organization?.owner_id, notify],
+    [organizationId, organization?.owner_user_id, notify],
   );
 
   const incrementUsage = useCallback(
@@ -248,6 +247,8 @@ export function usePlanLimits(): UsePlanLimitsReturn {
 
 export function useUpgradePlan() {
   const queryClient = useQueryClient();
+  const { refreshOrganization } = useOrganization();
+
   return useMutation({
     mutationFn: async ({ organizationId, newPlan }: { organizationId: string; newPlan: PlanType }) => {
       const { data, error } = await (supabase.rpc as any)("upgrade_organization_plan", {
@@ -257,10 +258,15 @@ export function useUpgradePlan() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data: unknown, variables: { organizationId: string; newPlan: PlanType }) => {
+    onSuccess: async (_data: unknown, variables: { organizationId: string; newPlan: PlanType }) => {
+      // 1. Refresh global organization context (non-react-query)
+      await refreshOrganization();
+
+      // 2. Invalidate react-query caches
       queryClient.invalidateQueries({ queryKey: ["organization"] });
       queryClient.invalidateQueries({ queryKey: ["plan-limits"] });
       queryClient.invalidateQueries({ queryKey: ["organization_usage", variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ["billing_info", variables.organizationId] });
     },
   });
 }

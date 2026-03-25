@@ -2,7 +2,7 @@ import type { ModuleType } from "./modules";
 import { isModuleEnabled as isModuleEnabledUtil } from "@/core/utils/modules";
 
 export type OrganizationStatus = "active" | "suspended" | "cancelled" | "trial";
-export type OrganizationPlan = "starter" | "professional" | "enterprise";
+export type OrganizationPlan = "foundation" | "growth" | "commercial" | "enterprise";
 
 // Re-export for consumers that import ModuleType from this file
 export type { ModuleType } from "./modules";
@@ -11,6 +11,7 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  owner_user_id?: string | null;
   org_code?: string;
   status: OrganizationStatus;
   plan_type: OrganizationPlan;

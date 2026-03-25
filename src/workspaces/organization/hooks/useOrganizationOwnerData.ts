@@ -132,7 +132,7 @@ export function useOrganizationOwnerData() {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, subscription]);
 
   useEffect(() => {
     void refresh();

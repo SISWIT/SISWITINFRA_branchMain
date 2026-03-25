@@ -244,6 +244,57 @@ export type Database = {
           },
         ]
       }
+      addon_purchases: {
+        Row: {
+          addon_key: string
+          created_at: string
+          expiry_date: string | null
+          id: string
+          organization_id: string
+          purchase_date: string
+          quantity: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          addon_key: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          organization_id: string
+          purchase_date?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          addon_key?: string
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          organization_id?: string
+          purchase_date?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addon_purchases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addon_purchases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -485,6 +536,54 @@ export type Database = {
             foreignKeyName: "background_jobs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_customers: {
+        Row: {
+          billing_contact_name: string | null
+          billing_email: string | null
+          created_at: string
+          id: string
+          organization_id: string
+          razorpay_customer_id: string | null
+          razorpay_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_contact_name?: string | null
+          billing_email?: string | null
+          created_at?: string
+          id?: string
+          organization_id: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_contact_name?: string | null
+          billing_email?: string | null
+          created_at?: string
+          id?: string
+          organization_id?: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_customers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -2127,6 +2226,60 @@ export type Database = {
           {
             foreignKeyName: "leads_tenant_id_fkey"
             columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          link: string | null
+          message: string
+          metadata: Json | null
+          organization_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message: string
+          metadata?: Json | null
+          organization_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          link?: string | null
+          message?: string
+          metadata?: Json | null
+          organization_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
@@ -3848,8 +4001,24 @@ export type Database = {
         Returns: Json
       }
       claim_pending_invitations: { Args: never; Returns: number }
+      create_billing_customer: {
+        Args: { p_email: string; p_name: string; p_organization_id: string }
+        Returns: Json
+      }
       create_client_signup_membership: {
         Args: { p_organization_id: string; p_user_id: string }
+        Returns: string
+      }
+      create_notification: {
+        Args: {
+          p_link?: string
+          p_message: string
+          p_metadata?: Json
+          p_organization_id: string
+          p_title: string
+          p_type: string
+          p_user_id: string
+        }
         Returns: string
       }
       create_signup_organization: {
@@ -3895,6 +4064,7 @@ export type Database = {
           slug: string
         }[]
       }
+      get_billing_info: { Args: { p_organization_id: string }; Returns: Json }
       get_client_invitation_details: {
         Args: { p_token: string }
         Returns: {
@@ -3930,6 +4100,7 @@ export type Database = {
         Args: { end_date: string; start_date: string }
         Returns: number
       }
+      get_unread_count: { Args: { p_user_id: string }; Returns: number }
       get_user_organization_role: {
         Args: { p_organization_id: string }
         Returns: string
@@ -3940,6 +4111,22 @@ export type Database = {
           p_amount?: number
           p_organization_id: string
           p_resource_type: string
+        }
+        Returns: Json
+      }
+      mark_all_notifications_read: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      mark_notification_read: {
+        Args: { p_notification_id: string }
+        Returns: undefined
+      }
+      purchase_addon: {
+        Args: {
+          p_addon_key: string
+          p_organization_id: string
+          p_quantity?: number
         }
         Returns: Json
       }
@@ -3963,6 +4150,10 @@ export type Database = {
       seed_plan_limits_for_organization: {
         Args: { p_organization_id: string; p_plan_type?: string }
         Returns: undefined
+      }
+      upgrade_organization_plan: {
+        Args: { p_new_plan: string; p_organization_id: string }
+        Returns: boolean
       }
     }
     Enums: {
