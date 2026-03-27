@@ -81,7 +81,34 @@ export default function OrganizationApprovalsPage() {
 
       <section className="org-panel">
         {pendingClients.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No pending client approvals.</p>
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center animate-in">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 animate-pulse" />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 border border-primary/20 shadow-glow">
+                <CheckCircle2 className="h-10 w-10 text-primary" />
+              </div>
+            </div>
+            
+            <h3 className="text-2xl font-semibold tracking-tight">No Pending Approvals</h3>
+            <p className="mt-2 max-w-[400px] text-muted-foreground">
+              You're all caught up! New client membership requests will appear here for your review.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60 italic">
+              Keep your organization workspace secure by reviewing all incoming requests.
+            </p>
+            
+            <div className="mt-8 flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full px-5 hover:bg-primary/5 transition-colors"
+                onClick={() => void refresh()}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Refresh List"}
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-3">
             {pendingClients.map((membership) => (
