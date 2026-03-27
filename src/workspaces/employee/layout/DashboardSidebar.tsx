@@ -143,7 +143,7 @@ export function DashboardSidebar({ collapsed = false, onCollapseToggle, classNam
   return (
     <aside
       className={cn(
-        "h-screen bg-card/60 backdrop-blur-xl border-r border-border/40 flex flex-col transition-all duration-300 relative z-20 overflow-hidden",
+        "h-screen bg-card/60 backdrop-blur-xl border-r border-border/60 flex flex-col transition-all duration-300 relative z-20 overflow-hidden",
         "before:absolute before:inset-0 before:bg-purple-600/5 before:pointer-events-none before:z-[-1]",
         collapsed ? "w-16" : "w-64",
         className
@@ -155,7 +155,7 @@ export function DashboardSidebar({ collapsed = false, onCollapseToggle, classNam
         {!collapsed && (
           <Link to={tenantDashboardPath(tenantSlug)} className="flex items-center gap-3">
             <div
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-white shrink-0 font-bold text-sm shadow-sm"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-foreground dark:text-white shrink-0 font-bold text-sm shadow-sm"
               style={{ backgroundColor: primaryColor }}
             >
               S

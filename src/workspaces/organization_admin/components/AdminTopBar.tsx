@@ -32,6 +32,7 @@ import { cn } from "@/core/utils/utils";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { NotificationBell } from "@/ui/notification-bell";
+import { ThemeToggle } from "@/ui/theme-toggle";
 import { tenantAppPath } from "@/core/utils/routes";
 
 interface AdminTopBarProps {
@@ -122,7 +123,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-purple-500/10 bg-card/60 backdrop-blur-2xl px-4 lg:px-8 py-3 overflow-visible">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-card/60 backdrop-blur-2xl px-4 lg:px-8 py-3 overflow-visible shadow-sm">
       {/* Topbar Internal Glow */}
       <div className="absolute inset-0 bg-purple-600/5 pointer-events-none overflow-hidden" />
       
@@ -133,7 +134,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden h-9 w-9 text-muted-foreground hover:bg-white/5"
+            className="lg:hidden h-9 w-9 text-muted-foreground hover:bg-muted"
             onClick={onOpenSidebar}
           >
             <Menu className="h-5 w-5" />
@@ -143,7 +144,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
             <Input
               placeholder="Search command..."
-              className="h-9 w-full bg-white/5 border-white/5 transition-all focus:bg-white/10 focus:ring-1 focus:ring-white/10 pl-10 text-xs font-medium"
+              className="h-9 w-full bg-muted/40 border-border/60 transition-all focus:bg-muted/60 focus:ring-1 focus:ring-primary/20 pl-10 text-xs font-medium"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -152,7 +153,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
               onFocus={() => setSearchOpen(true)}
             />
             {searchOpen && (
-              <div className="absolute left-0 top-full z-[100] mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-card/95 backdrop-blur-xl p-1 shadow-2xl animate-in fade-in zoom-in-95">
+              <div className="absolute left-0 top-full z-[100] mt-2 w-full overflow-hidden rounded-xl border border-border bg-card/95 backdrop-blur-xl p-1 shadow-2xl animate-in fade-in zoom-in-95">
                 {searchResults.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted-foreground/60">No matching commands</p>
                 ) : (
@@ -161,7 +162,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
                       <li key={page.path}>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-white/5 hover:text-foreground"
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             navigate(tenantAppPath(tenantSlug, page.path));
@@ -185,26 +186,26 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
         <div className="hidden lg:flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/60 hover:bg-muted/60 transition-all text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {dateLabel}
                 <ChevronDown className="h-3 w-3 opacity-40" />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="center" className="w-auto p-0 border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl">
+            <PopoverContent align="center" className="w-auto p-0 border-border bg-card/95 backdrop-blur-xl shadow-2xl">
               <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} />
             </PopoverContent>
           </Popover>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/60 hover:bg-muted/60 transition-all text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                 <Grid2X2 className="h-3.5 w-3.5" />
                 {selectedModule}
                 <ChevronDown className="h-3 w-3 opacity-40" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-48 border-white/10 bg-card/95 backdrop-blur-xl">
+            <DropdownMenuContent align="center" className="w-48 border-border bg-card/95 backdrop-blur-xl">
               <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Modules</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem className="text-xs font-medium cursor-pointer" onSelect={() => handleModuleSelect("All", "dashboard")}>Overview</DropdownMenuItem>
@@ -217,7 +218,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
           <button
             onClick={handleCopyOrgCode}
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-[11px] font-bold tracking-widest text-muted-foreground/80",
+              "flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/60 hover:bg-muted/60 transition-all text-[11px] font-bold tracking-widest text-muted-foreground/80",
               copied && "border-primary/40 text-primary bg-primary/5"
             )}
           >
@@ -234,15 +235,16 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
             </Button>
           </Link>
           
-          <div className="h-8 w-px bg-white/5 mx-1 hidden md:block" />
+          <div className="h-8 w-px bg-border/40 mx-1 hidden md:block" />
 
+          <ThemeToggle />
           <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 p-1 rounded-full hover:bg-white/5 transition-all">
+              <button className="flex items-center gap-2 p-1 rounded-full hover:bg-muted/40 transition-all">
                 <div 
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-lg border border-white/10 shrink-0 relative"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-foreground dark:text-white shadow-lg border border-primary/20 shrink-0 relative"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {initials}
@@ -255,8 +257,8 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
                 <ChevronDown className="h-3 w-3 text-muted-foreground/60 hidden md:block" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 mt-2 border-white/10 bg-card/95 backdrop-blur-xl p-2 shadow-2xl">
-              <div className="px-2 py-3 mb-2 rounded-lg bg-white/5">
+            <DropdownMenuContent align="end" className="w-56 mt-2 border-border bg-card/95 backdrop-blur-xl p-2 shadow-2xl">
+              <div className="px-2 py-3 mb-2 rounded-lg bg-muted/40">
                 <p className="text-xs font-bold">{displayName}</p>
                 <p className="text-[10px] text-muted-foreground font-medium truncate mt-0.5">{user?.email}</p>
               </div>

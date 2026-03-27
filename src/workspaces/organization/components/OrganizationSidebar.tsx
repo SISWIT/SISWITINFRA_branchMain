@@ -87,7 +87,7 @@ export function OrganizationSidebar({
   return (
     <aside 
       className={cn(
-        "flex flex-col bg-card/60 backdrop-blur-xl border-r border-border/40 h-full transition-all duration-300 relative z-20 overflow-hidden",
+        "flex flex-col bg-card/60 backdrop-blur-xl border-r border-border/60 h-full transition-all duration-300 relative z-20 overflow-hidden",
         "before:absolute before:inset-0 before:bg-purple-600/5 before:pointer-events-none before:z-[-1]",
         collapsed ? "w-16" : "w-64",
         className
@@ -95,11 +95,11 @@ export function OrganizationSidebar({
       style={{ "--sidebar-accent": primaryColor } as React.CSSProperties}
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center px-4 border-b border-border/40 shrink-0">
+      <div className="h-16 flex items-center px-4 border-b border-border/60 shrink-0">
         {!collapsed ? (
           <div className="flex items-center gap-3 overflow-hidden">
             <div 
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-white shrink-0 font-bold text-sm shadow-sm"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-foreground dark:text-white shrink-0 font-bold text-sm shadow-sm border border-black/5 dark:border-white/10"
               style={{ backgroundColor: primaryColor }}
             >
               {initials}
@@ -111,7 +111,7 @@ export function OrganizationSidebar({
           </div>
         ) : (
           <div 
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-white mx-auto font-bold text-sm shadow-sm"
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-foreground dark:text-white mx-auto font-bold text-sm shadow-sm border border-black/5 dark:border-white/10"
             style={{ backgroundColor: primaryColor }}
           >
             {initials[0]}
@@ -169,7 +169,7 @@ export function OrganizationSidebar({
       </div>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border/40 space-y-2 mt-auto">
+      <div className="p-3 border-t border-border/60 space-y-2 mt-auto">
         {!hideCollapseControl && (
           <Button
             variant="ghost"

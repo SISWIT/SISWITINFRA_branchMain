@@ -52,6 +52,14 @@ type SignupRpcDatabase = {
           status: "pending" | "accepted" | "expired" | "cancelled" | "rejected";
         }[];
       };
+      get_inventory_value: {
+        Args: { p_org_id?: string | null };
+        Returns: number;
+      };
+      get_revenue_mtd: {
+        Args: { p_end_date: string; p_org_id?: string | null; p_start_date: string };
+        Returns: number;
+      };
       search_signup_organizations: {
         Args: { p_limit?: number; p_query: string };
         Returns: {

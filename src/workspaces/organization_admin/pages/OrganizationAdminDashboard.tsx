@@ -155,7 +155,7 @@ export default function OrganizationAdminDashboard() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Hero Welcome Section */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/40 bg-card p-6 sm:p-8 lg:p-10 shadow-xl">
+      <section className="relative overflow-hidden rounded-[2rem] border border-border bg-card p-6 sm:p-8 lg:p-10 shadow-lg">
         <div 
           className="absolute -right-20 -top-20 h-64 w-64 rounded-full blur-[100px] opacity-20 pointer-events-none"
           style={{ backgroundColor: primaryColor }}
@@ -166,19 +166,18 @@ export default function OrganizationAdminDashboard() {
               <Layers className="mr-2 h-3 w-3" />
               Organizational Command
             </Badge>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground via-foreground/80 to-foreground/70 bg-clip-text text-transparent">
               Hello, {userName}
             </h1>
             <p className="text-muted-foreground max-w-md">
-              Welcome to the **{orgName}** administration hub. Here is your organization's high-level operational pulse.
+              Welcome to the <span className="font-bold text-foreground">{orgName}</span> administration hub. Here is your organization's high-level operational pulse.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
             <Button 
               onClick={() => navigate(tenantAppPath(tenantSlug, "invitations"))} 
-              className="h-12 rounded-2xl px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
-              style={{ backgroundColor: primaryColor }}
+              className="h-12 rounded-2xl px-6 font-semibold shadow-lg shadow-primary/20 hover:scale-105 transition-transform bg-primary text-primary-foreground"
             >
               <UserPlus className="mr-2 h-5 w-5" />
               Add Team Member
@@ -186,7 +185,7 @@ export default function OrganizationAdminDashboard() {
             <Button 
               variant="outline"
               onClick={() => navigate(tenantAppPath(tenantSlug, "subscription"))} 
-              className="h-12 rounded-2xl px-6 font-semibold bg-background/50 backdrop-blur-sm border-border/60 hover:bg-muted/50"
+              className="h-12 rounded-2xl px-6 font-semibold bg-background/80 backdrop-blur-sm border-border hover:bg-muted/50 transition-all"
             >
               <CreditCard className="mr-2 h-5 w-5" />
               Manage Billing
@@ -198,7 +197,7 @@ export default function OrganizationAdminDashboard() {
       {/* KPI Command Bar */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.label} className="group relative overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm hover:border-primary/40 transition-all duration-300">
+          <Card key={stat.label} className="group relative overflow-hidden border-border bg-card/60 backdrop-blur-sm hover:border-primary/40 transition-all duration-300">
             <div 
               className="absolute right-0 top-0 h-1 w-0 group-hover:w-full transition-all duration-500"
               style={{ backgroundColor: stat.color }}
@@ -232,7 +231,7 @@ export default function OrganizationAdminDashboard() {
       {/* Dynamic Activity & Operational Data */}
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Core Operational Pulse */}
-        <Card className="lg:col-span-8 border-border/40 bg-card/40 shadow-sm overflow-hidden flex flex-col">
+        <Card className="lg:col-span-8 border-border bg-card/60 shadow-sm overflow-hidden flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-8">
             <div className="space-y-1">
               <CardTitle className="text-xl">Operational Pulse</CardTitle>
@@ -300,7 +299,7 @@ export default function OrganizationAdminDashboard() {
         </Card>
 
         {/* Global Audit Feed */}
-        <Card className="lg:col-span-4 border-border/40 bg-card/40 shadow-sm flex flex-col">
+        <Card className="lg:col-span-4 border-border bg-card/60 shadow-sm flex flex-col">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl">Global Activity</CardTitle>
@@ -309,7 +308,7 @@ export default function OrganizationAdminDashboard() {
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto space-y-4 px-6 pb-6">
             {lists.auditLogs.length > 0 ? lists.auditLogs.map((log: DashboardAuditLog) => (
-              <div key={log.id} className="relative pl-6 pb-4 border-l border-border/60 last:border-0 last:pb-0">
+              <div key={log.id} className="relative pl-6 pb-4 border-l border-border last:border-0 last:pb-0">
                 <div 
                   className="absolute left-[-5px] top-1 h-2 w-2 rounded-full border-2 border-background"
                   style={{ backgroundColor: primaryColor }}
@@ -343,7 +342,7 @@ export default function OrganizationAdminDashboard() {
       {/* Snapshot Tables */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Core Leads Snapshot */}
-        <Card className="border-border/40 bg-card/40 shadow-sm">
+        <Card className="border-border bg-card/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-xl">Organization Leads</CardTitle>
             <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold hover:bg-muted/50 rounded-xl">
@@ -353,7 +352,7 @@ export default function OrganizationAdminDashboard() {
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent border-border/40">
+                <TableRow className="hover:bg-transparent border-border">
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider">Lead</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider">Status</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider text-right">Value</TableHead>
@@ -361,7 +360,7 @@ export default function OrganizationAdminDashboard() {
               </TableHeader>
               <TableBody>
                 {lists.leads.slice(0, 5).map((lead) => (
-                  <TableRow key={lead.id} className="border-border/40 hover:bg-muted/20 transition-colors">
+                  <TableRow key={lead.id} className="border-border/60 hover:bg-muted/20 transition-colors">
                     <TableCell className="py-4">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary">
@@ -389,7 +388,7 @@ export default function OrganizationAdminDashboard() {
         </Card>
 
         {/* Core Contracts Snapshot */}
-        <Card className="border-border/40 bg-card/40 shadow-sm">
+        <Card className="border-border bg-card/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-xl">Recent Contracts</CardTitle>
             <Button variant="ghost" size="sm" className="h-9 px-3 text-xs font-semibold hover:bg-muted/50 rounded-xl">
@@ -399,7 +398,7 @@ export default function OrganizationAdminDashboard() {
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent border-border/40">
+                <TableRow className="hover:bg-transparent border-border">
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider">Title</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider">Status</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold tracking-wider text-right">Value</TableHead>
@@ -407,7 +406,7 @@ export default function OrganizationAdminDashboard() {
               </TableHeader>
               <TableBody>
                 {lists.contracts.slice(0, 5).map((contract) => (
-                  <TableRow key={contract.id} className="border-border/40 hover:bg-muted/20 transition-colors">
+                  <TableRow key={contract.id} className="border-border/60 hover:bg-muted/20 transition-colors">
                     <TableCell className="py-4">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">

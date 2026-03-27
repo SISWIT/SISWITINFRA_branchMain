@@ -19,6 +19,7 @@ import { cn } from "@/core/utils/utils";
 import { useAuth } from "@/core/auth/useAuth";
 import { platformPath } from "@/core/utils/routes";
 import { ImpersonationBanner } from "./ImpersonationBanner";
+import { ThemeToggle } from "@/ui/theme-toggle";
 
 const menuItems = [
   { title: "Overview", icon: LayoutDashboard, path: platformPath() },
@@ -171,7 +172,10 @@ export function PlatformAdminLayout({ children }: PlatformAdminLayoutProps) {
             <h1 className="text-lg font-semibold">Platform Administration</h1>
           </div>
 
-          <span className="text-sm text-muted-foreground">SaaS Owner Console</span>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <span className="text-sm text-muted-foreground">SaaS Owner Console</span>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children || <Outlet />}</main>

@@ -15,6 +15,7 @@ import {
   organizationPortalPath,
   platformPath,
 } from "@/core/utils/routes";
+import { ThemeToggle } from "@/ui/theme-toggle";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -153,6 +154,11 @@ const Auth = () => {
         <div className="absolute -left-16 top-16 h-72 w-72 rounded-full bg-info/20 blur-3xl" />
         <div className="absolute bottom-8 right-8 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
       </div>
+
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
+
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center lg:min-h-[calc(100vh-5rem)]">
         <div className="w-full animate-scale-in overflow-hidden rounded-3xl border border-border/60 bg-card/85 shadow-card backdrop-blur-sm dark:border-primary/20 dark:bg-[rgba(16,12,30,0.88)] dark:shadow-[0_24px_80px_rgba(13,9,34,0.72)]">
           <div className="grid lg:grid-cols-[1.02fr_1fr]">
@@ -219,7 +225,7 @@ const Auth = () => {
                       placeholder="Email"
                       required
                       autoComplete="email"
-                      className="h-11 rounded-xl border-input/80 bg-background/80 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-[#d5dbea]/80 dark:bg-[#c3c9d8] dark:text-[#1a2233] dark:placeholder:text-[#5f687e]"
+                      className="h-11 rounded-xl border-input/80 bg-background/80 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     />
                   </div>
 
@@ -231,7 +237,7 @@ const Auth = () => {
                       placeholder="Password"
                       required
                       autoComplete="current-password"
-                      className="h-11 rounded-xl border-input/80 bg-background/80 pr-10 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-[#d5dbea]/80 dark:bg-[#c3c9d8] dark:text-[#1a2233] dark:placeholder:text-[#5f687e]"
+                      className="h-11 rounded-xl border-input/80 bg-background/80 pr-10 text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-0 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-white/40"
                     />
                     <button
                       type="button"
@@ -304,7 +310,7 @@ const Auth = () => {
 
                   <Button
                     type="submit"
-                    className="h-11 w-full rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 dark:bg-[#9d84e8] dark:text-white dark:hover:bg-[#ad95f0] dark:shadow-[0_14px_34px_rgba(145,108,237,0.35)]"
+                    className="h-11 w-full rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 dark:bg-primary dark:shadow-[0_14px_34px_rgba(var(--primary),0.35)]"
                     disabled={submitting || loading}
                   >
                     {submitting ? (

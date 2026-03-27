@@ -127,7 +127,7 @@ export default function OrganizationOverviewPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="hidden rounded-2xl border border-border/40 bg-card/40 backdrop-blur-md px-6 py-3 shadow-lg sm:block">
+          <div className="hidden rounded-2xl border border-border bg-card/60 backdrop-blur-md px-6 py-3 shadow-lg sm:block">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1 text-right">System Time</p>
             <p className="font-mono text-lg font-bold leading-none tracking-tight">{clock}</p>
           </div>
@@ -175,11 +175,11 @@ export default function OrganizationOverviewPage() {
       <section className="grid gap-6 xl:grid-cols-12">
         {/* Left Column: Analytics & Team */}
         <div className="space-y-6 xl:col-span-7">
-          <div className="rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden shadow-xl transition-all hover:shadow-2xl">
+          <div className="rounded-[2rem] border border-border bg-card/50 backdrop-blur-md overflow-hidden shadow-xl transition-all hover:shadow-2xl">
             <OrganizationAnalyticsCard data={inviteApprovalTrend} />
           </div>
 
-          <div className="rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md p-6 shadow-xl">
+          <div className="rounded-3xl border border-border bg-card/60 backdrop-blur-md p-6 shadow-xl">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-xl font-bold tracking-tight">Team Collaboration</h3>
@@ -230,15 +230,15 @@ export default function OrganizationOverviewPage() {
 
         {/* Right Column: Activity, Alerts & Progress */}
         <div className="space-y-6 xl:col-span-5">
-          <div className="rounded-3xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden shadow-xl">
+          <div className="rounded-3xl border border-border bg-card/50 backdrop-blur-md overflow-hidden shadow-xl">
             <OrganizationActivityCard title="Recent Invitations" items={recentInvites} />
           </div>
 
-          <div className="rounded-3xl border border-border/40 bg-card/30 backdrop-blur-md overflow-hidden shadow-xl">
+          <div className="rounded-3xl border border-border bg-card/50 backdrop-blur-md overflow-hidden shadow-xl">
             <OrganizationAlertsPanel alerts={alerts} onDismiss={dismissAlert} />
           </div>
 
-          <div className="rounded-3xl border border-border/40 bg-card/50 backdrop-blur-md p-6 shadow-xl space-y-6">
+          <div className="rounded-3xl border border-border bg-card/70 backdrop-blur-md p-6 shadow-xl space-y-6">
             <div className="relative">
               <OrganizationProgressCard
                 value={completion}

@@ -37,7 +37,7 @@ export default function OrganizationOwnerLayout() {
           onCollapseToggle={() => setCollapsed(!collapsed)}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background/20 backdrop-blur-3xl">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background/80 backdrop-blur-3xl">
           <OrganizationTopBar onOpenSidebar={() => setSidebarOpen(true)} />
           <main className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8 bg-muted/0">
             <div className="mx-auto max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -48,7 +48,7 @@ export default function OrganizationOwnerLayout() {
       </div>
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-[280px] p-0 border-r border-border/40 bg-card/95 backdrop-blur-xl">
+        <SheetContent side="left" className="w-[280px] p-0 border-r border-border bg-card/95 backdrop-blur-xl">
           <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           <SheetDescription className="sr-only">Organization navigation links</SheetDescription>
           <OrganizationSidebar

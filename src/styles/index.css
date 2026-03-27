@@ -38,7 +38,7 @@
     
     /* Muted - Supporting Text System */
     --muted: 214 18% 94%;
-    --muted-foreground: 231 15% 50%;
+    --muted-foreground: 224 35% 35%;
     
     /* Accent - Supporting Info Blue */
     --accent: 210 62% 94%;
@@ -58,8 +58,8 @@
     --info-foreground: 0 0% 100%;
     
     /* Borders & Inputs */
-    --border: 218 20% 86%;
-    --input: 218 20% 86%;
+    --border: 218 20% 82%;
+    --input: 218 20% 82%;
     --ring: 221 92% 39%;
     
     /* Border Radius */
@@ -110,15 +110,15 @@
     ═══════════════════════════════════════════════════════════════════════ */
     
     /* Background Colors - Dark Palette */
-    --background: 240 11% 5%;
+    --background: 240 10% 8%;
     --foreground: 240 10% 92%;
     
     /* Card Colors - Core Surface */
-    --card: 240 2% 1%;
+    --card: 240 10% 11%;
     --card-foreground: 240 10% 92%;
     
     /* Popover */
-    --popover: 240 2% 16%;
+    --popover: 240 10% 11%;
     --popover-foreground: 240 10% 92%;
     
     /* Primary - Preserve Purple Accent */
@@ -126,11 +126,11 @@
     --primary-foreground: 0 0% 100%;
     
     /* Secondary - Requested Mid Tone */
-    --secondary: 240 1% 30%;
+    --secondary: 240 4% 18%;
     --secondary-foreground: 240 8% 86%;
     
     /* Muted */
-    --muted: 240 2% 22%;
+    --muted: 240 6% 16%;
     --muted-foreground: 240 6% 68%;
     
     /* Accent */
@@ -151,12 +151,12 @@
     --info-foreground: 229 55% 10%;
     
     /* Borders & Inputs */
-    --border: 240 2% 30%;
-    --input: 240 2% 30%;
+    --border: 240 6% 22%;
+    --input: 240 6% 22%;
     --ring: 257 75% 70%;
     
     /* Sidebar - Dark Mode */
-    --sidebar-background: 240 6% 8%;
+    --sidebar-background: 240 10% 10%;
     --sidebar-foreground: 240 10% 92%;
     --sidebar-primary: 256 65% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -491,18 +491,18 @@
 
   .org-panel {
     border-radius: 1.25rem;
-    border: 1px solid hsl(var(--border) / 0.72);
+    border: 1px solid hsl(var(--border) / 0.85);
     background:
-      linear-gradient(162deg, hsl(var(--card)) 0%, hsl(var(--background) / 0.72) 100%);
+      linear-gradient(162deg, hsl(var(--card)) 0%, hsl(var(--background) / 0.85) 100%);
     padding: 1rem;
     box-shadow: var(--shadow-card);
   }
 
   .org-stat-card {
     border-radius: 1.1rem;
-    border: 1px solid hsl(var(--border) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.9);
     background:
-      linear-gradient(150deg, hsl(var(--card)) 0%, hsl(var(--background) / 0.7) 100%);
+      linear-gradient(150deg, hsl(var(--card)) 0%, hsl(var(--background) / 0.82) 100%);
     padding: 0.92rem;
     box-shadow: var(--shadow-card);
     transition: transform 0.24s ease, box-shadow 0.24s ease;

@@ -25,7 +25,7 @@ export function OrganizationStatCard({
   return (
     <article 
       className={cn(
-        "group relative overflow-hidden p-6 rounded-[2rem] border border-border/40 bg-card/50 backdrop-blur-md shadow-xl transition-all duration-500 hover:shadow-2xl hover:-translate-y-1",
+        "group relative overflow-hidden p-6 rounded-[2rem] border border-border bg-card/70 backdrop-blur-md shadow-xl transition-all duration-500 hover:shadow-2xl hover:-translate-y-1",
         className
       )}
     >

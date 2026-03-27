@@ -17,7 +17,7 @@ export function OrganizationAnalyticsCard({ data }: OrganizationAnalyticsCardPro
   const max = Math.max(1, ...data.map((entry) => Math.max(entry.invites, entry.approvals)));
 
   return (
-    <section className="p-6 h-full bg-card/40 backdrop-blur-md rounded-3xl border border-border/40 shadow-xl">
+    <section className="p-6 h-full bg-card/60 backdrop-blur-md rounded-3xl border border-border shadow-xl">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold tracking-tight">Invite Analytics</h3>

@@ -34,7 +34,7 @@ export function OrganizationActivityCard({ title, items }: OrganizationActivityC
   };
 
   return (
-    <section className="p-8 h-full bg-card/40 backdrop-blur-md rounded-[2rem] border border-border/40 shadow-xl">
+    <section className="p-8 h-full bg-card/60 backdrop-blur-md rounded-[2rem] border border-border shadow-xl">
       <div className="mb-8 flex items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold tracking-tight">{title}</h3>

@@ -40,6 +40,12 @@ interface Profile {
   company: string | null;
 }
 
+interface DbActivity {
+  subject: string | null;
+  created_at: string | null;
+  is_completed: boolean | null;
+}
+
 type ActivityStatus = "completed" | "pending" | "failed" | string;
 
 interface Activity {
@@ -167,28 +173,29 @@ const Dashboard = () => {
             .select("id", { count: "exact" })
             .eq("organization_id", organizationId as string),
           supabase.rpc("get_inventory_value"),
-          supabase.rpc("get_revenue_mtd", {
-            start_date: new Date(
+          supabase.rpc("get_revenue_mtd" as any, {
+            p_start_date: new Date(
               new Date().getFullYear(),
               new Date().getMonth(),
               1
             )
               .toISOString()
               .split("T")[0],
-            end_date: new Date().toISOString().split("T")[0],
+            p_end_date: new Date().toISOString().split("T")[0],
+            p_org_id: organizationId,
           }),
           supabase
             .from("activities")
             .select("subject, created_at, is_completed")
             .eq("organization_id", organizationId as string)
             .order("created_at", { ascending: false })
-            .limit(6),
+            .limit(6) as any,
         ]);
 
-        if (profileRes.data) setProfile(profileRes.data);
+        if (profileRes.data) setProfile(profileRes.data as Profile);
 
-        const inventoryValue = Number(invRes.data ?? 0);
-        const revenueMTD = Number(revRes.data ?? 0);
+        const inventoryValue = Number((invRes as any).data ?? 0);
+        const revenueMTD = Number((revRes as any).data ?? 0);
 
         setStats((prev) =>
           prev.map((s) => {
@@ -215,9 +222,10 @@ const Dashboard = () => {
           })
         );
 
-        if (activitiesRes.data) {
+        const activitiesData = (activitiesRes as any).data as DbActivity[] | null;
+        if (activitiesData) {
           setRecentActivity(
-            activitiesRes.data.map((a) => ({
+            activitiesData.map((a) => ({
               title: a.subject || "No Subject",
               time: a.created_at
                 ? new Date(a.created_at).toLocaleString()
@@ -262,7 +270,7 @@ const Dashboard = () => {
 
         {/* HERO */}
         <section className="container mx-auto px-4 md:px-6">
-          <div className="rounded-2xl p-5 md:p-8 bg-gradient-to-br from-primary/10 to-background border border-border flex flex-col md:flex-row justify-between gap-5">
+          <div className="rounded-2xl p-5 md:p-8 bg-gradient-to-br from-primary/10 via-background to-background border border-border/60 flex flex-col md:flex-row justify-between gap-5 shadow-sm">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">
                 Welcome back, {firstName}
@@ -346,9 +354,9 @@ const Dashboard = () => {
                 className="w-full p-3 md:p-4 rounded-xl border bg-card flex items-center gap-3 hover:shadow-md transition group"
               >
                 <div
-                  className={`w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gradient-to-br ${a.color} flex items-center justify-center`}
+                  className={`w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gradient-to-br ${a.color} flex items-center justify-center shadow-inner`}
                 >
-                  <a.icon className="w-4 h-4 text-white" />
+                  <a.icon className="w-4 h-4 text-white drop-shadow-sm" />
                 </div>
 
                 <div className="text-left flex-1">

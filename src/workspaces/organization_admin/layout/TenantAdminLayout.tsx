@@ -38,7 +38,7 @@ export function TenantAdminLayout({ children }: TenantAdminLayoutProps) {
         onCollapseToggle={() => setCollapsed((current) => !current)}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden relative z-10 bg-background/20 backdrop-blur-3xl">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10 bg-background/80 backdrop-blur-3xl">
         <ImpersonationBanner />
 
         <AdminTopBar onOpenSidebar={() => setMobileMenuOpen(true)} />
