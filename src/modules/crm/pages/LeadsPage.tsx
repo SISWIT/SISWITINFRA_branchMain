@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLeads, useCreateLead, useUpdateLead, useDeleteLead } from "@/modules/crm/hooks/useCRM";
+import { z } from "zod";
 import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Badge } from "@/ui/shadcn/badge";
@@ -14,6 +15,7 @@ import type { Lead, LeadStatus, LeadSource } from "@/core/types/crm";
 import { format } from "date-fns";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
+import { toast } from "sonner";
 import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
@@ -57,6 +59,13 @@ export default function LeadsPage() {
     filterDefs: LEAD_FILTERS,
   });
   
+  const leadSchema = z.object({
+    first_name: z.string().min(1, "First name is required"),
+    last_name: z.string().min(1, "Last name is required"),
+    email: z.string().email("Please enter a valid email address"),
+    phone: z.string().optional().refine((val) => !val || /^\+?[0-9\s\-()]{7,15}$/.test(val), "Please enter a valid phone number"),
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [formData, setFormData] = useState({ first_name: "", last_name: "", email: "", phone: "", company: "", job_title: "", status: "new" as LeadStatus, source: "other" as LeadSource, description: "" });
@@ -65,9 +74,19 @@ export default function LeadsPage() {
   const openEditDialog = (lead: Lead) => { setEditingLead(lead); setFormData({ first_name: lead.first_name, last_name: lead.last_name, email: lead.email || "", phone: lead.phone || "", company: lead.company || "", job_title: lead.job_title || "", status: lead.status, source: lead.source || "other", description: lead.description || "" }); setDialogOpen(true); };
 
   const handleSubmit = async () => {
-    if (editingLead) { await updateLead.mutateAsync({ id: editingLead.id, ...formData }); }
-    else { await createLead.mutateAsync(formData); }
-    setDialogOpen(false);
+    try {
+      leadSchema.parse(formData);
+
+      if (editingLead) { await updateLead.mutateAsync({ id: editingLead.id, ...formData }); }
+      else { await createLead.mutateAsync(formData); }
+      setDialogOpen(false);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("An error occurred. Please try again.");
+      }
+    }
   };
 
   const columns = [

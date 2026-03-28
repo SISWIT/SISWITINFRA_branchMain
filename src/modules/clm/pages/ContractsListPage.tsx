@@ -148,7 +148,7 @@ export default function ContractsListPage() {
                               <Edit className="h-4 w-4 mr-2" />Edit
                             </DropdownMenuItem>
                             {contract.status === "approved" && (
-                              <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}/sign`)}>
+                              <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/esign/${contract.id}`)}>
                                 <PenTool className="h-4 w-4 mr-2" />Send for Signature
                               </DropdownMenuItem>
                             )}

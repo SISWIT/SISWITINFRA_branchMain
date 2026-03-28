@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
 import { useProducts, useCreateQuote, useQuote, useUpdateQuote, useQuoteItems } from "@/modules/cpq/hooks/useCPQ";
+import { useAccounts } from "@/modules/crm/hooks/useCRM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Separator } from "@/ui/shadcn/separator";
 
@@ -88,20 +89,7 @@ export default function QuoteBuilderPage() {
     }
   }, [isEditMode, existingItems, isLoadingItems]);
 
-  const { data: accounts } = useQuery({
-    queryKey: ["accounts-list", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("id, name, billing_address, billing_city, billing_state, billing_zip, billing_country")
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: accounts } = useAccounts();
 
   const { data: contacts } = useQuery({
     queryKey: ["contacts-list", quoteData.account_id, user?.id],
@@ -213,6 +201,32 @@ export default function QuoteBuilderPage() {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
   };
 
+  if (isEditMode && !isLoadingQuote && existingQuote && existingQuote.status !== "draft") {
+    return (
+      <div className="container mx-auto max-w-2xl p-1 md:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Only draft quotes can be edited</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This quote is currently in the <span className="font-medium text-foreground">{existingQuote.status.replace(/_/g, " ")}</span> state.
+              Editing is only available while a quote is still a draft, so the workflow stays consistent.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={() => navigate(`/dashboard/cpq/quotes/${quoteId}`)}>
+                View Quote
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/dashboard/cpq/quotes")}>
+                Back to Quotes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-1 md:p-6 space-y-6">
       {/* Header - Stacked on mobile */}
@@ -268,8 +282,8 @@ export default function QuoteBuilderPage() {
                     </Select>
                     {selectedAccountDetails && (
                       <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded-md">
-                        <p className="font-medium">Bill To: {selectedAccountDetails.billing_address}</p>
-                        <p>{selectedAccountDetails.billing_city}, {selectedAccountDetails.billing_state}</p>
+                        <p className="font-medium">Bill To: {selectedAccountDetails.address}</p>
+                        <p>{selectedAccountDetails.city}, {selectedAccountDetails.state}</p>
                       </div>
                     )}
                   </div>

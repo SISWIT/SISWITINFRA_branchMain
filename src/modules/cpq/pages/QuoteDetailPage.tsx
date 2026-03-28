@@ -104,6 +104,11 @@ export default function QuoteDetailPage() {
               </Button>
             </>
           )}
+          {quote.status === "approved" && (
+            <Button onClick={() => updateStatusMutation.mutate({ id: id || "", status: "sent" })}>
+              <Send className="h-4 w-4 mr-2" />Mark as Sent
+            </Button>
+          )}
           <Button variant="outline" onClick={handlePrint}>
             <Download className="h-4 w-4 mr-2" />Export PDF
           </Button>

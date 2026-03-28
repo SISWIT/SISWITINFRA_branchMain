@@ -3,6 +3,10 @@
 export type ContractStatus = 'draft' | 'pending_review' | 'pending_approval' | 'approved' | 'sent' | 'signed' | 'expired' | 'cancelled';
 export type ESignatureStatus = 'pending' | 'signed' | 'rejected' | 'expired';
 
+export function isContractEditableStatus(status: ContractStatus | null | undefined) {
+  return (status ?? "draft") === "draft";
+}
+
 export interface ContractTemplate {
   id: string;
   name: string;
@@ -98,4 +102,3 @@ export interface CLMDashboardStats {
   contractsByStatus: Record<string, number>;
   recentContracts: Contract[];
 }
-

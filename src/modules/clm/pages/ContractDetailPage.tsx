@@ -18,6 +18,7 @@ import { Button } from "@/ui/shadcn/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Separator } from "@/ui/shadcn/separator";
 import { useContract, useUpdateContract } from "@/modules/clm/hooks/useCLM";
+import { isContractEditableStatus } from "@/core/types/clm";
 
 
 // Remove local type definitions that conflict with imports
@@ -138,7 +139,7 @@ export default function ContractDetailPage() {
 
           {status === "approved" && (
             <Button asChild>
-              <Link to={toTenantPath(`${id}/sign`)}>
+              <Link to={`/${tenantSlug}/app/clm/esign/${id}`}>
                 <PenTool className="mr-2 h-4 w-4" />
                 Send for Signature
               </Link>
@@ -229,9 +230,11 @@ export default function ContractDetailPage() {
               <Button className="w-full" variant="outline" onClick={() => navigate(contractsRootPath)}>
                 Back to list
               </Button>
-              <Button className="w-full" variant="outline" onClick={() => navigate(toTenantPath(`${id}/edit`))}>
-                Edit contract
-              </Button>
+              {isContractEditableStatus(status) && (
+                <Button className="w-full" variant="outline" onClick={() => navigate(toTenantPath(`${id}/edit`))}>
+                  Edit contract
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -56,6 +56,19 @@ function mapESignature(
   };
 }
 
+function normalizeNullableField(value: string | null | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 async function ensureContractAccessible(contractId: string, scope: ModuleScopeContext) {
   const query = supabase.from("contracts").select("id").eq("id", contractId);
   const scoped = applyModuleReadScope(query, scope, { ownerColumns: ["owner_id"], hasSoftDelete: true });
@@ -298,15 +311,15 @@ export function useCreateContract() {
         {
           name: contract.name || "",
           contract_number: contract.contract_number || `CTR-${Date.now()}`,
-          template_id: contract.template_id,
-          opportunity_id: contract.opportunity_id,
-          quote_id: contract.quote_id,
-          account_id: contract.account_id,
-          contact_id: contract.contact_id,
+          template_id: normalizeNullableField(contract.template_id),
+          opportunity_id: normalizeNullableField(contract.opportunity_id),
+          quote_id: normalizeNullableField(contract.quote_id),
+          account_id: normalizeNullableField(contract.account_id),
+          contact_id: normalizeNullableField(contract.contact_id),
           status: contract.status || "draft",
           content: contract.content,
-          start_date: contract.start_date,
-          end_date: contract.end_date,
+          start_date: normalizeNullableField(contract.start_date),
+          end_date: normalizeNullableField(contract.end_date),
           value: contract.value,
         },
         scope,
@@ -377,10 +390,22 @@ export function useUpdateContract() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Contract> & { id: string }) => {
+      const payload = {
+        ...updates,
+        template_id: normalizeNullableField(updates.template_id),
+        opportunity_id: normalizeNullableField(updates.opportunity_id),
+        quote_id: normalizeNullableField(updates.quote_id),
+        account_id: normalizeNullableField(updates.account_id),
+        contact_id: normalizeNullableField(updates.contact_id),
+        start_date: normalizeNullableField(updates.start_date),
+        end_date: normalizeNullableField(updates.end_date),
+        updated_at: new Date().toISOString(),
+      };
+
       const scopedQuery = applyModuleMutationScope(
         supabase
           .from("contracts")
-          .update({ ...updates, updated_at: new Date().toISOString() })
+          .update(payload)
           .eq("id", id),
         scope,
         ["owner_id"],
@@ -409,7 +434,7 @@ export function useUpdateContract() {
         entityId: id,
         tenantId,
         userId,
-        newValues: updates,
+        newValues: payload,
       });
 
       return data as Contract;

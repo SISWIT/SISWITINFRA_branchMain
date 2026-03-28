@@ -8,80 +8,103 @@ import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
-import { useContractTemplates, useCreateContract } from "@/modules/clm/hooks/useCLM";
+import { useContract, useContractTemplates, useCreateContract, useUpdateContract } from "@/modules/clm/hooks/useCLM";
+import { useQuote } from "@/modules/cpq/hooks/useCPQ";
+import { useAccounts } from "@/modules/crm/hooks/useCRM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
-import { toast } from "sonner";
 import { Separator } from "@/ui/shadcn/separator";
 import { Badge } from "@/ui/shadcn/badge";
-import { type ContractStatus } from "@/core/types/clm";
+import { type ContractStatus, isContractEditableStatus } from "@/core/types/clm";
+
+const EMPTY_CONTRACT_FORM = {
+  name: "",
+  account_id: "",
+  contact_id: "",
+  opportunity_id: "",
+  quote_id: "",
+  template_id: "",
+  start_date: "",
+  end_date: "",
+  value: 0,
+  content: "",
+};
+
+function toDateInputValue(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
+}
 
 
 export default function ContractBuilderPage() {
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const { tenantSlug, id } = useParams<{ tenantSlug: string; id?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const isEditMode = Boolean(id);
   const quoteId = searchParams.get("quote_id");
-
-
+  const [hasPrefilledFromQuote, setHasPrefilledFromQuote] = useState(false);
+  const [loadedContractId, setLoadedContractId] = useState<string | null>(null);
   const [contractData, setContractData] = useState({
-    name: "",
-    account_id: "",
-    contact_id: "",
+    ...EMPTY_CONTRACT_FORM,
     quote_id: quoteId || "",
-    template_id: "",
-    start_date: "",
-    end_date: "",
-    value: 0,
-    content: "",
   });
 
-  // Fetch quote details if converting from quote - UPDATED: Filter by current user
-  const { data: quote } = useQuery({
-    queryKey: ["quote-for-contract", quoteId, user?.id],
-    enabled: !!quoteId && !!user,
-    queryFn: async () => {
-      if (!quoteId || !user?.id) return null;
-      const { data, error } = await supabase
-        .from("quotes")
-        .select("*, accounts(id, name), contacts(id, first_name, last_name), opportunities(name)")
-        .eq("id", quoteId)
-        .or(`owner_id.eq.${user.id},created_by.eq.${user.id}`)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: existingContract, isLoading: isLoadingExistingContract } = useContract(isEditMode ? id ?? "" : "");
+  const { data: quote, isLoading: isLoadingQuote } = useQuote(!isEditMode && quoteId ? quoteId : "");
 
   // Pre-fill from quote
   useEffect(() => {
-    if (quote) {
+    if (isEditMode) {
+      return;
+    }
+
+    if (quoteId !== contractData.quote_id) {
       setContractData((prev) => ({
         ...prev,
+        quote_id: quoteId || "",
+      }));
+      setHasPrefilledFromQuote(false);
+    }
+  }, [contractData.quote_id, isEditMode, quoteId]);
+
+  useEffect(() => {
+    if (!isEditMode && quote && !hasPrefilledFromQuote) {
+      setContractData((prev) => ({
+        ...prev,
+        quote_id: quote.id,
+        opportunity_id: quote.opportunity_id || "",
         name: `Contract for ${quote.accounts?.name || "Customer"}`,
         account_id: quote.account_id || "",
         contact_id: quote.contact_id || "",
-        value: quote.total_amount || 0,
+        value: quote.total || 0,
       }));
+      setHasPrefilledFromQuote(true);
     }
-  }, [quote]);
+  }, [hasPrefilledFromQuote, isEditMode, quote]);
+
+  useEffect(() => {
+    if (!isEditMode || !existingContract || loadedContractId === existingContract.id) {
+      return;
+    }
+
+    setContractData({
+      name: existingContract.name || "",
+      account_id: existingContract.account_id || "",
+      contact_id: existingContract.contact_id || "",
+      opportunity_id: existingContract.opportunity_id || "",
+      quote_id: existingContract.quote_id || "",
+      template_id: existingContract.template_id || "",
+      start_date: toDateInputValue(existingContract.start_date),
+      end_date: toDateInputValue(existingContract.end_date),
+      value: existingContract.value || 0,
+      content: existingContract.content || "",
+    });
+    setLoadedContractId(existingContract.id);
+  }, [existingContract, isEditMode, loadedContractId]);
+
   // Use standardized hooks
   const { data: templates } = useContractTemplates();
   const createContract = useCreateContract();
-
-  // Legacy manual queries for accounts/contacts (keeping for now to avoid cross-module complexity, but scoping to current user/tenant)
-  const { data: accounts } = useQuery({
-    queryKey: ["accounts-list", tenantSlug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const updateContract = useUpdateContract();
+  const { data: accounts } = useAccounts();
 
   const { data: contacts } = useQuery({
     queryKey: ["contacts-list", contractData.account_id],
@@ -109,22 +132,71 @@ export default function ContractBuilderPage() {
     }
   };
 
-  const handleCreate = (status: ContractStatus) => {
-    createContract.mutate({
+  const handleSave = (status: ContractStatus) => {
+    const payload = {
       ...contractData,
       status,
       value: contractData.value || 0,
-    }, {
-      onSuccess: (data) => {
-        toast.success("Contract created successfully");
-        navigate(`/${tenantSlug}/app/clm/contracts/${data.id}`);
-      }
-    });
+    };
+
+    const onSuccess = (data: { id: string }) => {
+      navigate(`/${tenantSlug}/app/clm/contracts/${data.id}`);
+    };
+
+    if (isEditMode && id) {
+      updateContract.mutate({ id, ...payload }, { onSuccess });
+      return;
+    }
+
+    createContract.mutate(payload, { onSuccess });
   };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(value);
   };
+
+  const isSaving = createContract.isPending || updateContract.isPending;
+
+  if (isEditMode && isLoadingExistingContract) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 w-1/3 rounded bg-muted" />
+        <div className="h-64 rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (isEditMode && !existingContract) {
+    return (
+      <Card className="border-destructive/30 bg-destructive/10">
+        <CardContent className="py-8 text-center">
+          <p className="text-lg font-semibold">Contract not found</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The contract you are trying to edit could not be loaded.
+          </p>
+          <Button className="mt-4" variant="outline" onClick={() => navigate(`/${tenantSlug}/app/clm/contracts`)}>
+            Back to contracts
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isEditMode && existingContract && !isContractEditableStatus(existingContract.status)) {
+    return (
+      <Card className="border-warning/40 bg-warning/10">
+        <CardContent className="py-8 text-center">
+          <p className="text-lg font-semibold">This contract can no longer be edited</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Editing is only available while a contract is still a draft. Open the contract details page to continue the approved workflow.
+          </p>
+          <Button className="mt-4" variant="outline" onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${existingContract.id}`)}>
+            Back to contract
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -135,24 +207,28 @@ export default function ContractBuilderPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Create Contract</h1>
+            <h1 className="text-3xl font-bold">{isEditMode ? "Edit Contract" : "Create Contract"}</h1>
             <p className="text-muted-foreground">
-              {quoteId ? "Converting approved quote to contract" : "Create a new contract from template"}
+              {isEditMode
+                ? "Update draft contract details before moving it forward"
+                : quoteId
+                  ? "Converting approved quote to contract"
+                  : "Create a new contract from template"}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => handleCreate("draft")} disabled={createContract.isPending || !contractData.name}>
-            <Save className="h-4 w-4 mr-2" />Save Draft
+          <Button variant="outline" onClick={() => handleSave("draft")} disabled={isSaving || !contractData.name}>
+            <Save className="h-4 w-4 mr-2" />{isEditMode ? "Save Changes" : "Save Draft"}
           </Button>
-          <Button onClick={() => handleCreate("pending_review")} disabled={createContract.isPending || !contractData.name}>
+          <Button onClick={() => handleSave("pending_review")} disabled={isSaving || !contractData.name}>
             <Send className="h-4 w-4 mr-2" />Submit for Review
           </Button>
         </div>
       </div>
 
       {/* Quote Info Banner */}
-      {quote && (
+      {!isEditMode && quote && (
         <Card className="bg-info/10 border-info/30">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
@@ -160,11 +236,22 @@ export default function ContractBuilderPage() {
                 <FileText className="h-8 w-8 text-info" />
                 <div>
                   <p className="font-medium">Converting from Quote: {quote.quote_number}</p>
-                  <p className="text-sm text-muted-foreground">{quote.accounts?.name} • {quote.opportunities?.name}</p>
+                  <p className="text-sm text-muted-foreground">{quote.accounts?.name} | {quote.opportunities?.name}</p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-lg">{formatCurrency(quote.total_amount || 0)}</Badge>
+              <Badge variant="outline" className="text-lg">{formatCurrency(quote.total || 0)}</Badge>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isEditMode && quoteId && !isLoadingQuote && !quote && (
+        <Card className="border-warning/40 bg-warning/10">
+          <CardContent className="py-4">
+            <p className="font-medium">Quote details could not be loaded</p>
+            <p className="text-sm text-muted-foreground">
+              The contract form is still available, but the source quote values could not be prefilled for this conversion.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -299,11 +386,11 @@ export default function ContractBuilderPage() {
               <Separator />
 
               <div className="space-y-2">
-                <Button className="w-full" onClick={() => handleCreate("pending_review")} disabled={createContract.isPending || !contractData.name}>
+                <Button className="w-full" onClick={() => handleSave("pending_review")} disabled={isSaving || !contractData.name}>
                   <Send className="h-4 w-4 mr-2" />Submit for Review
                 </Button>
-                <Button variant="outline" className="w-full" onClick={() => handleCreate("draft")} disabled={createContract.isPending || !contractData.name}>
-                  <Save className="h-4 w-4 mr-2" />Save as Draft
+                <Button variant="outline" className="w-full" onClick={() => handleSave("draft")} disabled={isSaving || !contractData.name}>
+                  <Save className="h-4 w-4 mr-2" />{isEditMode ? "Save Changes" : "Save as Draft"}
                 </Button>
               </div>
             </CardContent>

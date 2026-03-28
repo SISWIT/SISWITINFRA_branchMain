@@ -7,6 +7,8 @@ import {
   useAccounts
 } from "@/modules/crm/hooks/useCRM";
 import { useCRUD } from "@/core/rbac/usePermissions";
+import { z } from "zod";
+import { toast } from "sonner";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
 import {
@@ -128,6 +130,16 @@ export default function OpportunitiesPage() {
     customFilters: OPP_CUSTOM_FILTERS,
   });
 
+  const opportunitySchema = z.object({
+    name: z.string().min(1, "Opportunity name is required"),
+    amount: z.string().optional().refine((val) => !val || !isNaN(parseFloat(val)), "Amount must be a number"),
+    probability: z.string().optional().refine((val) => {
+      if (!val) return true;
+      const num = parseInt(val);
+      return !isNaN(num) && num >= 0 && num <= 100;
+    }, "Probability must be between 0 and 100"),
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOpp, setEditingOpp] = useState<OpportunityRow | null>(null);
 
@@ -170,19 +182,29 @@ export default function OpportunitiesPage() {
   };
 
   const handleSubmit = async () => {
-    const payload = {
-      ...formData,
-      amount: formData.amount ? parseFloat(formData.amount) : undefined,
-      probability: formData.probability ? parseInt(formData.probability) : undefined,
-      close_date: formData.close_date || undefined,
-    };
+    try {
+      opportunitySchema.parse(formData);
 
-    if (editingOpp) {
-      await updateOpp.mutateAsync({ id: editingOpp.id, ...payload });
-    } else {
-      await createOpp.mutateAsync(payload);
+      const payload = {
+        ...formData,
+        amount: formData.amount ? parseFloat(formData.amount) : undefined,
+        probability: formData.probability ? parseInt(formData.probability) : undefined,
+        close_date: formData.close_date || undefined,
+      };
+
+      if (editingOpp) {
+        await updateOpp.mutateAsync({ id: editingOpp.id, ...payload });
+      } else {
+        await createOpp.mutateAsync(payload);
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("An error occurred. Please try again.");
+      }
     }
-    setDialogOpen(false);
   };
 
   const formatCurrency = (amount: number | null) => {

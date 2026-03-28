@@ -8,6 +8,8 @@ import {
   useDeleteAccount,
 } from "@/modules/crm/hooks/useCRM";
 import { useCRUD } from "@/core/rbac/usePermissions";
+import { z } from "zod";
+import { toast } from "sonner";
 
 import { DataTable } from "@/modules/crm/components/DataTable";
 
@@ -96,6 +98,13 @@ export default function AccountsPage() {
     filterDefs: ACCOUNT_FILTERS,
   });
 
+  // validation schema
+  const accountSchema = z.object({
+    name: z.string().min(1, "Account name is required"),
+    email: z.string().optional().refine((val) => !val || z.string().email().safeParse(val).success, "Please enter a valid email address"),
+    phone: z.string().optional().refine((val) => !val || /^\+?[0-9\s\-()]{7,15}$/.test(val), "Please enter a valid phone number"),
+  });
+
   // ui state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null);
@@ -161,26 +170,36 @@ export default function AccountsPage() {
 
   // submit handler
   const handleSubmit = async () => {
-    const annualRevenue = formData.annual_revenue
-      ? parseFloat(formData.annual_revenue)
-      : undefined;
-    const employeeCount = formData.employee_count
-      ? parseInt(formData.employee_count)
-      : undefined;
+    try {
+      accountSchema.parse(formData);
 
-    const payload = {
-      ...formData,
-      annual_revenue: annualRevenue,
-      employee_count: employeeCount,
-    };
+      const annualRevenue = formData.annual_revenue
+        ? parseFloat(formData.annual_revenue)
+        : undefined;
+      const employeeCount = formData.employee_count
+        ? parseInt(formData.employee_count)
+        : undefined;
 
-    if (editingAccount) {
-      await updateAccount.mutateAsync({ id: editingAccount.id, ...payload });
-    } else {
-      await createAccount.mutateAsync(payload);
+      const payload = {
+        ...formData,
+        annual_revenue: annualRevenue,
+        employee_count: employeeCount,
+      };
+
+      if (editingAccount) {
+        await updateAccount.mutateAsync({ id: editingAccount.id, ...payload });
+      } else {
+        await createAccount.mutateAsync(payload);
+      }
+
+      setDialogOpen(false);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("An error occurred. Please try again.");
+      }
     }
-
-    setDialogOpen(false);
   };
 
   // table columns

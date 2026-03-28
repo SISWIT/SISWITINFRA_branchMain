@@ -181,9 +181,11 @@ export default function QuotesListPage() {
                               <DropdownMenuItem onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}`)}>
                                 <Eye className="h-4 w-4 mr-2" />View
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}/edit`)}>
-                                <Edit className="h-4 w-4 mr-2" />Edit
-                              </DropdownMenuItem>
+                              {quote.status === "draft" && (
+                                <DropdownMenuItem onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}/edit`)}>
+                                  <Edit className="h-4 w-4 mr-2" />Edit
+                                </DropdownMenuItem>
+                              )}
                               {quote.status === "draft" && (
                                 <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "pending_approval")}>
                                   <Send className="h-4 w-4 mr-2" />Submit for Approval
@@ -199,7 +201,7 @@ export default function QuotesListPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {(quote.status === "approved" || quote.status === "draft") && (
+                              {quote.status === "approved" && (
                                 <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "sent")}>
                                   <Send className="h-4 w-4 mr-2" />Mark as Sent
                                 </DropdownMenuItem>

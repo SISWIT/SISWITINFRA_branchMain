@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useContacts, useCreateContact, useUpdateContact, useDeleteContact, useAccounts } from "@/modules/crm/hooks/useCRM";
+import { z } from "zod";
+import { toast } from "sonner";
 import { useCRUD } from "@/core/rbac/usePermissions";
 import { DataTable } from "@/modules/crm/components/DataTable";
 import { Button } from "@/ui/shadcn/button";
@@ -51,6 +53,13 @@ export default function ContactsPage() {
     searchFields: ["first_name", "last_name", "email", "phone"],
   });
 
+  const contactSchema = z.object({
+    first_name: z.string().min(1, "First name is required"),
+    last_name: z.string().min(1, "Last name is required"),
+    email: z.string().optional().refine((val) => !val || z.string().email().safeParse(val).success, "Please enter a valid email address"),
+    phone: z.string().optional().refine((val) => !val || /^\+?[0-9\s\-()]{7,15}$/.test(val), "Please enter a valid phone number"),
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
 
@@ -98,12 +107,22 @@ export default function ContactsPage() {
   };
 
   const handleSubmit = async () => {
-    if (editingContact) {
-      await updateContact.mutateAsync({ id: editingContact.id, ...formData });
-    } else {
-      await createContact.mutateAsync(formData);
+    try {
+      contactSchema.parse(formData);
+
+      if (editingContact) {
+        await updateContact.mutateAsync({ id: editingContact.id, ...formData });
+      } else {
+        await createContact.mutateAsync(formData);
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("An error occurred. Please try again.");
+      }
     }
-    setDialogOpen(false);
   };
 
   const columns = [

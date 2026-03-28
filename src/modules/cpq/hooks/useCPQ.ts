@@ -35,6 +35,10 @@ const QUOTE_STATUS_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
 };
 
 function validateQuoteStatusTransition(currentStatus: string, nextStatus: string) {
+  if (currentStatus === nextStatus) {
+    return;
+  }
+
   const allowedNextStatuses = QUOTE_STATUS_TRANSITIONS[currentStatus as QuoteStatus] ?? [];
   if (!allowedNextStatuses.includes(nextStatus as QuoteStatus)) {
     throw new Error(`Invalid quote status transition from "${currentStatus}" to "${nextStatus}"`);

@@ -138,36 +138,48 @@ function LegacyDashboardRedirect() {
   const location = useLocation();
   const { role, loading } = useAuth();
   const { tenant, tenantLoading } = useTenant();
+  const locationSuffix = `${location.search}${location.hash}`;
 
   if (loading || tenantLoading) return <RouteLoader />;
 
   if (isPlatformRole(role)) {
     const rest = location.pathname.replace(/^\/dashboard\/?/, "");
-    return <Navigate to={platformPath(rest)} replace />;
+    return <Navigate to={`${platformPath(rest)}${locationSuffix}`} replace />;
   }
 
   if (!tenant?.slug) return <Navigate to="/auth/sign-in" replace />;
 
   const rest = location.pathname.replace(/^\/dashboard\/?/, "");
-  return <Navigate to={normalizeLegacyDashboardPath(tenant.slug, rest)} replace />;
+  return <Navigate to={`${normalizeLegacyDashboardPath(tenant.slug, rest)}${locationSuffix}`} replace />;
 }
 
 function LegacyPortalRedirect() {
   const location = useLocation();
   const { loading } = useAuth();
   const { tenant, tenantLoading } = useTenant();
+  const locationSuffix = `${location.search}${location.hash}`;
 
   if (loading || tenantLoading) return <RouteLoader />;
   if (!tenant?.slug) return <Navigate to="/auth/sign-in" replace />;
 
   const rest = location.pathname.replace(/^\/portal\/?/, "");
-  return <Navigate to={tenantPortalPath(tenant.slug, rest)} replace />;
+  return <Navigate to={`${tenantPortalPath(tenant.slug, rest)}${locationSuffix}`} replace />;
 }
 
 function LegacyAdminRedirect() {
   const location = useLocation();
   const rest = location.pathname.replace(/^\/admin\/?/, "");
-  return <Navigate to={platformPath(rest)} replace />;
+  return <Navigate to={`${platformPath(rest)}${location.search}${location.hash}`} replace />;
+}
+
+function LegacyContractSignRedirect() {
+  const { tenantSlug, id } = useParams<{ tenantSlug: string; id: string }>();
+
+  if (!tenantSlug || !id) {
+    return <NotFound />;
+  }
+
+  return <Navigate to={`/${tenantSlug}/app/clm/esign/${id}`} replace />;
 }
 
 // W-06: Guard /:tenantSlug against reserved root segments
@@ -342,6 +354,7 @@ function AppRoutes() {
           <Route path="clm/contracts/new" element={<ModuleGate module="clm"><ContractBuilderPage /></ModuleGate>} />
           <Route path="clm/contracts/:id" element={<ModuleGate module="clm"><ContractDetailPage /></ModuleGate>} />
           <Route path="clm/contracts/:id/edit" element={<ModuleGate module="clm"><ContractBuilderPage /></ModuleGate>} />
+          <Route path="clm/contracts/:id/sign" element={<ModuleGate module="clm"><LegacyContractSignRedirect /></ModuleGate>} />
           <Route path="clm/templates" element={<ModuleGate module="clm"><TemplatesPage /></ModuleGate>} />
           <Route path="clm/scan" element={<ModuleGate module="clm"><ContractScanPage /></ModuleGate>} />
           <Route path="clm/esign/:id" element={<ModuleGate module="clm"><ESignaturePage /></ModuleGate>} />
