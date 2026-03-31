@@ -1,32 +1,40 @@
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, LogOut } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { useImpersonation } from "@/core/hooks/useImpersonation";
 
 export function ImpersonationBanner() {
   const { state, stopImpersonation } = useImpersonation();
 
-  if (!state.active || !state.tenantSlug) {
+  if (!state.active) {
     return null;
   }
 
+  const displaySlug = state.organizationSlug ?? state.tenantSlug ?? "unknown";
+
   return (
-    <div className="border-b border-warning/40 bg-warning/10 px-4 py-2">
+    <div className="border-b border-destructive/40 bg-destructive/10 px-4 py-2">
       <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-warning-foreground">
-          <AlertTriangle className="h-4 w-4" />
-          <p className="text-sm font-medium">
-            Impersonation mode is active for tenant <span className="font-bold">{state.tenantSlug}</span>
-          </p>
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <div className="text-sm">
+            <span className="font-semibold">Impersonation active</span>
+            {" — "}
+            Organization: <span className="font-bold">{displaySlug}</span>
+            {state.reason && (
+              <span className="ml-2 text-muted-foreground">
+                (Reason: {state.reason})
+              </span>
+            )}
+          </div>
         </div>
         <Button
           type="button"
-          variant="ghost"
+          variant="destructive"
           size="sm"
-          className="text-warning-foreground hover:bg-warning/20"
           onClick={() => void stopImpersonation()}
         >
-          <X className="mr-1 h-4 w-4" />
-          Exit
+          <LogOut className="mr-1.5 h-4 w-4" />
+          End Impersonation Session
         </Button>
       </div>
     </div>

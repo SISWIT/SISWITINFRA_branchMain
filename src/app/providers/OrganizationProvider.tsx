@@ -104,16 +104,32 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     async (userId: string) => {
       const currentFetch = ++fetchCount.current;
       try {
-        if (role === "platform_super_admin" && impersonation.active && impersonation.tenantSlug) {
-          const orgResult = await unsafeSupabase
-            .from("organizations")
-            .select("*")
-            .eq("slug", impersonation.tenantSlug)
-            .maybeSingle();
+        if (role === "platform_super_admin" && impersonation.active) {
+          // Prefer canonical organizationId, fall back to slug
+          const impersonatedOrgId = impersonation.organizationId;
+          const impersonatedSlug = impersonation.organizationSlug ?? impersonation.tenantSlug;
+
+          let orgResult = null;
+          if (impersonatedOrgId) {
+            orgResult = await unsafeSupabase
+              .from("organizations")
+              .select("*")
+              .eq("id", impersonatedOrgId)
+              .maybeSingle();
+          }
+
+          // Fall back to slug if ID lookup fails
+          if (!orgResult?.data && impersonatedSlug) {
+            orgResult = await unsafeSupabase
+              .from("organizations")
+              .select("*")
+              .eq("slug", impersonatedSlug)
+              .maybeSingle();
+          }
 
           if (currentFetch !== fetchCount.current) return;
 
-          if (orgResult.data) {
+          if (orgResult?.data) {
             const nextOrg = mapOrganization(orgResult.data as Record<string, unknown>);
             setOrganization(nextOrg);
             setMemberships([]);
@@ -175,7 +191,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [fetchSubscriptionByOrganization, impersonation.active, impersonation.tenantSlug, role, unsafeSupabase],
+    [fetchSubscriptionByOrganization, impersonation.active, impersonation.organizationId, impersonation.organizationSlug, impersonation.tenantSlug, role, unsafeSupabase],
   );
 
   useEffect(() => {

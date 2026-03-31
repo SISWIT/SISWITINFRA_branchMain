@@ -1897,41 +1897,57 @@ export type Database = {
       impersonation_sessions: {
         Row: {
           ended_at: string | null
+          expires_at: string | null
           id: string
           metadata: Json
           organization_id: string
           organization_slug: string
           platform_super_admin_user_id: string
           reason: string | null
+          source_ip: string | null
           started_at: string
           tenant_id: string | null
           tenant_slug: string | null
+          user_agent: string | null
         }
         Insert: {
           ended_at?: string | null
+          expires_at?: string | null
           id?: string
           metadata?: Json
           organization_id: string
           organization_slug: string
           platform_super_admin_user_id: string
           reason?: string | null
+          source_ip?: string | null
           started_at?: string
           tenant_id?: string | null
           tenant_slug?: string | null
+          user_agent?: string | null
         }
         Update: {
           ended_at?: string | null
+          expires_at?: string | null
           id?: string
           metadata?: Json
           organization_id?: string
           organization_slug?: string
           platform_super_admin_user_id?: string
           reason?: string | null
+          source_ip?: string | null
           started_at?: string
           tenant_id?: string | null
           tenant_slug?: string | null
+          user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_admin_user_id_fkey"
+            columns: ["platform_super_admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "impersonation_sessions_organization_id_fkey"
             columns: ["organization_id"]
@@ -2670,6 +2686,127 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_domain_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          organization_id: string | null
+          payload: Json
+          processed_at: string | null
+          target_entity_id: string | null
+          target_entity_type: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          organization_id?: string | null
+          payload?: Json
+          processed_at?: string | null
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          organization_id?: string | null
+          payload?: Json
+          processed_at?: string | null
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_domain_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_domain_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_feature_flags: {
+        Row: {
+          created_at: string
+          description: string | null
+          is_enabled: boolean
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          is_enabled?: boolean
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          is_enabled?: boolean
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_feature_flags_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4098,6 +4235,7 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: Json
       }
+      get_platform_overview: { Args: never; Returns: Json }
       get_revenue_mtd:
         | {
             Args: {

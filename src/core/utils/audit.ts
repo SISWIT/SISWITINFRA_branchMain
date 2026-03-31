@@ -14,6 +14,12 @@ export interface AuditLogInput {
   oldValues?: Record<string, unknown> | null;
   newValues?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
+  /** Unique ID to correlate related audit events (e.g. a multi-step workflow). */
+  correlationId?: string | null;
+  /** Identifies the type of actor performing the action. */
+  actorType?: "user" | "platform_admin" | "system" | null;
+  /** Links this audit entry to an active impersonation session. */
+  impersonationSessionId?: string | null;
 }
 
 function asJson(value: Record<string, unknown> | null | undefined): Json | null {
@@ -26,6 +32,22 @@ function asJson(value: Record<string, unknown> | null | undefined): Json | null 
  */
 export async function writeAuditLog(input: AuditLogInput): Promise<void> {
   const organizationId = input.organizationId ?? input.tenantId ?? null;
+
+  // Merge platform-specific metadata into the metadata payload
+  const enrichedMetadata: Record<string, unknown> = {
+    ...(input.metadata ?? {}),
+  };
+
+  if (input.correlationId) {
+    enrichedMetadata.correlation_id = input.correlationId;
+  }
+  if (input.actorType) {
+    enrichedMetadata.actor_type = input.actorType;
+  }
+  if (input.impersonationSessionId) {
+    enrichedMetadata.impersonation_session_id = input.impersonationSessionId;
+  }
+
   const auditEntry: Database["public"]["Tables"]["audit_logs"]["Insert"] = {
     action: input.action,
     entity_type: input.entityType,
@@ -35,7 +57,7 @@ export async function writeAuditLog(input: AuditLogInput): Promise<void> {
     user_id: input.userId ?? null,
     old_values: asJson(input.oldValues),
     new_values: asJson(input.newValues),
-    metadata: asJson(input.metadata) ?? {},
+    metadata: asJson(enrichedMetadata) ?? {},
     created_at: new Date().toISOString(),
   };
 

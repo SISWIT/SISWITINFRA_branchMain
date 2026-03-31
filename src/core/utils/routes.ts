@@ -65,3 +65,34 @@ export const tenantAppPath = organizationAppPath;
 export const tenantDashboardPath = organizationDashboardPath;
 export const tenantPortalPath = organizationPortalPath;
 export const tenantModulePath = organizationModulePath;
+
+// ---------------------------------------------------------------------------
+// Platform admin route helpers
+// ---------------------------------------------------------------------------
+
+export const platformOrganizationsPath = (): string => platformPath("organizations");
+
+export const platformOrganizationDetailPath = (id: string): string =>
+  platformPath(`organizations/${clean(id)}`);
+
+export const platformUsersPath = (): string => platformPath("users");
+
+export const platformUserDetailPath = (id: string): string =>
+  platformPath(`users/${clean(id)}`);
+
+export const platformSubscriptionsPath = (): string => platformPath("subscriptions");
+
+export const platformAuditLogsPath = (): string => platformPath("audit-logs");
+
+export const platformSettingsPath = (): string => platformPath("settings");
+
+export const platformPlansPath = (): string => platformPath("plans");
+
+export const platformModulesPath = (): string => platformPath("modules");
+
+export const platformSecurityPath = (): string => platformPath("security");
+
+export const platformHealthPath = (): string => platformPath("health");
+
+export const platformAnalyticsPath = (): string => platformPath("analytics");
+

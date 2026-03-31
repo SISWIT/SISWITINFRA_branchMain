@@ -4,9 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/core/auth/useAuth";
 import { useTenant } from "@/core/tenant/useTenant";
 import { useImpersonation } from "@/core/hooks/useImpersonation";
-import { supabase } from "@/core/api/client";
 import { isPlatformRole } from "@/core/types/roles";
-import { logger } from "@/core/utils/logger";
 
 interface TenantSlugGuardProps {
   children: ReactNode;
@@ -16,7 +14,7 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const { user, role, loading } = useAuth();
   const { tenant, tenantLoading, memberships, switchTenantBySlug } = useTenant();
-  const { state: impersonation, startImpersonation } = useImpersonation();
+  const { state: impersonation } = useImpersonation();
   const [resolving, setResolving] = useState(false);
   const lastSwitchedSlugRef = useRef<string | null>(null);
 
@@ -28,40 +26,10 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
   useEffect(() => {
     if (!tenantSlug || loading || tenantLoading || !user) return;
 
+    // Platform admins: do NOT auto-start impersonation.
+    // The ProtectedRoute guard already requires an active impersonation session.
+    // If the slug does not match the current impersonation, redirect will happen at the route level.
     if (isPlatformRole(role)) {
-      if (impersonation.tenantSlug !== tenantSlug) {
-        const membershipTenant = memberships.find((m) => m.tenant?.slug === tenantSlug)?.tenant;
-        if (membershipTenant?.id) {
-          void startImpersonation({
-            tenantId: membershipTenant.id,
-            tenantSlug,
-            reason: "Route scope switch",
-          });
-          return;
-        }
-
-        void (async () => {
-          const tenantResult = await supabase
-            .from("tenants")
-            .select("id,slug")
-            .eq("slug", tenantSlug)
-            .maybeSingle();
-
-          if (tenantResult.data?.id) {
-            await startImpersonation({
-              tenantId: tenantResult.data.id,
-              tenantSlug: tenantResult.data.slug ?? tenantSlug,
-              reason: "Platform admin tenant preview",
-            });
-          }
-        })().catch((err) => {
-          logger.error("Impersonation lookup failed", {
-            tenantSlug,
-            userId: user?.id,
-            error: err,
-          });
-        });
-      }
       return;
     }
 
@@ -74,11 +42,8 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
     void switchTenantBySlug(tenantSlug).finally(() => setResolving(false));
   }, [
     hasMembership,
-    impersonation.tenantSlug,
     loading,
-    memberships,
     role,
-    startImpersonation,
     switchTenantBySlug,
     tenant?.slug,
     tenantLoading,
@@ -98,8 +63,16 @@ export function TenantSlugGuard({ children }: TenantSlugGuardProps) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
+  // Platform admins: require active impersonation matching this slug
   if (isPlatformRole(role)) {
-    return <>{children}</>;
+    if (
+      impersonation.active &&
+      impersonation.organizationSlug === tenantSlug
+    ) {
+      return <>{children}</>;
+    }
+    // Impersonation not active or slug mismatch — redirect to platform
+    return <Navigate to="/platform" replace />;
   }
 
   if (!tenantSlug || !hasMembership) {

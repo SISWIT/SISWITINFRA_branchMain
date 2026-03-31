@@ -30,21 +30,44 @@ async function logImpersonationEvent(
 
     await unsafeSupabase.from("audit_logs").insert({
       user_id: actorUserId,
-      tenant_id: nextState.tenantId,
+      organization_id: nextState.organizationId,
+      tenant_id: nextState.organizationId,
       entity_type: "impersonation",
       entity_id: actorUserId,
       action: `impersonation_${action}`,
       old_values: null,
       new_values: nextState,
       metadata: {
-        tenant_slug: nextState.tenantSlug,
+        organization_slug: nextState.organizationSlug,
         started_at: nextState.startedAt,
+        reason: nextState.reason ?? null,
+        actor_type: "platform_admin",
       },
       created_at: new Date().toISOString(),
     });
   } catch {
     // Impersonation should still work even if logging fails.
   }
+}
+
+/**
+ * Migrate old session storage format (tenantId/tenantSlug only) into canonical format.
+ */
+function migrateSessionState(parsed: Record<string, unknown>): ImpersonationState {
+  const organizationId = (parsed.organizationId as string) ?? (parsed.tenantId as string) ?? null;
+  const organizationSlug = (parsed.organizationSlug as string) ?? (parsed.tenantSlug as string) ?? null;
+
+  return {
+    active: Boolean(parsed.active),
+    sessionId: (parsed.sessionId as string) ?? null,
+    organizationId,
+    organizationSlug,
+    // Keep compat aliases in sync
+    tenantId: organizationId,
+    tenantSlug: organizationSlug,
+    startedAt: (parsed.startedAt as string) ?? null,
+    reason: (parsed.reason as string) ?? null,
+  };
 }
 
 export function ImpersonationProvider({ children }: { children: ReactNode }) {
@@ -56,9 +79,13 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       const raw = sessionStorage.getItem(IMPERSONATION_STORAGE_KEY);
       if (!raw) return;
 
-      const parsed = JSON.parse(raw) as ImpersonationState;
-      if (parsed?.active && parsed.tenantId && parsed.tenantSlug) {
-        setState(parsed);
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const migrated = migrateSessionState(parsed);
+
+      if (migrated.active && migrated.organizationId && migrated.organizationSlug) {
+        setState(migrated);
+        // Re-persist in canonical format if we migrated from legacy
+        sessionStorage.setItem(IMPERSONATION_STORAGE_KEY, JSON.stringify(migrated));
       }
     } catch {
       setState(defaultImpersonationState);
@@ -106,9 +133,21 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   }, [persist, state, user?.id]);
 
   const startImpersonation = useCallback(
-    async ({ tenantId, tenantSlug, reason }: StartImpersonationInput) => {
+    async (input: StartImpersonationInput) => {
       if (!user?.id) throw new Error("Not authenticated");
       if (!isPlatformRole(role)) throw new Error("Only platform admins can impersonate");
+
+      // Resolve canonical IDs (accept legacy tenantId/tenantSlug as fallback)
+      const organizationId = input.organizationId ?? input.tenantId;
+      const organizationSlug = input.organizationSlug ?? input.tenantSlug;
+
+      if (!organizationId || !organizationSlug) {
+        throw new Error("organizationId and organizationSlug are required for impersonation");
+      }
+
+      if (!input.reason) {
+        throw new Error("A reason is required to start impersonation");
+      }
 
       let sessionId: string | null = null;
       try {
@@ -127,6 +166,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
           };
         };
 
+        // Close previous session if one exists
         if (state.sessionId) {
           await unsafeSupabase
             .from("impersonation_sessions")
@@ -135,16 +175,21 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
             .is("ended_at", null);
         }
 
+        // Write canonical columns: platform_super_admin_user_id, organization_id, organization_slug
         const { data } = await unsafeSupabase
           .from("impersonation_sessions")
           .insert({
-            platform_admin_user_id: user.id,
-            tenant_id: tenantId,
-            tenant_slug: tenantSlug,
+            platform_super_admin_user_id: user.id,
+            organization_id: organizationId,
+            organization_slug: organizationSlug,
+            // Compatibility aliases
+            tenant_id: organizationId,
+            tenant_slug: organizationSlug,
             started_at: new Date().toISOString(),
-            reason: reason ?? null,
+            reason: input.reason,
             metadata: {
               source: "web",
+              actor_type: "platform_admin",
             },
           })
           .select("id")
@@ -158,10 +203,13 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       const next: ImpersonationState = {
         active: true,
         sessionId,
-        tenantId,
-        tenantSlug,
+        organizationId,
+        organizationSlug,
+        // Keep compat aliases in sync
+        tenantId: organizationId,
+        tenantSlug: organizationSlug,
         startedAt: new Date().toISOString(),
-        reason: reason ?? null,
+        reason: input.reason,
       };
 
       persist(next);

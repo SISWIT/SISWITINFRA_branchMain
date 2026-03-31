@@ -17,12 +17,11 @@ import {
   CustomerRoute,
   OrganizationOwnerRoute,
   PendingApprovalRoute,
-  PlatformAdminRoute,
   TenantAdminRoute,
 } from "@/core/auth/components/ProtectedRoute";
 import { TenantSlugGuard } from "@/core/auth/components/TenantSlugGuard";
 import { ModuleGate } from "@/core/auth/components/ModuleGate";
-import { PlatformAdminLayout } from "@/workspaces/platform/layout/PlatformAdminLayout";
+import { PlatformAdminRoutes } from "@/workspaces/platform/app/PlatformAdminRoutes";
 import { TenantAdminLayout } from "@/workspaces/organization_admin/layout/TenantAdminLayout";
 import { CustomerPortalLayout } from "@/workspaces/portal/layout/CustomerPortalLayout";
 import { ImpersonationProvider } from "@/app/providers/ImpersonationProvider";
@@ -73,12 +72,6 @@ const EmployeeSettingsPage = lazy(() => import("../workspaces/employee/pages/Emp
 const OrganizationAdminDashboard = lazy(
   () => import("../workspaces/organization_admin/pages/OrganizationAdminDashboard"),
 );
-const PlatformAdminDashboard = lazy(() => import("../workspaces/platform/pages/PlatformAdminDashboard"));
-const TenantsPanel = lazy(() => import("../workspaces/platform/pages/panels/TenantsPanel"));
-const UsersPanel = lazy(() => import("../workspaces/platform/pages/panels/UsersPanel"));
-const BillingPanel = lazy(() => import("../workspaces/platform/pages/panels/BillingPanel"));
-const SettingsPanel = lazy(() => import("../workspaces/platform/pages/panels/SettingsPanel"));
-const AuditLogsPanel = lazy(() => import("../workspaces/platform/pages/panels/AuditLogsPanel"));
 
 const PortalDashboard = lazy(() => import("../workspaces/portal/pages/PortalDashboard"));
 const CustomerQuotesPage = lazy(() => import("../workspaces/portal/pages/CustomerQuotesPage"));
@@ -271,23 +264,8 @@ function AppRoutes() {
           <Route path="settings" element={<OrganizationSettingsPage />} />
         </Route>
 
-        {/* Platform */}
-        <Route
-          path="/platform"
-          element={
-            <PlatformAdminRoute>
-              <PlatformAdminLayout />
-            </PlatformAdminRoute>
-          }
-        >
-          <Route index element={<PlatformAdminDashboard />} />
-          <Route path="tenants" element={<TenantsPanel />} />
-          <Route path="users" element={<UsersPanel />} />
-          <Route path="billing" element={<BillingPanel />} />
-          <Route path="settings" element={<SettingsPanel />} />
-          <Route path="audit-logs" element={<AuditLogsPanel />} />
-          <Route path="logs" element={<Navigate to="/platform/audit-logs" replace />} />
-        </Route>
+        {/* Platform — route tree owned by PlatformAdminRoutes */}
+        <Route path="/platform/*" element={<PlatformAdminRoutes />} />
 
         {/* Tenant Portal */}
         <Route
@@ -367,66 +345,12 @@ function AppRoutes() {
           <Route path="crm/opportunities" element={<ModuleGate module="crm"><OpportunitiesPage /></ModuleGate>} />
           <Route path="crm/activities" element={<ModuleGate module="crm"><ActivitiesPage /></ModuleGate>} />
 
-          <Route
-            path="documents"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <DocumentsDashboard />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
-          <Route
-            path="documents/create"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <DocumentCreatePage />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
-          <Route
-            path="documents/templates"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <DocumentTemplatesPage />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
-          <Route
-            path="documents/history"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <DocumentHistoryPage />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
-          <Route
-            path="documents/pending"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <PendingSignaturesPage />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
-          <Route
-            path="documents/:id/esign"
-            element={
-              <ModuleGate module="documents">
-                <DocumentsRealtimeProvider>
-                  <DocumentESignPage />
-                </DocumentsRealtimeProvider>
-              </ModuleGate>
-            }
-          />
+          <Route path="documents" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><DocumentsDashboard /></DocumentsRealtimeProvider></ModuleGate>} />
+          <Route path="documents/create" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><DocumentCreatePage /></DocumentsRealtimeProvider></ModuleGate>} />
+          <Route path="documents/templates" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><DocumentTemplatesPage /></DocumentsRealtimeProvider></ModuleGate>} />
+          <Route path="documents/history" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><DocumentHistoryPage /></DocumentsRealtimeProvider></ModuleGate>} />
+          <Route path="documents/pending" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><PendingSignaturesPage /></DocumentsRealtimeProvider></ModuleGate>} />
+          <Route path="documents/:id/esign" element={<ModuleGate module="documents"><DocumentsRealtimeProvider><DocumentESignPage /></DocumentsRealtimeProvider></ModuleGate>} />
 
           <Route path="erp" element={<ModuleGate module="erp"><ERPDashboard /></ModuleGate>} />
           <Route path="erp/inventory" element={<ModuleGate module="erp"><InventoryPage /></ModuleGate>} />

@@ -63,5 +63,5 @@ main().catch((error) => {
 });
 
 
-//use this command to generate types
+// use this command to generate types
 // $env:SUPABASE_PROJECT_ID="swzepbbpbeoqbiavidfh"; npm run db:types

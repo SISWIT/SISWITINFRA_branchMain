@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-This document defines the revised architecture for the **Platform Super Admin** area in the SISWIT SaaS platform.
+This document defines the revised architecture (main/docs/super-admin-architecture.md) for the **Platform Super Admin** area in the SISWIT SaaS platform.
 
-The goal of this revision is to keep the original vision strong while making the architecture more practical, safer, more scalable, and easier to implement in phases.
+The goal of this revision is to keep the original (main/docs/super-admin-architecture.md) vision strong while making the architecture more practical, safer, more scalable, and easier to implement in phases.
 
 This revision makes the following major corrections:
 
@@ -1226,6 +1226,41 @@ Before executing any dangerous platform action, verify:
 
 ---
 
-**Document Version**: 2.0  
-**Last Updated**: 2026-03-30  
-**Status**: Revised Draft - Recommended for Implementation Review
+---
+
+## 29. Implementation Workflow (Phase 1)
+
+This section provides a granular, step-by-step workflow for the Phase 1 implementation.
+
+### Step 1: Foundation & Layout
+- [ ] Create `src/workspaces/platform/app/PlatformRouteGuard.tsx` (Auth & Role check).
+- [ ] Create `src/workspaces/platform/app/PlatformAdminLayout.tsx` (Sidebar + Topbar).
+- [ ] Implement `src/workspaces/platform/app/PlatformSidebar.tsx` with navigation links.
+
+### Step 2: Routing Setup
+- [ ] Define `src/workspaces/platform/app/PlatformAdminRoutes.tsx`.
+- [ ] Register `/platform` routes in the main application entry point (`App.tsx` or `Router.tsx`).
+
+### Step 3: Organizations Domain (Preserving Logic)
+- [ ] Define types in `src/workspaces/platform/domains/organizations/types.ts`.
+- [ ] Implement query logic in `src/workspaces/platform/domains/organizations/api/` using `organizations` and `organization_memberships`.
+- [ ] Create `src/workspaces/platform/pages/OrganizationsPage.tsx` with a searchable table.
+
+### Step 4: Users Domain (Preserving Logic)
+- [ ] Define types in `src/workspaces/platform/domains/users/types.ts`.
+- [ ] Implement query logic using `tenant_users` view in `src/workspaces/platform/domains/users/api/`.
+- [ ] Create `src/workspaces/platform/pages/UsersPage.tsx`.
+
+### Step 5: Audit & Security
+- [ ] Implement `src/workspaces/platform/domains/audit/api/` using `audit_logs`.
+- [ ] Create `src/workspaces/platform/pages/AuditLogsPage.tsx`.
+
+### Step 6: Dashboard Overview
+- [ ] Build `src/workspaces/platform/pages/PlatformDashboardPage.tsx`.
+- [ ] Core metrics: Total Tenants, Active Users, Recent Events.
+
+---
+
+**Document Version**: 2.1  
+**Last Updated**: 2026-03-31  
+**Status**: Revised Draft - Workflow Added

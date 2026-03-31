@@ -13,6 +13,8 @@ import {
   Shield,
   Users,
   X,
+  HeartPulse,
+  BarChart4
 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { cn } from "@/core/utils/utils";
@@ -23,10 +25,13 @@ import { ThemeToggle } from "@/ui/theme-toggle";
 
 const menuItems = [
   { title: "Overview", icon: LayoutDashboard, path: platformPath() },
-  { title: "Tenants", icon: Building2, path: platformPath("tenants") },
+  { title: "Organizations", icon: Building2, path: platformPath("organizations") },
   { title: "Users", icon: Users, path: platformPath("users") },
+  { title: "Subscriptions", icon: CreditCard, path: platformPath("subscriptions") },
+  { title: "Analytics", icon: BarChart4, path: platformPath("analytics") },
   { title: "Audit Logs", icon: FileText, path: platformPath("audit-logs") },
-  { title: "Billing", icon: CreditCard, path: platformPath("billing") },
+  { title: "System Health", icon: HeartPulse, path: platformPath("health") },
+  { title: "Security", icon: Shield, path: platformPath("security") },
   { title: "Settings", icon: Settings, path: platformPath("settings") },
 ];
 

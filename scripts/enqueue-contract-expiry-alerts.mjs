@@ -28,7 +28,7 @@ async function main() {
 
   const { data: contracts, error } = await supabase
     .from("contracts")
-    .select("id,name,tenant_id,end_date,status")
+    .select("id,name,organization_id,tenant_id,end_date,status")
     .not("end_date", "is", null)
     .gte("end_date", fromDate)
     .lte("end_date", toDate)
@@ -49,10 +49,11 @@ async function main() {
   let enqueuedCount = 0;
 
   for (const contract of rows) {
+    const scopeId = contract.organization_id ?? contract.tenant_id;
     const { data: existing } = await supabase
       .from("background_jobs")
       .select("id")
-      .eq("tenant_id", contract.tenant_id)
+      .eq("organization_id", scopeId)
       .eq("job_type", "contract.expiry_alert")
       .in("status", ["queued", "processing"])
       .contains("payload", { contract_id: contract.id })
@@ -69,7 +70,8 @@ async function main() {
     );
 
     const { error: enqueueError } = await supabase.from("background_jobs").insert({
-      tenant_id: contract.tenant_id,
+      organization_id: scopeId,
+      tenant_id: scopeId,
       job_type: "contract.expiry_alert",
       payload: {
         contract_id: contract.id,

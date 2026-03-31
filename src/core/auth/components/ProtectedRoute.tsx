@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/core/auth/useAuth";
 import { useTenant } from "@/core/tenant/useTenant";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
+import { useImpersonation } from "@/core/hooks/useImpersonation";
 import { Loader2 } from "lucide-react";
 import { organizationDashboardPath, organizationPortalPath, platformPath } from "@/core/utils/routes";
 import {
@@ -92,6 +93,7 @@ export function PendingApprovalRoute({ children }: { children: React.ReactNode }
  */
 export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
   const { user, role, isActiveAccount, loading } = useGuardedAuth();
+  const { state: impersonation } = useImpersonation();
 
   if (loading) {
     return <RouteLoader />;
@@ -101,9 +103,12 @@ export function TenantAdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth/sign-in" replace />;
   }
 
-  // S-12: Platform admins must use impersonation to access tenant routes
+  // Platform admins must have an active impersonation session to access tenant routes
   if (isPlatformRole(role)) {
-    return <>{children}</>;
+    if (impersonation.active && impersonation.organizationId) {
+      return <>{children}</>;
+    }
+    return <Navigate to={platformPath()} replace />;
   }
 
   if (canAccessTenantWorkspace(role)) {
