@@ -52,6 +52,23 @@ function mapSubscription(row: Record<string, unknown> | null): OrganizationSubsc
     module_erp: Boolean(row.module_erp),
     module_documents: Boolean(row.module_documents),
     features: (row.features as Record<string, boolean>) ?? {},
+    is_trial: typeof row.is_trial === "boolean" ? row.is_trial : undefined,
+    trial_start_date: row.trial_start_date ? String(row.trial_start_date) : null,
+    trial_end_date: row.trial_end_date ? String(row.trial_end_date) : null,
+    razorpay_subscription_id: row.razorpay_subscription_id
+      ? String(row.razorpay_subscription_id)
+      : null,
+    razorpay_plan_id: row.razorpay_plan_id
+      ? String(row.razorpay_plan_id)
+      : null,
+    cancelled_at: row.cancelled_at ? String(row.cancelled_at) : null,
+    cancel_reason: row.cancel_reason ? String(row.cancel_reason) : null,
+    subscription_start_date: row.subscription_start_date
+      ? String(row.subscription_start_date)
+      : null,
+    subscription_end_date: row.subscription_end_date
+      ? String(row.subscription_end_date)
+      : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
   };

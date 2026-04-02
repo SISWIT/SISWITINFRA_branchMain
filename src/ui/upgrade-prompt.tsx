@@ -1,28 +1,24 @@
-// src/ui/upgrade-prompt.tsx
-// Modal dialog showing plan comparison and upgrade options.
-
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/ui/shadcn/dialog";
 import { Button } from "@/ui/shadcn/button";
 import { Badge } from "@/ui/shadcn/badge";
-import { X, Crown, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Crown, Loader2, X } from "lucide-react";
 import type { PlanType, ResourceType } from "@/core/utils/plan-limits";
 import {
+  ADD_ONS,
   PLAN_LIMITS,
   PLAN_PRICES,
   formatLimit,
   getResourceLabel,
   getUpgradePlanFor,
-  ADD_ONS,
 } from "@/core/utils/plan-limits";
-import { useUpgradePlan } from "@/core/hooks/usePlanLimits";
-import { useModuleScope } from "@/core/hooks/useModuleScope";
-import { toast } from "sonner";
+import { useSubscription } from "@/core/hooks/useSubscription";
 
 interface UpgradePromptProps {
   open: boolean;
@@ -63,7 +59,12 @@ const PLAN_DESCRIPTIONS: Record<PlanType, string> = {
   enterprise: "For enterprises needing unlimited resources and governance",
 };
 
-const PLAN_ORDER: PlanType[] = ["foundation", "growth", "commercial", "enterprise"];
+const PLAN_ORDER: PlanType[] = [
+  "foundation",
+  "growth",
+  "commercial",
+  "enterprise",
+];
 
 export function UpgradePrompt({
   open,
@@ -72,33 +73,19 @@ export function UpgradePrompt({
   triggeredByResource,
 }: UpgradePromptProps) {
   const recommendedPlan = getUpgradePlanFor(currentPlan);
-  const { organizationId } = useModuleScope();
-  const upgradePlan = useUpgradePlan();
+  const { initiateCheckout, isCheckoutPending } = useSubscription();
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
 
-  const handleUpgrade = (plan: PlanType) => {
-    if (plan === "enterprise") {
-      toast.success("Our sales team will contact you shortly.");
+  const handleUpgrade = async (plan: PlanType) => {
+    setSelectedPlan(plan);
+    try {
+      await initiateCheckout(plan);
       onOpenChange(false);
-      return;
+    } catch {
+      // Error handling is centralized in useSubscription.
+    } finally {
+      setSelectedPlan(null);
     }
-
-    if (!organizationId) {
-      toast.error("Organization context missing.");
-      return;
-    }
-
-    upgradePlan.mutate(
-      { organizationId, newPlan: plan },
-      {
-        onSuccess: () => {
-          toast.success(`Successfully upgraded to ${PLAN_NAMES[plan]} Plan!`);
-          onOpenChange(false);
-        },
-        onError: (err) => {
-          toast.error(`Upgrade failed: ${err.message}`);
-        },
-      }
-    );
   };
 
   return (
@@ -110,12 +97,13 @@ export function UpgradePrompt({
           </DialogTitle>
           <DialogDescription>
             {triggeredByResource
-              ? `You've reached your ${getResourceLabel(triggeredByResource).toLowerCase()} limit. Upgrade to get more.`
+              ? `You've reached your ${getResourceLabel(
+                  triggeredByResource,
+                ).toLowerCase()} limit. Upgrade to get more.`
               : "Compare plans and choose the right one for your team."}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Plan Cards */}
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
           {PLAN_ORDER.map((plan) => {
             const isCurrent = plan === currentPlan;
@@ -124,16 +112,18 @@ export function UpgradePrompt({
             return (
               <div
                 key={plan}
-                className={`relative rounded-xl border-2 p-5 transition-all ${isRecommended
+                className={`relative rounded-xl border-2 p-5 transition-all ${
+                  isRecommended
                     ? "border-primary bg-primary/5 shadow-lg"
                     : isCurrent
                       ? "border-muted-foreground/30 bg-muted/30"
                       : "border-border"
-                  }`}
+                }`}
               >
                 {isRecommended && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
-                    <Crown className="mr-1 h-3 w-3" /> Recommended
+                    <Crown className="mr-1 h-3 w-3" />
+                    Recommended
                   </Badge>
                 )}
 
@@ -146,7 +136,7 @@ export function UpgradePrompt({
 
                 <div className="mt-4">
                   <span className="text-3xl font-bold">
-                    ₹{PLAN_PRICES[plan]}
+                    INR {PLAN_PRICES[plan]}
                   </span>
                   <span className="text-sm text-muted-foreground">/month</span>
                 </div>
@@ -161,12 +151,12 @@ export function UpgradePrompt({
                       className={`w-full ${isRecommended ? "" : "variant-outline"}`}
                       variant={isRecommended ? "default" : "outline"}
                       onClick={() => handleUpgrade(plan)}
-                      disabled={upgradePlan.isPending}
+                      disabled={isCheckoutPending}
                     >
-                      {upgradePlan.isPending && upgradePlan.variables?.newPlan === plan ? (
+                      {isCheckoutPending && selectedPlan === plan ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
-                      {plan === "enterprise" ? "Contact Sales" : "Upgrade"}
+                      Upgrade
                       <ArrowRight className="ml-1 h-4 w-4" />
                     </Button>
                   )}
@@ -176,7 +166,6 @@ export function UpgradePrompt({
           })}
         </div>
 
-        {/* Comparison Table */}
         <div className="mt-8">
           <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Detailed Comparison
@@ -189,8 +178,9 @@ export function UpgradePrompt({
                   {PLAN_ORDER.map((plan) => (
                     <th
                       key={plan}
-                      className={`px-4 py-3 text-center font-medium capitalize ${plan === currentPlan ? "bg-primary/5" : ""
-                        }`}
+                      className={`px-4 py-3 text-center font-medium capitalize ${
+                        plan === currentPlan ? "bg-primary/5" : ""
+                      }`}
                     >
                       {PLAN_NAMES[plan]}
                       {plan === currentPlan && (
@@ -213,7 +203,10 @@ export function UpgradePrompt({
                       <td className="px-4 py-2.5 font-medium">
                         {getResourceLabel(resource)}
                         {isTriggered && (
-                          <Badge variant="outline" className="ml-2 text-[10px] border-warning text-warning">
+                          <Badge
+                            variant="outline"
+                            className="ml-2 border-warning text-[10px] text-warning"
+                          >
                             Limit hit
                           </Badge>
                         )}
@@ -223,8 +216,9 @@ export function UpgradePrompt({
                         return (
                           <td
                             key={plan}
-                            className={`px-4 py-2.5 text-center ${plan === currentPlan ? "bg-primary/5" : ""
-                              }`}
+                            className={`px-4 py-2.5 text-center ${
+                              plan === currentPlan ? "bg-primary/5" : ""
+                            }`}
                           >
                             {limit ? (
                               <span className="font-mono text-xs">
@@ -244,23 +238,32 @@ export function UpgradePrompt({
                     </tr>
                   );
                 })}
-                {/* Modules row */}
                 <tr className="border-b bg-muted/30">
                   <td className="px-4 py-2.5 font-medium">Modules</td>
-                  <td className="px-4 py-2.5 text-center text-xs">CRM, CPQ, Docs</td>
+                  <td className="px-4 py-2.5 text-center text-xs">
+                    CRM, CPQ, Docs
+                  </td>
                   <td className="px-4 py-2.5 text-center text-xs">+ CLM</td>
-                  <td className="px-4 py-2.5 text-center text-xs">+ ERP (All 5)</td>
-                  <td className="px-4 py-2.5 text-center text-xs">All 5 + Governance</td>
+                  <td className="px-4 py-2.5 text-center text-xs">
+                    + ERP (All 5)
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-xs">
+                    All 5 + Governance
+                  </td>
                 </tr>
                 <tr className="border-b">
                   <td className="px-4 py-2.5 font-medium">Users</td>
                   <td className="px-4 py-2.5 text-center font-mono text-xs">5</td>
                   <td className="px-4 py-2.5 text-center font-mono text-xs">25</td>
                   <td className="px-4 py-2.5 text-center font-mono text-xs">100</td>
-                  <td className="px-4 py-2.5 text-center font-mono text-xs">Unlimited</td>
+                  <td className="px-4 py-2.5 text-center font-mono text-xs">
+                    Unlimited
+                  </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 font-medium">Audit Log Retention</td>
+                  <td className="px-4 py-2.5 font-medium">
+                    Audit Log Retention
+                  </td>
                   <td className="px-4 py-2.5 text-center text-xs">30 days</td>
                   <td className="px-4 py-2.5 text-center text-xs">90 days</td>
                   <td className="px-4 py-2.5 text-center text-xs">365 days</td>
@@ -271,23 +274,19 @@ export function UpgradePrompt({
           </div>
         </div>
 
-        {/* Add-ons */}
         <div className="mt-6">
           <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Add-Ons (Available on any plan)
           </h4>
           <div className="grid gap-3 sm:grid-cols-3">
             {Object.values(ADD_ONS).map((addon) => (
-              <div
-                key={addon.name}
-                className="rounded-lg border p-4"
-              >
+              <div key={addon.name} className="rounded-lg border p-4">
                 <p className="font-medium">{addon.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {addon.description}
                 </p>
                 <p className="mt-2 text-lg font-bold">
-                  ₹{addon.price}
+                  INR {addon.price}
                   <span className="text-xs font-normal text-muted-foreground">
                     /month
                   </span>

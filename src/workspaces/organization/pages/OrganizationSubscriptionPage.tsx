@@ -1,15 +1,38 @@
 import { useState } from "react";
-import { Loader2, ArrowUpRight, ShoppingBag, CreditCard, Receipt, Activity, User, Info, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Info,
+  Loader2,
+  Receipt,
+  ShieldCheck,
+  ShoppingBag,
+  User,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/shadcn/tabs";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { useOrganizationStats } from "@/workspaces/organization/hooks/useOrganizationStats";
 import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { useBillingInfo, useCreateBillingCustomer } from "@/workspaces/organization/hooks/useBilling";
-import { UpgradePrompt } from "@/ui/upgrade-prompt";
+import { useSubscription } from "@/core/hooks/useSubscription";
+import { PlanSelectionModal } from "@/ui/plan-selection-modal";
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
 import { Skeleton } from "@/ui/shadcn/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/shadcn/dialog";
 import { toast } from "sonner";
 import { cn } from "@/core/utils/utils";
 import {
@@ -68,20 +91,68 @@ function getBarColor(percent: number): string {
   return "bg-primary";
 }
 
+function getEventIcon(eventType: string) {
+  switch (eventType) {
+    case "payment_success":
+      return <CheckCircle2 className="h-4 w-4 text-success" />;
+    case "payment_failed":
+      return <XCircle className="h-4 w-4 text-destructive" />;
+    case "subscription_cancelled":
+      return <AlertTriangle className="h-4 w-4 text-warning" />;
+    case "subscription_created":
+      return <CheckCircle2 className="h-4 w-4 text-primary" />;
+    case "trial_started":
+      return <Clock className="h-4 w-4 text-info" />;
+    case "plan_upgraded":
+      return <ArrowUpRight className="h-4 w-4 text-primary" />;
+    default:
+      return <Activity className="h-4 w-4 text-muted-foreground" />;
+  }
+}
+
+function formatEventType(eventType: string): string {
+  return eventType
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "N/A";
+  try {
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function OrganizationSubscriptionPage() {
-  const { 
-    organization, 
-    organizationLoading, 
-    subscription 
-  } = useOrganization();
+  const { organization, organizationLoading, subscription } = useOrganization();
   const { data: stats, isLoading: statsLoading } = useOrganizationStats(organization?.id);
   const { usage, planType, isLoading: usageLoading } = usePlanLimits();
   const { data: billingInfo, isLoading: billingLoading } = useBillingInfo();
   const createCustomer = useCreateBillingCustomer();
-  
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const {
+    subscription: subStatus,
+    isTrial,
+    trialDaysRemaining,
+    isExpired,
+    isActive,
+    cancelSubscription,
+    isCancelPending,
+    events,
+    eventsLoading,
+  } = useSubscription();
+
+  const [planModalOpen, setPlanModalOpen] = useState(false);
   const [billingEmail, setBillingEmail] = useState("");
   const [billingName, setBillingName] = useState("");
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const modules = [
     { name: "CRM", enabled: Boolean(subscription?.module_crm) },
@@ -103,8 +174,18 @@ export default function OrganizationSubscriptionPage() {
     try {
       await createCustomer.mutateAsync({ email: billingEmail, name: billingName });
       toast.success("Billing profile created successfully");
-    } catch (err) {
+    } catch {
       toast.error("Failed to create billing profile");
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    try {
+      await cancelSubscription(cancelReason || "User requested cancellation");
+      setCancelDialogOpen(false);
+      setCancelReason("");
+    } catch {
+      // Error handling is centralized in useSubscription.
     }
   };
 
@@ -152,9 +233,51 @@ export default function OrganizationSubscriptionPage() {
         </div>
       </header>
 
+      {isTrial && (
+        <div
+          className={cn(
+            "flex items-center justify-between gap-4 rounded-xl border p-4",
+            isExpired
+              ? "border-destructive/20 bg-destructive/5"
+              : trialDaysRemaining != null && trialDaysRemaining <= 3
+                ? "border-red-500/20 bg-red-500/5"
+                : trialDaysRemaining != null && trialDaysRemaining <= 7
+                  ? "border-amber-500/20 bg-amber-500/5"
+                  : "border-emerald-500/20 bg-emerald-500/5",
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <Clock
+              className={cn(
+                "h-5 w-5",
+                isExpired ? "text-destructive" : "text-primary",
+              )}
+            />
+            <div>
+              <p className="text-sm font-medium">
+                {isExpired
+                  ? "Your free trial has expired"
+                  : `You are on a 14-day free trial - ${
+                      trialDaysRemaining ?? 0
+                    } days remaining`}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isExpired
+                  ? "Upgrade now to regain access to all features."
+                  : "Upgrade to a paid plan to unlock full access after your trial ends."}
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setPlanModalOpen(true)}>
+            <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" />
+            Upgrade Now
+          </Button>
+        </div>
+      )}
+
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex gap-2 bg-muted/30 border border-border/40 rounded-2xl p-1.5 w-fit shadow-inner mb-10">
-          {(["overview", "billing", "invoices"] as const).map((tab) => (
+          {(["overview", "billing", "history"] as const).map((tab) => (
             <TabsTrigger 
               key={tab}
               value={tab} 
@@ -162,7 +285,7 @@ export default function OrganizationSubscriptionPage() {
             >
               {tab === "overview" && <Activity className="mr-2 h-4 w-4" />}
               {tab === "billing" && <CreditCard className="mr-2 h-4 w-4" />}
-              {tab === "invoices" && <Receipt className="mr-2 h-4 w-4" />}
+              {tab === "history" && <Receipt className="mr-2 h-4 w-4" />}
               <span className="hidden sm:inline capitalize">{tab}</span>
             </TabsTrigger>
           ))}
@@ -210,15 +333,48 @@ export default function OrganizationSubscriptionPage() {
                         </div>
                       </div>
 
+                      {subStatus && (
+                        <div className="space-y-2 rounded-xl border border-border/30 bg-muted/20 p-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Start Date</span>
+                            <span className="font-medium">
+                              {formatDate(subStatus.subscription_start_date)}
+                            </span>
+                          </div>
+                          {subStatus.subscription_end_date && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Next Billing</span>
+                              <span className="font-medium">
+                                {formatDate(subStatus.subscription_end_date)}
+                              </span>
+                            </div>
+                          )}
+                          {subStatus.is_trial && subStatus.trial_end_date && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Trial Ends</span>
+                              <span className="font-medium">
+                                {formatDate(subStatus.trial_end_date)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex flex-col sm:flex-row gap-3">
-                        <Button onClick={() => toast.info("Redirecting to Razorpay...")} className="flex-1" disabled={organizationLoading}>
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Manage Billing
-                        </Button>
-                        <Button variant="outline" onClick={() => setUpgradeOpen(true)} className="flex-1" disabled={organizationLoading}>
+                        <Button onClick={() => setPlanModalOpen(true)} className="flex-1" disabled={organizationLoading}>
                           <ArrowUpRight className="mr-2 h-4 w-4" />
                           Change Plan
                         </Button>
+                        {isActive && (
+                          <Button
+                            variant="outline"
+                            onClick={() => setCancelDialogOpen(true)}
+                            className="flex-1 text-destructive hover:text-destructive"
+                            disabled={organizationLoading}
+                          >
+                            Cancel Subscription
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -409,17 +565,40 @@ export default function OrganizationSubscriptionPage() {
                       ) : (
                         <>
                           <div className="flex justify-between items-center py-2 border-b border-border/50">
+                            <span className="text-sm text-muted-foreground">Status</span>
+                            <span
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-xs font-bold uppercase",
+                                statusBadgeClass(subStatus?.status ?? "trial"),
+                              )}
+                            >
+                              {subStatus?.status ?? "trial"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-border/50">
                             <span className="text-sm text-muted-foreground">Billing Cycle</span>
                             <span className="text-sm font-medium">Monthly</span>
                           </div>
                           <div className="flex justify-between items-center py-2 border-b border-border/50">
                             <span className="text-sm text-muted-foreground">Period Start</span>
-                            <span className="text-sm font-medium">{billingInfo?.subscription_start_date || "N/A"}</span>
+                            <span className="text-sm font-medium">
+                              {formatDate(subStatus?.subscription_start_date)}
+                            </span>
                           </div>
-                          <div className="flex justify-between items-center py-2">
+                          <div className="flex justify-between items-center py-2 border-b border-border/50">
                             <span className="text-sm text-muted-foreground">Renewal Date</span>
-                            <span className="text-sm font-medium">{billingInfo?.subscription_end_date || "N/A"}</span>
+                            <span className="text-sm font-medium">
+                              {formatDate(subStatus?.subscription_end_date)}
+                            </span>
                           </div>
+                          {subStatus?.razorpay_subscription_id && (
+                            <div className="flex justify-between items-center py-2">
+                              <span className="text-sm text-muted-foreground">Razorpay ID</span>
+                              <span className="rounded bg-muted/50 px-2 py-0.5 text-xs font-mono">
+                                {subStatus.razorpay_subscription_id}
+                              </span>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -427,36 +606,139 @@ export default function OrganizationSubscriptionPage() {
 
                   <article className="p-4 rounded-xl border border-primary/20 bg-primary/5">
                     <p className="text-xs font-medium text-primary mb-1 uppercase tracking-wider">Payment Method</p>
-                    <p className="text-sm text-muted-foreground">No payment method added yet. Direct billing via Razorpay is used for plan upgrades.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {subStatus?.razorpay_subscription_id
+                        ? "Managed via Razorpay. Payments are automatically charged monthly."
+                        : "No payment method added yet. Subscribe to a paid plan to set up billing."}
+                    </p>
                   </article>
+
+                  {isActive && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-destructive/30 text-destructive hover:bg-destructive/5"
+                      onClick={() => setCancelDialogOpen(true)}
+                    >
+                      Cancel Subscription
+                    </Button>
+                  )}
                 </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="invoices" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="org-panel flex flex-col items-center justify-center py-20 text-center">
-                <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                  <Receipt className="h-8 w-8 text-muted-foreground/50" />
+            <TabsContent value="history" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {eventsLoading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                  ))}
                 </div>
-                <h2 className="text-xl font-semibold">Invoice History</h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xs">
-                  Direct billing is active. Invoices will appear here once your automated billing cycle starts.
-                </p>
-                <Button variant="outline" className="mt-6" disabled>
-                  Launch Billing Portal
-                </Button>
-              </div>
+              ) : events.length === 0 ? (
+                <div className="org-panel flex flex-col items-center justify-center py-20 text-center">
+                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <Receipt className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <h2 className="text-xl font-semibold">No Activity Yet</h2>
+                  <p className="mt-2 text-sm text-muted-foreground max-w-xs">
+                    Subscription events and payment history will appear here once your billing begins.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h2 className="mb-4 text-lg font-semibold">Subscription History</h2>
+                  {events.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/30 p-4 transition-colors hover:bg-card/50"
+                    >
+                      <div className="shrink-0">{getEventIcon(event.event_type)}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">
+                          {formatEventType(event.event_type)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {event.plan_type && (
+                            <span className="capitalize">
+                              {PLAN_NAMES[event.plan_type as PlanType] ?? event.plan_type}
+                            </span>
+                          )}
+                          {event.amount != null && event.amount > 0 && (
+                            <span> · INR {(event.amount / 100).toLocaleString("en-IN")}</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(event.created_at)}
+                        </p>
+                        {event.razorpay_payment_id && (
+                          <p className="mt-0.5 text-[10px] font-mono text-muted-foreground/60">
+                            {event.razorpay_payment_id}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </>
         )}
       </Tabs>
 
-      {/* Upgrade Prompt Modal */}
-      <UpgradePrompt
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
+      <PlanSelectionModal
+        open={planModalOpen}
+        onOpenChange={setPlanModalOpen}
         currentPlan={plan}
       />
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Subscription</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel? Your plan will be downgraded to
+              Foundation CRM at the end of the current billing period.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+              <p className="text-xs font-medium text-destructive">
+                You will lose access to:
+              </p>
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <li>- Advanced modules (CLM, ERP)</li>
+                <li>- Higher resource limits</li>
+                <li>- Priority support</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason" className="text-sm">
+                Why are you cancelling? (optional)
+              </Label>
+              <Input
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Help us improve..."
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Keep Subscription
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelSubscription}
+              disabled={isCancelPending}
+            >
+              {isCancelPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

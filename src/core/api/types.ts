@@ -2511,9 +2511,12 @@ export type Database = {
         Row: {
           billing_contact_name: string | null
           billing_email: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           features: Json
           id: string
+          is_trial: boolean
           module_clm: boolean
           module_cpq: boolean
           module_crm: boolean
@@ -2521,7 +2524,11 @@ export type Database = {
           module_erp: boolean
           organization_id: string
           plan_type: string
+          razorpay_plan_id: string | null
+          razorpay_subscription_id: string | null
           status: string
+          subscription_end_date: string | null
+          subscription_start_date: string | null
           trial_end_date: string | null
           trial_start_date: string | null
           updated_at: string
@@ -2529,9 +2536,12 @@ export type Database = {
         Insert: {
           billing_contact_name?: string | null
           billing_email?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           features?: Json
           id?: string
+          is_trial?: boolean
           module_clm?: boolean
           module_cpq?: boolean
           module_crm?: boolean
@@ -2539,7 +2549,11 @@ export type Database = {
           module_erp?: boolean
           organization_id: string
           plan_type?: string
+          razorpay_plan_id?: string | null
+          razorpay_subscription_id?: string | null
           status?: string
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           trial_end_date?: string | null
           trial_start_date?: string | null
           updated_at?: string
@@ -2547,9 +2561,12 @@ export type Database = {
         Update: {
           billing_contact_name?: string | null
           billing_email?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           features?: Json
           id?: string
+          is_trial?: boolean
           module_clm?: boolean
           module_cpq?: boolean
           module_crm?: boolean
@@ -2557,7 +2574,11 @@ export type Database = {
           module_erp?: boolean
           organization_id?: string
           plan_type?: string
+          razorpay_plan_id?: string | null
+          razorpay_subscription_id?: string | null
           status?: string
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           trial_end_date?: string | null
           trial_start_date?: string | null
           updated_at?: string
@@ -3617,6 +3638,57 @@ export type Database = {
           },
         ]
       }
+      subscription_events: {
+        Row: {
+          amount: number | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          organization_id: string
+          plan_type: string | null
+          razorpay_payment_id: string | null
+          razorpay_subscription_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          organization_id: string
+          plan_type?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_subscription_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          plan_type?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -4097,6 +4169,15 @@ export type Database = {
         Args: { p_employee_id?: string; p_token: string; p_user_id: string }
         Returns: string
       }
+      activate_subscription: {
+        Args: {
+          p_org_id: string
+          p_plan_type: string
+          p_razorpay_plan_id: string
+          p_razorpay_sub_id: string
+        }
+        Returns: Json
+      }
       app_is_platform_super_admin: {
         Args: { p_user_id?: string }
         Returns: boolean
@@ -4132,6 +4213,10 @@ export type Database = {
       app_user_has_organization_access: {
         Args: { p_organization_id: string; p_user_id?: string }
         Returns: boolean
+      }
+      cancel_subscription: {
+        Args: { p_org_id: string; p_reason?: string }
+        Returns: Json
       }
       check_plan_limit: {
         Args: { p_organization_id: string; p_resource_type: string }
@@ -4246,6 +4331,7 @@ export type Database = {
             Returns: number
           }
         | { Args: { end_date: string; start_date: string }; Returns: number }
+      get_subscription_status: { Args: { p_org_id: string }; Returns: Json }
       get_unread_count: { Args: { p_user_id: string }; Returns: number }
       get_user_organization_role: {
         Args: { p_organization_id: string }
@@ -4296,6 +4382,10 @@ export type Database = {
       seed_plan_limits_for_organization: {
         Args: { p_organization_id: string; p_plan_type?: string }
         Returns: undefined
+      }
+      start_trial: {
+        Args: { p_org_id: string; p_plan_type?: string }
+        Returns: Json
       }
       upgrade_organization_plan: {
         Args: { p_new_plan: string; p_organization_id: string }
