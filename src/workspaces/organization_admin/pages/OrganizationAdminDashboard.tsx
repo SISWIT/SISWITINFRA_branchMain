@@ -43,7 +43,7 @@ import {
 } from "../hooks/useOrganizationAdminDashboard";
 
 export default function OrganizationAdminDashboard() {
-  const { user } = useAuth();
+  const { user, fullName } = useAuth();
   const { organization, memberships } = useOrganization();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
@@ -52,12 +52,13 @@ export default function OrganizationAdminDashboard() {
   const primaryColor = organization?.primary_color || "var(--primary)";
   
   const userName = useMemo(() => {
+    if (fullName) return fullName;
     const firstName = String(user?.user_metadata?.first_name ?? "").trim();
     const lastName = String(user?.user_metadata?.last_name ?? "").trim();
-    const fullName = `${firstName} ${lastName}`.trim();
-    if (fullName) return fullName;
+    const derivedName = `${firstName} ${lastName}`.trim();
+    if (derivedName) return derivedName;
     return user?.email?.split("@")[0] ?? "Admin";
-  }, [user?.email, user?.user_metadata]);
+  }, [user?.email, user?.user_metadata, fullName]);
 
   const orgName = organization?.name || "Your Organization";
 

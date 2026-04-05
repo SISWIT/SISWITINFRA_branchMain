@@ -53,6 +53,7 @@ export interface InviteClientInput {
 export interface AuthContextType {
   user: User | null;
   session: Session | null;
+  fullName: string | null;
   role: AuthRole;
   accountState: string | null;
   loading: boolean;

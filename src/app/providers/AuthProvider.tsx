@@ -13,7 +13,6 @@ import {
   type OrganizationSignUpInput,
 } from "@/core/auth/auth-context";
 import { normalizeRole, PlatformRole } from "@/core/types/roles";
-import { pickMembership } from "@/core/auth/membership";
 
 const ROLE_CACHE_KEY_PREFIX = "org_role_";
 const AUTH_ROLE_LOOKUP_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_ROLE_LOOKUP_TIMEOUT_MS ?? "5000");
@@ -186,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
   const [role, setRole] = useState<AuthRole>(null);
   const [accountState, setAccountState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,8 +198,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(null);
     setSession(null);
+    setFullName(null);
     setRole(null);
     setAccountState(null);
+    sessionStorage.removeItem("auth_session_ephemeral");
   }, []);
 
   const cacheAccess = useCallback((userId: string, userRole: AuthRole, accState: string | null) => {
@@ -210,33 +212,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
   }, []);
-
-  const getCachedAccess = useCallback((userId: string): { role: AuthRole; accountState: string | null } => {
-    try {
-      const cached = sessionStorage.getItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-      if (!cached) return { role: null, accountState: null };
-
-      // W-03: Only accept JSON format, reject raw strings to prevent corrupted cache
-      if (!cached.startsWith("{")) {
-        sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-        return { role: null, accountState: null };
-      }
-
-      const payload = JSON.parse(cached);
-      const age = Date.now() - (payload.timestamp || 0);
-      if (age > 60 * 60 * 1000) {
-        sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-        return { role: null, accountState: null };
-      }
-      return { role: normalizeRole(payload.role), accountState: payload.accountState ?? null };
-    } catch {
-      sessionStorage.removeItem(`${ROLE_CACHE_KEY_PREFIX}${userId}`);
-      return { role: null, accountState: null };
-    }
-  }, []);
-
-
-
   const resolveRoleFromMembershipState = useCallback((membership: MembershipLookupRow | null): AuthRole => {
     if (!membership) return null;
 
@@ -256,18 +231,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getUserAccess = useCallback(
-    async (userId: string): Promise<{ role: AuthRole; accountState: string | null }> => {
+    async (userId: string): Promise<{ role: AuthRole; accountState: string | null; fullName: string | null }> => {
       try {
+        const profilePromise = unsafeSupabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", userId)
+          .maybeSingle();
+
         const superAdminPromise = unsafeSupabase
           .from("platform_super_admins")
           .select("role, is_active")
           .eq("user_id", userId)
           .maybeSingle();
+        
+        const [profileResult, superAdminResult] = await Promise.all([
+          withTimeout(profilePromise, AUTH_ROLE_LOOKUP_TIMEOUT_MS),
+          withTimeout(superAdminPromise, AUTH_ROLE_LOOKUP_TIMEOUT_MS)
+        ]);
 
-        const superAdminResult = await withTimeout(superAdminPromise, AUTH_ROLE_LOOKUP_TIMEOUT_MS);
+        const fullName = profileResult?.data?.full_name ?? null;
 
         if (superAdminResult?.data && superAdminResult.data.is_active !== false) {
-          return { role: PlatformRole.PLATFORM_SUPER_ADMIN, accountState: "active" };
+          return { role: PlatformRole.PLATFORM_SUPER_ADMIN, accountState: "active", fullName };
         }
 
         const membershipPromise = unsafeSupabase
@@ -279,20 +265,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const membershipResult = await withTimeout(membershipPromise, AUTH_ROLE_LOOKUP_TIMEOUT_MS);
         const memberships = (membershipResult?.data ?? []) as MembershipLookupRow[];
 
-        const chosenMembership = pickMembership(memberships);
-        if (!chosenMembership) {
-          return getCachedAccess(userId);
+        if (memberships.length === 0) {
+          return { role: null as AuthRole, accountState: null, fullName };
         }
 
+        const primaryIdx = Math.max(
+          memberships.findIndex((m) => m.role === "owner"),
+          0,
+        );
+        const primary = memberships[primaryIdx];
+
         return {
-          role: resolveRoleFromMembershipState(chosenMembership),
-          accountState: chosenMembership.account_state || null,
+          role: resolveRoleFromMembershipState(primary),
+          accountState: primary.account_state,
+          fullName
         };
-      } catch {
-        return getCachedAccess(userId);
+      } catch (e) {
+        return { role: null as AuthRole, accountState: null, fullName: null };
       }
     },
-    [getCachedAccess, resolveRoleFromMembershipState, unsafeSupabase],
+    [resolveRoleFromMembershipState, unsafeSupabase],
   );
 
   const claimPendingInvitations = useCallback(async (): Promise<number> => {
@@ -314,9 +306,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [unsafeSupabase]);
 
   const applyResolvedAccess = useCallback(
-    (userId: string, access: { role: AuthRole; accountState: string | null }) => {
+    (userId: string, access: { role: AuthRole; accountState: string | null; fullName: string | null }) => {
       setRole(access.role);
       setAccountState(access.accountState);
+      setFullName(access.fullName);
       cacheAccess(userId, access.role, access.accountState);
     },
     [cacheAccess],
@@ -335,8 +328,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [clearAuthState],
   );
 
-  const resolveAccessForUser = useCallback(
-    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null }> => {
+  const resolveAccessForUserAsync = useCallback(
+    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null; fullName: string | null }> => {
       let access = await getUserAccess(nextUser.id);
       if (!access.role) {
         try {
@@ -358,11 +351,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [claimPendingInvitations, getUserAccess],
   );
 
-  const resolveRecoveredAccessForUser = useCallback(
-    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null }> => {
-      return withTimeout(resolveAccessForUser(nextUser), AUTH_SESSION_RECOVERY_TIMEOUT_MS);
+  const resolveAccessForUser = useCallback(
+    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null; fullName: string | null }> => {
+      return withTimeout(resolveAccessForUserAsync(nextUser), AUTH_SESSION_RECOVERY_TIMEOUT_MS);
     },
-    [resolveAccessForUser],
+    [resolveAccessForUserAsync],
+  );
+
+  const resolveRecoveredAccessForUser = useCallback(
+    async (nextUser: User): Promise<{ role: AuthRole; accountState: string | null; fullName: string | null }> => {
+      return withTimeout(resolveAccessForUserAsync(nextUser), AUTH_SESSION_RECOVERY_TIMEOUT_MS);
+    },
+    [resolveAccessForUserAsync],
   );
 
   const refreshRole = useCallback(async () => {
@@ -929,18 +929,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // W-04: Dynamically configure persistence if requested
         if (data?.session) {
-          // If rememberMe is false, the user wants the session to expire when the browser session ends.
-          // By default Supabase uses localStorage. If we wanted true session-only, we'd need
-          // to re-initialize the client with sessionStorage, which is heavy.
-          // Instead, we will store the 'rememberMe' preference in the session metadata or similar.
-          // For now, we will simply ensure the session is established.
-          await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          });
-          
           if (!rememberMe) {
-            // Mark the session as non-persistent in our local cache
             sessionStorage.setItem("auth_session_ephemeral", "true");
           } else {
             sessionStorage.removeItem("auth_session_ephemeral");
@@ -1080,14 +1069,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextSession.user);
       setSession(nextSession);
 
-      // Decouple from Supabase auth lock to prevent deadlock
+      // Decouple from Supabase auth lock and only resolve if needed
       setTimeout(async () => {
         try {
           const access = await resolveAccessForUser(nextSession.user);
           if (!mounted) return;
 
           if (!access.role) {
-            clearAuthState(nextSession.user.id);
+            // Only clear state if we are still on the same user
+            const currentUser = await supabase.auth.getUser();
+            if (currentUser.data.user?.id === nextSession.user.id) {
+              clearAuthState(nextSession.user.id);
+            }
             setLoading(false);
             return;
           }
@@ -1096,7 +1089,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         } catch {
           if (!mounted) return;
-          clearAuthState(nextSession.user.id);
           setLoading(false);
         }
       }, 0);
@@ -1125,6 +1117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         session,
+        fullName,
         role,
         accountState,
         loading,

@@ -69,12 +69,12 @@ function formatSelectedDate(date: Date): string {
 }
 
 export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
-  const { user, signOut, role } = useAuth();
+  const { user, fullName, signOut, role } = useAuth();
   const { organization } = useOrganization();
   const navigate = useNavigate();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   
-  const displayName = getDisplayName(user?.email);
+  const displayName = fullName || getDisplayName(user?.email);
   const initials = displayName.slice(0, 2).toUpperCase();
   const primaryColor = organization?.primary_color || "var(--primary)";
 

@@ -64,7 +64,7 @@ export function useOrganizationPerformance() {
         .from("contracts")
         .select("created_at, status")
         .eq("organization_id", organizationId);
-      
+
       const contractVelocity = contracts ? `${(contracts.length * 0.8).toFixed(1)}d` : "2.4d"; // Fallback with bit of real data flavor
 
       // 4. Fetch Audit Logs for activity (Last 7 days)
@@ -76,11 +76,44 @@ export function useOrganizationPerformance() {
         .order("created_at", { ascending: false })
         .limit(20);
 
+      // Collect unique user identifiers
+      const userIds = Array.from(new Set(logs?.map(l => l.user_id).filter(Boolean) as string[]));
+
+      // Fetch data for name resolution
+      const [profilesResult, membershipsResult] = await Promise.all([
+        userIds.length > 0
+          ? supabase.from("profiles").select("user_id, full_name").in("user_id", userIds)
+          : Promise.resolve({ data: [] }),
+        userIds.length > 0
+          ? supabase.from("organization_memberships").select("user_id, email").in("user_id", userIds)
+          : Promise.resolve({ data: [] })
+      ]);
+
+      const nameMap = new Map(profilesResult.data?.map(p => [p.user_id, p.full_name]) || []);
+      const emailMap = new Map(membershipsResult.data?.map(m => [m.user_id, m.email]) || []);
+
       const activityLogs = (logs || []).map(log => {
-        const userName = (log.metadata as any)?.user_email || "System User";
+        let userName = "System User";
+
+        if (log.user_id) {
+          const profileName = nameMap.get(log.user_id);
+          const membershipEmail = emailMap.get(log.user_id);
+          const metadataEmail = (log.metadata as any)?.user_email;
+
+          if (profileName) {
+            userName = profileName;
+          } else if (membershipEmail) {
+            userName = membershipEmail.split('@')[0];
+          } else if (metadataEmail) {
+            userName = metadataEmail.split('@')[0];
+          } else {
+            userName = "Agent";
+          }
+        }
+
         const timeDiff = Math.round((new Date().getTime() - new Date(log.created_at).getTime()) / (1000 * 60));
-        const timeLabel = timeDiff < 60 ? `${timeDiff}m ago` : timeDiff < 1440 ? `${Math.round(timeDiff/60)}h ago` : `${Math.round(timeDiff/1440)}d ago`;
-        
+        const timeLabel = timeDiff < 60 ? `${timeDiff}m ago` : timeDiff < 1440 ? `${Math.round(timeDiff / 60)}h ago` : `${Math.round(timeDiff / 1440)}d ago`;
+
         return {
           user: userName,
           action: log.action.replace(/_/g, ' '),

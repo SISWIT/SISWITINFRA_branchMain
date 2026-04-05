@@ -61,7 +61,7 @@ const Auth = () => {
     }
 
     if (role === "pending_approval") {
-      navigate("/auth/pending-approval", { replace: true });
+      navigate("/pending-approval", { replace: true });
       return;
     }
 
@@ -133,7 +133,7 @@ const Auth = () => {
     }
 
     if (resolvedRole === "pending_approval") {
-      navigate("/auth/pending-approval");
+      navigate("/pending-approval");
       return;
     }
 
