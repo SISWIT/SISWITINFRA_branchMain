@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { EmployeeTopBar } from "./EmployeeTopBar";
 import { Sheet, SheetContent } from "@/ui/shadcn/sheet";
+import { SubscriptionGate } from "@/ui/subscription-gate";
 
 interface DashboardLayoutProps {
   children?: ReactNode;
@@ -44,6 +45,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children || <Outlet />}
         </main>
       </div>
+
+      {/* Blocks all interaction when subscription is cancelled */}
+      <SubscriptionGate />
     </div>
   );
 }

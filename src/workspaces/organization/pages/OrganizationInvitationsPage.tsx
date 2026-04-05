@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, MailPlus, UserPlus, ShieldCheck, Clock3 } from "lucide-react";
+import { Loader2, MailPlus, UserPlus, ShieldCheck, Clock3, AlertCircle, Lock } from "lucide-react";
+import { useSubscription } from "@/core/hooks/useSubscription";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
@@ -39,6 +40,7 @@ type Tab = "employee" | "client" | "history";
 export default function OrganizationInvitationsPage() {
   const { inviteEmployee, inviteClient } = useAuth();
   const { organization, loading, employeeInvites, clientInvites, refresh } = useOrganizationOwnerData();
+  const { isCancelled } = useSubscription();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("employee");
@@ -57,7 +59,7 @@ export default function OrganizationInvitationsPage() {
 
   const handleEmployeeInvite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!organization?.id) return;
+    if (!organization?.id || isCancelled) return;
     setSubmittingEmployee(true);
     const expiresAt = getFutureIso(Number(employeeExpiryDays || "2"));
     const { error, invitationUrl, emailError } = await inviteEmployee({
@@ -90,7 +92,7 @@ export default function OrganizationInvitationsPage() {
 
   const handleClientInvite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!organization?.id) return;
+    if (!organization?.id || isCancelled) return;
     setSubmittingClient(true);
     const expiresAt = getFutureIso(Number(clientExpiryDays || "7"));
     const { error, invitationUrl, emailError } = await inviteClient({
@@ -178,7 +180,19 @@ export default function OrganizationInvitationsPage() {
               </p>
             </div>
 
-            <form className="space-y-4" onSubmit={handleEmployeeInvite}>
+            <div className="relative">
+              {isCancelled && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[2px] border border-destructive/20 text-center p-4">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 border border-destructive/20">
+                    <Lock className="h-6 w-6 text-destructive" />
+                  </div>
+                  <h3 className="text-sm font-bold text-destructive mb-1">Invitations Suspended</h3>
+                  <p className="text-[11px] text-muted-foreground max-w-[200px]">
+                    Your subscription has been cancelled. Resubscribe to resume inviting team members.
+                  </p>
+                </div>
+              )}
+              <form className={cn("space-y-4", isCancelled && "opacity-40 grayscale pointer-events-none")} onSubmit={handleEmployeeInvite}>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email address</label>
                 <Input
@@ -266,6 +280,7 @@ export default function OrganizationInvitationsPage() {
                 )}
               </Button>
             </form>
+            </div>
           </article>
 
           {/* Right-side info panel */}
@@ -313,7 +328,19 @@ export default function OrganizationInvitationsPage() {
               </p>
             </div>
 
-            <form className="space-y-4" onSubmit={handleClientInvite}>
+            <div className="relative">
+              {isCancelled && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-background/60 backdrop-blur-[2px] border border-destructive/20 text-center p-4">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 border border-destructive/20">
+                    <Lock className="h-6 w-6 text-destructive" />
+                  </div>
+                  <h3 className="text-sm font-bold text-destructive mb-1">Invitations Suspended</h3>
+                  <p className="text-[11px] text-muted-foreground max-w-[200px]">
+                    Your subscription has been cancelled. Resubscribe to resume onboarding clients.
+                  </p>
+                </div>
+              )}
+              <form className={cn("space-y-4", isCancelled && "opacity-40 grayscale pointer-events-none")} onSubmit={handleClientInvite}>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email address</label>
                 <Input
@@ -373,6 +400,7 @@ export default function OrganizationInvitationsPage() {
                 )}
               </Button>
             </form>
+            </div>
           </article>
 
           {/* Right-side info */}

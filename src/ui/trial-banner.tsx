@@ -8,7 +8,7 @@ import { PlanSelectionModal } from "@/ui/plan-selection-modal";
 const DISMISS_KEY = "siswit_trial_banner_dismissed";
 
 export function TrialBanner() {
-  const { isTrial, trialDaysRemaining, isExpired, subscription, isLoading } =
+  const { isTrial, trialDaysRemaining, isExpired, isCancelled, subscription, isLoading } =
     useSubscription();
 
   const [dismissed, setDismissed] = useState(() => {
@@ -29,7 +29,7 @@ export function TrialBanner() {
     }
   }, []);
 
-  if (isLoading || dismissed || (!isTrial && !isExpired)) return null;
+  if (isLoading || dismissed || (!isTrial && !isExpired && !isCancelled)) return null;
 
   const days = trialDaysRemaining ?? 0;
   const isUrgent = days <= 3;
@@ -40,7 +40,13 @@ export function TrialBanner() {
   let textClasses: string;
   let buttonClasses: string;
 
-  if (isExpired) {
+  if (isCancelled) {
+    bannerClasses =
+      "bg-gradient-to-r from-red-950/90 via-red-900/80 to-red-950/90 border-red-500/30";
+    iconClasses = "text-red-400";
+    textClasses = "text-red-100";
+    buttonClasses = "bg-red-500 border-0 text-white hover:bg-red-600";
+  } else if (isExpired) {
     bannerClasses =
       "bg-gradient-to-r from-red-950/90 via-red-900/80 to-red-950/90 border-red-500/30";
     iconClasses = "text-red-400";
@@ -67,6 +73,9 @@ export function TrialBanner() {
   }
 
   const getMessage = () => {
+    if (isCancelled) {
+      return "Your subscription has been cancelled. All services are suspended. Resubscribe to restore access.";
+    }
     if (isExpired) {
       return "Your free trial has expired. Upgrade now to continue using all features.";
     }
@@ -124,7 +133,7 @@ export function TrialBanner() {
       <PlanSelectionModal
         open={showPlanModal}
         onOpenChange={setShowPlanModal}
-        currentPlan={subscription?.plan_type ?? "foundation"}
+        currentPlan={isCancelled ? "foundation" : (subscription?.plan_type ?? "foundation")}
       />
     </>
   );

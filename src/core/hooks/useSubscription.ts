@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
@@ -8,6 +8,8 @@ import {
 } from "@/workspaces/organization/hooks/useBilling";
 import { toast } from "sonner";
 import type { PlanType } from "@/core/utils/plan-limits";
+import { PLAN_MODULES } from "@/core/utils/plan-limits";
+import type { ModuleType } from "@/core/types/modules";
 
 export interface SubscriptionStatus {
   plan_type: PlanType;
@@ -43,13 +45,20 @@ interface UseSubscriptionReturn {
   trialDaysRemaining: number | null;
   isExpired: boolean;
   isActive: boolean;
-  initiateCheckout: (planType: PlanType) => Promise<void>;
+  isCancelled: boolean;
+  initiateCheckout: (planType: PlanType, opts?: { onBeforeOpen?: () => void }) => Promise<void>;
   cancelSubscription: (reason: string) => Promise<void>;
   isCheckoutPending: boolean;
   isCancelPending: boolean;
   events: SubscriptionEvent[];
   eventsLoading: boolean;
   refresh: () => void;
+  /** Check if a module is accessible under the current plan */
+  canAccessModule: (module: ModuleType) => boolean;
+  /** List of modules allowed by the current plan */
+  allowedModules: ModuleType[];
+  /** Effective plan type — 'foundation' when cancelled, otherwise the DB plan */
+  effectivePlan: PlanType;
 }
 
 interface EdgeFunctionErrorPayload {
@@ -127,7 +136,7 @@ const PLAN_DISPLAY_NAMES: Record<PlanType, string> = {
 };
 
 export function useSubscription(): UseSubscriptionReturn {
-  const { organization } = useOrganization();
+  const { organization, refreshOrganization } = useOrganization();
   const queryClient = useQueryClient();
   const { data: billingInfo } = useBillingInfo();
   const createCustomer = useCreateBillingCustomer();
@@ -184,6 +193,7 @@ export function useSubscription(): UseSubscriptionReturn {
   const trialDaysRemaining = subscription?.trial_days_remaining ?? null;
   const isActive =
     subscription?.status === "active" && subscription?.is_trial === false;
+  const isCancelled = subscription?.status === "cancelled";
 
   const isExpired = useMemo(() => {
     if (!subscription) return false;
@@ -197,6 +207,23 @@ export function useSubscription(): UseSubscriptionReturn {
     return false;
   }, [subscription]);
 
+  // Module access based on plan
+  // When cancelled, the DB may still have the old plan_type — treat as foundation
+  const currentPlan: PlanType = isCancelled
+    ? "foundation"
+    : (subscription?.plan_type ?? "foundation");
+  const allowedModules = useMemo(
+    () => PLAN_MODULES[currentPlan] ?? PLAN_MODULES.foundation,
+    [currentPlan],
+  );
+
+  const canAccessModule = useCallback(
+    (module: ModuleType): boolean => {
+      return allowedModules.includes(module);
+    },
+    [allowedModules],
+  );
+
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({
       queryKey: ["subscription_status", organizationId],
@@ -207,7 +234,13 @@ export function useSubscription(): UseSubscriptionReturn {
     void queryClient.invalidateQueries({
       queryKey: ["billing_info", organizationId],
     });
-  }, [organizationId, queryClient]);
+    // Crucial: also update the global organization context which stores
+    // the actual plan_type and module entry flags (CRM, CPQ, etc.)
+    void refreshOrganization();
+  }, [organizationId, queryClient, refreshOrganization]);
+
+  // Ref to hold the onBeforeOpen callback so the mutation closure can read it
+  const onBeforeOpenRef = useRef<(() => void) | null>(null);
 
   const checkoutMutation = useMutation({
     mutationFn: async (planType: PlanType) => {
@@ -287,9 +320,9 @@ export function useSubscription(): UseSubscriptionReturn {
 
       const subData = fnData as
         | {
-            subscription_id?: string;
-            short_url?: string;
-          }
+          subscription_id?: string;
+          short_url?: string;
+        }
         | null;
 
       if (!subData?.subscription_id) {
@@ -321,11 +354,17 @@ export function useSubscription(): UseSubscriptionReturn {
           description: `${PLAN_DISPLAY_NAMES[planType]} - Monthly Subscription`,
           handler: (_response: RazorpayResponse) => {
             toast.success(
-              "Payment successful. Your plan will activate shortly.",
+              "Payment successful! Your plan is now active.",
             );
-            setTimeout(() => refresh(), 2_000);
-            setTimeout(() => refresh(), 5_000);
-            setTimeout(() => refresh(), 10_000);
+            // Refresh immediately so the UI updates right away
+            refresh();
+            // Also invalidate all organization-related queries
+            queryClient.invalidateQueries({ queryKey: ["organization-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["organization-performance"] });
+            // Staggered refreshes as backup in case webhook processing is slow
+            setTimeout(() => refresh(), 3_000);
+            setTimeout(() => refresh(), 8_000);
+            setTimeout(() => refresh(), 15_000);
             resolve();
           },
           modal: {
@@ -347,18 +386,38 @@ export function useSubscription(): UseSubscriptionReturn {
           },
         };
 
-        try {
-          const razorpay = new window.Razorpay(options);
-          razorpay.open();
-        } catch (error) {
-          reject(
-            new Error(
-              `Failed to open Razorpay checkout: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            ),
-          );
+        // Fire the onBeforeOpen callback (e.g. close the plan-selection
+        // dialog) so that any focus traps are released before the
+        // Razorpay iframe appears.
+        if (onBeforeOpenRef.current) {
+          onBeforeOpenRef.current();
+          onBeforeOpenRef.current = null;
         }
+
+        // Small delay to let callers (dialog unmount) settle, then open
+        setTimeout(() => {
+          try {
+            const razorpay = new window.Razorpay!(options);
+            razorpay.open();
+            // Focus the Razorpay iframe after it renders
+            setTimeout(() => {
+              const rzpFrame = document.querySelector<HTMLIFrameElement>(
+                "iframe.razorpay-checkout-frame",
+              );
+              if (rzpFrame) {
+                rzpFrame.focus();
+              }
+            }, 500);
+          } catch (error) {
+            reject(
+              new Error(
+                `Failed to open Razorpay checkout: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              ),
+            );
+          }
+        }, 200);
       });
     },
     onError: (error) => {
@@ -393,8 +452,14 @@ export function useSubscription(): UseSubscriptionReturn {
   });
 
   const initiateCheckout = useCallback(
-    async (planType: PlanType) => {
-      await checkoutMutation.mutateAsync(planType);
+    async (planType: PlanType, opts?: { onBeforeOpen?: () => void }) => {
+      // Store callback in ref so the mutation closure can read it
+      onBeforeOpenRef.current = opts?.onBeforeOpen ?? null;
+      try {
+        await checkoutMutation.mutateAsync(planType);
+      } finally {
+        onBeforeOpenRef.current = null;
+      }
     },
     [checkoutMutation],
   );
@@ -413,6 +478,7 @@ export function useSubscription(): UseSubscriptionReturn {
     trialDaysRemaining,
     isExpired,
     isActive,
+    isCancelled,
     initiateCheckout,
     cancelSubscription,
     isCheckoutPending: checkoutMutation.isPending,
@@ -420,5 +486,8 @@ export function useSubscription(): UseSubscriptionReturn {
     events,
     eventsLoading,
     refresh,
+    canAccessModule,
+    allowedModules,
+    effectivePlan: currentPlan,
   };
 }

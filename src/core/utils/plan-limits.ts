@@ -2,7 +2,24 @@
 // Plan limit types, constants, and helper functions for the SISWIT pricing model.
 // Author: Solanki
 
+import type { ModuleType } from "@/core/types/modules";
+
 export type PlanType = "foundation" | "growth" | "commercial" | "enterprise";
+
+/**
+ * Maps each plan to the set of modules accessible under that plan.
+ *
+ * - Foundation: CRM, CPQ, Documents
+ * - Growth: + CLM
+ * - Commercial: + ERP (all 5 modules)
+ * - Enterprise: All modules, unlimited
+ */
+export const PLAN_MODULES: Record<PlanType, ModuleType[]> = {
+  foundation: ["crm", "cpq", "documents"],
+  growth: ["crm", "cpq", "clm", "documents"],
+  commercial: ["crm", "cpq", "clm", "documents", "erp"],
+  enterprise: ["crm", "cpq", "clm", "documents", "erp"],
+};
 
 export type ResourceType =
   | "contacts"

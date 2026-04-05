@@ -114,18 +114,25 @@ export function PlanSelectionModal({
   onOpenChange,
   currentPlan,
 }: PlanSelectionModalProps) {
-  const { initiateCheckout, isCheckoutPending } = useSubscription();
+  const { initiateCheckout, isCheckoutPending, isTrial } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
   const recommendedPlan = getUpgradePlanFor(currentPlan);
   const currentPlanIndex = PLAN_ORDER.indexOf(currentPlan);
 
   const handleSelectPlan = async (plan: PlanType) => {
-    if (plan === currentPlan) return;
+    // If user is on a trial, allow selecting ANY plan including foundation
+    // If user has a paid plan, don't let them re-select the same plan
+    if (!isTrial && plan === currentPlan) return;
 
     setSelectedPlan(plan);
     try {
-      await initiateCheckout(plan);
-      onOpenChange(false);
+      // The dialog stays open showing the loading spinner while the
+      // backend creates the subscription.  The onBeforeOpen callback
+      // fires right before razorpay.open() — that is where we close
+      // this dialog so the Radix focus-trap is released.
+      await initiateCheckout(plan, {
+        onBeforeOpen: () => onOpenChange(false),
+      });
     } catch {
       // Error handling is centralized in useSubscription.
     } finally {
@@ -150,9 +157,10 @@ export function PlanSelectionModal({
           {PLAN_ORDER.map((plan, index) => {
             const meta = PLAN_META[plan];
             const Icon = meta.icon;
-            const isCurrent = plan === currentPlan;
+            // On trial, no plan is "current" so all are selectable
+            const isCurrent = !isTrial && plan === currentPlan;
             const isRecommended = plan === recommendedPlan;
-            const isDowngrade = index < currentPlanIndex;
+            const isDowngrade = !isTrial && index < currentPlanIndex;
             const isPending = isCheckoutPending && selectedPlan === plan;
 
             return (

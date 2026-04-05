@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/ui/shadcn/s
 import { OrganizationSidebar } from "@/workspaces/organization/components/OrganizationSidebar";
 import { OrganizationTopBar } from "@/workspaces/organization/components/OrganizationTopBar";
 import { TrialBanner } from "@/ui/trial-banner";
+import { SubscriptionGate } from "@/ui/subscription-gate";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { cn } from "@/core/utils/utils";
 
@@ -60,6 +61,9 @@ export default function OrganizationOwnerLayout() {
           />
         </SheetContent>
       </Sheet>
+
+      {/* Blocks all interaction when subscription is cancelled */}
+      <SubscriptionGate />
     </div>
   );
 }

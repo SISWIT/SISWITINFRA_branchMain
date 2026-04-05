@@ -40,6 +40,7 @@ import {
   formatLimit,
   isUnlimited,
   ADD_ONS,
+  PLAN_MODULES,
   type PlanType,
   type ResourceType
 } from "@/core/utils/plan-limits";
@@ -133,7 +134,7 @@ function formatDate(dateStr: string | null | undefined): string {
 export default function OrganizationSubscriptionPage() {
   const { organization, organizationLoading, subscription } = useOrganization();
   const { data: stats, isLoading: statsLoading } = useOrganizationStats(organization?.id);
-  const { usage, planType, isLoading: usageLoading } = usePlanLimits();
+  const { usage, isLoading: usageLoading } = usePlanLimits();
   const { data: billingInfo, isLoading: billingLoading } = useBillingInfo();
   const createCustomer = useCreateBillingCustomer();
   const {
@@ -142,10 +143,13 @@ export default function OrganizationSubscriptionPage() {
     trialDaysRemaining,
     isExpired,
     isActive,
+    isCancelled,
     cancelSubscription,
     isCancelPending,
     events,
     eventsLoading,
+    allowedModules,
+    effectivePlan,
   } = useSubscription();
 
   const [planModalOpen, setPlanModalOpen] = useState(false);
@@ -154,16 +158,23 @@ export default function OrganizationSubscriptionPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
-  const modules = [
-    { name: "CRM", enabled: Boolean(subscription?.module_crm) },
-    { name: "CPQ", enabled: Boolean(subscription?.module_cpq) },
-    { name: "CLM", enabled: Boolean(subscription?.module_clm) },
-    { name: "ERP", enabled: Boolean(subscription?.module_erp) },
-    { name: "Documents", enabled: Boolean(subscription?.module_documents) },
-  ];
+  // Build module list from PLAN_MODULES so it accurately reflects plan access
+  const moduleNames: Record<string, string> = {
+    crm: "CRM",
+    cpq: "CPQ",
+    clm: "CLM",
+    erp: "ERP",
+    documents: "Documents",
+  };
+  const allModuleKeys = ["crm", "cpq", "clm", "erp", "documents"] as const;
+  const modules = allModuleKeys.map((key) => ({
+    name: moduleNames[key] ?? key.toUpperCase(),
+    enabled: allowedModules.includes(key) && !isCancelled,
+    suspended: allowedModules.includes(key) && isCancelled,
+  }));
 
-  const status = subscription?.status ?? organization?.status ?? "unknown";
-  const plan = planType;
+  const status = subStatus?.status ?? subscription?.status ?? organization?.status ?? "unknown";
+  const plan = effectivePlan;
   const planDisplayName = PLAN_NAMES[plan] ?? plan;
 
   const handleSetupBilling = async () => {
@@ -184,6 +195,7 @@ export default function OrganizationSubscriptionPage() {
       await cancelSubscription(cancelReason || "User requested cancellation");
       setCancelDialogOpen(false);
       setCancelReason("");
+      // The global SubscriptionGate will automatically catch the isCancelled status change
     } catch {
       // Error handling is centralized in useSubscription.
     }
@@ -220,7 +232,7 @@ export default function OrganizationSubscriptionPage() {
             <Skeleton className="h-6 w-20 rounded-full" />
           ) : (
             <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", statusBadgeClass(status))}>
-              {status.replace("_", " ")}
+              {status === "cancelled" ? "CANCELLED" : status.replace("_", " ")}
             </span>
           )}
           {organizationLoading ? (
@@ -232,6 +244,27 @@ export default function OrganizationSubscriptionPage() {
           )}
         </div>
       </header>
+
+      {/* Cancelled banner */}
+      {isCancelled && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+          <div className="flex items-center gap-3">
+            <XCircle className="h-5 w-5 text-destructive" />
+            <div>
+              <p className="text-sm font-medium">
+                Your subscription has been cancelled
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                You are now on the Foundation CRM plan. Resubscribe anytime to unlock advanced features.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={() => setPlanModalOpen(true)}>
+            <ArrowUpRight className="mr-1.5 h-3.5 w-3.5" />
+            Resubscribe
+          </Button>
+        </div>
+      )}
 
       {isTrial && (
         <div
@@ -357,13 +390,21 @@ export default function OrganizationSubscriptionPage() {
                               </span>
                             </div>
                           )}
+                          {subStatus.cancelled_at && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Cancelled On</span>
+                              <span className="font-medium text-destructive">
+                                {formatDate(subStatus.cancelled_at)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button onClick={() => setPlanModalOpen(true)} className="flex-1" disabled={organizationLoading}>
                           <ArrowUpRight className="mr-2 h-4 w-4" />
-                          Change Plan
+                          {isCancelled ? "Resubscribe" : "Change Plan"}
                         </Button>
                         {isActive && (
                           <Button
@@ -386,7 +427,9 @@ export default function OrganizationSubscriptionPage() {
                     <ShieldCheck className="h-6 w-6 text-primary" />
                     <h2 className="text-xl font-bold tracking-tight">Platform Modules</h2>
                   </div>
-                  <p className="text-sm text-muted-foreground font-medium mb-6 leading-relaxed">Included features for your current organization profile.</p>
+                  <p className="text-sm text-muted-foreground font-medium mb-6 leading-relaxed">
+                    Module access based on your <span className="text-foreground font-semibold">{planDisplayName}</span> plan.
+                  </p>
                   
                   <div className="grid gap-3 sm:grid-cols-2">
                     {organizationLoading ? (
@@ -399,22 +442,40 @@ export default function OrganizationSubscriptionPage() {
                           key={module.name}
                           className={cn(
                             "flex items-center justify-between p-4 rounded-xl border transition-colors",
-                            module.enabled ? "bg-background border-border" : "bg-muted/10 border-dashed border-border/50 opacity-60"
+                            module.enabled ? "bg-background border-border" : 
+                            module.suspended ? "bg-destructive/5 border-destructive/20 opacity-80" :
+                            "bg-muted/10 border-dashed border-border/50 opacity-60"
                           )}
                         >
-                          <span className="text-sm font-medium">{module.name}</span>
+                          <span className={cn("text-sm font-medium", module.suspended && "text-destructive")}>{module.name}</span>
                           <span
                             className={cn(
                               "text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full",
-                              module.enabled ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+                              module.enabled ? "bg-success/10 text-success" : 
+                              module.suspended ? "bg-destructive/10 text-destructive" :
+                              "bg-muted text-muted-foreground"
                             )}
                           >
-                            {module.enabled ? "Active" : "Locked"}
+                            {module.enabled ? "Active" : module.suspended ? "Suspended" : "Locked"}
                           </span>
                         </div>
                       ))
                     )}
                   </div>
+
+                  {!organizationLoading && (
+                    <p className="text-[11px] text-muted-foreground mt-4 text-center">
+                      {PLAN_MODULES[plan]?.length ?? 0} of 5 modules included in your plan.
+                      {plan !== "enterprise" && (
+                        <button
+                          className="ml-1 text-primary hover:underline"
+                          onClick={() => setPlanModalOpen(true)}
+                        >
+                          Upgrade to unlock more →
+                        </button>
+                      )}
+                    </p>
+                  )}
                 </article>
               </div>
 
@@ -423,7 +484,7 @@ export default function OrganizationSubscriptionPage() {
                 <h2 className="text-xl font-bold tracking-tight mb-2">Resource Usage</h2>
                 <p className="text-sm text-muted-foreground font-medium mb-6">Real-time consumption snapshot across your organization.</p>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", isCancelled && "opacity-50 grayscale pointer-events-none")}>
                   {usageLoading ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <Skeleton key={i} className="h-24 w-full rounded-xl" />
@@ -536,7 +597,7 @@ export default function OrganizationSubscriptionPage() {
                         <Button
                           className="w-full"
                           onClick={handleSetupBilling}
-                          disabled={createCustomer.isPending}
+                          disabled={createCustomer.isPending || isCancelled}
                         >
                           {createCustomer.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           <CreditCard className="mr-2 h-4 w-4" />
@@ -572,7 +633,9 @@ export default function OrganizationSubscriptionPage() {
                                 statusBadgeClass(subStatus?.status ?? "trial"),
                               )}
                             >
-                              {subStatus?.status ?? "trial"}
+                              {subStatus?.status === "cancelled"
+                                ? "CANCELLED"
+                                : (subStatus?.status ?? "trial")}
                             </span>
                           </div>
                           <div className="flex justify-between items-center py-2 border-b border-border/50">
@@ -591,6 +654,14 @@ export default function OrganizationSubscriptionPage() {
                               {formatDate(subStatus?.subscription_end_date)}
                             </span>
                           </div>
+                          {subStatus?.cancelled_at && (
+                            <div className="flex justify-between items-center py-2 border-b border-border/50">
+                              <span className="text-sm text-muted-foreground">Cancelled On</span>
+                              <span className="text-sm font-medium text-destructive">
+                                {formatDate(subStatus.cancelled_at)}
+                              </span>
+                            </div>
+                          )}
                           {subStatus?.razorpay_subscription_id && (
                             <div className="flex justify-between items-center py-2">
                               <span className="text-sm text-muted-foreground">Razorpay ID</span>
@@ -620,6 +691,16 @@ export default function OrganizationSubscriptionPage() {
                       onClick={() => setCancelDialogOpen(true)}
                     >
                       Cancel Subscription
+                    </Button>
+                  )}
+
+                  {isCancelled && (
+                    <Button
+                      className="w-full"
+                      onClick={() => setPlanModalOpen(true)}
+                    >
+                      <ArrowUpRight className="mr-2 h-4 w-4" />
+                      Resubscribe
                     </Button>
                   )}
                 </div>
@@ -692,39 +773,27 @@ export default function OrganizationSubscriptionPage() {
         currentPlan={plan}
       />
 
+      {/* Cancellation Dialog to be continued... */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Cancel Subscription</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel? Your plan will be downgraded to
-              Foundation CRM at the end of the current billing period.
+              Are you sure you want to cancel your subscription? Your organization will be downgraded to the Foundation CRM plan at the end of your current billing period.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-              <p className="text-xs font-medium text-destructive">
-                You will lose access to:
-              </p>
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <li>- Advanced modules (CLM, ERP)</li>
-                <li>- Higher resource limits</li>
-                <li>- Priority support</li>
-              </ul>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="cancel-reason" className="text-sm">
-                Why are you cancelling? (optional)
-              </Label>
+              <Label htmlFor="cancel-reason">Reason for cancellation (optional)</Label>
               <Input
                 id="cancel-reason"
+                placeholder="Help us improve..."
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Help us improve..."
               />
             </div>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
               Keep Subscription
             </Button>
@@ -734,7 +803,7 @@ export default function OrganizationSubscriptionPage() {
               disabled={isCancelPending}
             >
               {isCancelPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Yes, Cancel
+              Confirm Cancellation
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -743,53 +812,36 @@ export default function OrganizationSubscriptionPage() {
   );
 }
 
-interface UsageMeterRowProps {
-  label: string;
-  used: number;
-  max: number;
+function UsageMeterRow({ 
+  label, 
+  used, 
+  max, 
+  unit = "", 
+  period 
+}: { 
+  label: string; 
+  used: number; 
+  max: number; 
   unit?: string;
-  period?: string;
-}
-
-function UsageMeterRow({ label, used, max, unit = "", period }: UsageMeterRowProps) {
-  if (isUnlimited(max)) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">{label}</span>
-          <span className="font-mono text-xs text-muted-foreground">
-            {used} / ∞ {unit}
-          </span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary/20" style={{ width: "10%" }} />
-        </div>
-      </div>
-    );
-  }
-
-  const safeMax = Math.max(1, max);
-  const percent = Math.min(100, Math.round((used / safeMax) * 100));
-
+  period?: string | null;
+}) {
+  const percent = Math.min(100, Math.round((used / max) * 100));
+  
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">
-          {label}
-          {period && period !== "total" && (
-            <span className="ml-1 text-[10px] text-muted-foreground uppercase">
-              ({period === "monthly" ? "mo" : "day"})
-            </span>
-          )}
-        </span>
-        <span className="font-mono text-xs text-muted-foreground">
-          {used} / {formatLimit(max)} {unit}
+      <div className="flex justify-between items-baseline">
+        <div className="flex flex-col">
+          <span className="text-xs font-semibold text-foreground/80">{label}</span>
+          {period && <span className="text-[9px] uppercase tracking-tighter text-muted-foreground">Monthly Limit</span>}
+        </div>
+        <span className="text-xs font-medium">
+          {used.toLocaleString()}{unit} / {isUnlimited(max) ? "Unlimited" : `${max.toLocaleString()}${unit}`}
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
         <div
-          className={cn("h-full rounded-full transition-all duration-500", getBarColor(percent))}
-          style={{ width: `${percent}%` }}
+          className={cn("h-full transition-all duration-500", getBarColor(percent))}
+          style={{ width: `${isUnlimited(max) ? 0 : percent}%` }}
         />
       </div>
     </div>

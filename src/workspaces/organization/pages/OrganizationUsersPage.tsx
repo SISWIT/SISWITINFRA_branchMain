@@ -33,6 +33,7 @@ import {
 import { supabase } from "@/core/api/client";
 import { toast } from "sonner";
 import { useOrganizationOwnerData, type OrganizationOwnerMembership } from "@/workspaces/organization/hooks/useOrganizationOwnerData";
+import { useAuth } from "@/core/auth/useAuth";
 
 type RoleFilter = "all" | "owner" | "admin" | "manager" | "employee" | "client";
 type StateFilter = "all" | "active" | "pending_approval" | "rejected" | "disabled";
@@ -43,6 +44,7 @@ const editableRoles = ["admin", "manager", "employee", "client"];
 
 export default function OrganizationUsersPage() {
   const { organization, loading, memberships, roleDistribution, refresh } = useOrganizationOwnerData();
+  const { inviteEmployee, inviteClient } = useAuth();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
@@ -108,22 +110,31 @@ export default function OrganizationUsersPage() {
     if (!organization?.id) return;
     setActionLoading(true);
     try {
-      const table = member.role === "client" ? "client_invitations" : "employee_invitations";
-      const payload: Record<string, unknown> = {
-        organization_id: organization.id,
-        invited_email: member.email,
-        status: "pending",
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-      if (table === "employee_invitations") {
-        payload.role = member.role;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      let result;
+
+      if (member.role === "client") {
+        result = await inviteClient({
+          organizationId: organization.id,
+          email: member.email,
+          expiresAt,
+        });
+      } else {
+        result = await inviteEmployee({
+          organizationId: organization.id,
+          email: member.email,
+          role: member.role as any, // app_role enum
+          expiresAt,
+        });
       }
 
-      const { error } = await supabase
-        .from(table as "employee_invitations" | "client_invitations")
-        .insert([payload as Database["public"]["Tables"]["employee_invitations"]["Insert"]]);
-      if (error) throw error;
-      toast.success(`Invitation resent to ${member.email}.`);
+      if (result.error) throw new Error(result.error);
+      
+      if (result.emailError) {
+        toast.warning(`Invitation created, but email failed: ${result.emailError}`);
+      } else {
+        toast.success(`Invitation resent to ${member.email}.`);
+      }
     } catch (err: unknown) {
       toast.error(`Failed to resend invite: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
