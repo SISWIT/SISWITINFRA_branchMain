@@ -32,6 +32,48 @@ const PLAN_ENV_MAP: Record<string, string> = {
 
 const RAZORPAY_API_BASE = "https://api.razorpay.com/v1";
 
+/**
+ * Searches for a Razorpay customer by email address.
+ * Since Razorpay doesn't support direct filtering by email in the GET /customers endpoint,
+ * we fetch the most recent customers and filter locally.
+ */
+async function findRazorpayCustomerByEmail(
+  email: string,
+  basicAuth: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(`${RAZORPAY_API_BASE}/customers?count=100`, {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        "Failed to fetch customers for lookup:",
+        await response.text(),
+      );
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      items?: Array<{ id: string; email?: string }>;
+    };
+
+    const targetEmail = email.toLowerCase().trim();
+    const existingCustomer = data.items?.find(
+      (c) => c.email?.toLowerCase().trim() === targetEmail,
+    );
+
+    return existingCustomer?.id || null;
+  } catch (error) {
+    console.error("Error during Razorpay customer lookup:", error);
+    return null;
+  }
+}
+
 interface CreateSubscriptionRequest {
   organization_id: string;
   plan_type: string;
@@ -262,21 +304,60 @@ Deno.serve(async (req: Request) => {
 
       if (!createCustomerResponse.ok) {
         const createCustomerErrorBody = await createCustomerResponse.text();
-        return jsonResponse(
-          502,
-          {
-            error: "Failed to create billing customer with Razorpay",
-            details: createCustomerErrorBody,
-          },
-          req,
-        );
+        let wasConflict = false;
+
+        try {
+          const errorJson = JSON.parse(createCustomerErrorBody);
+          // Handle "Customer already exists for the merchant" error (BAD_REQUEST_ERROR)
+          if (
+            errorJson.error?.code === "BAD_REQUEST_ERROR" &&
+            errorJson.error?.description?.toLowerCase().includes(
+              "customer already exists",
+            )
+          ) {
+            wasConflict = true;
+          }
+        } catch {
+          // If not JSON, we can't be sure, but we'll fall back to returning the error
+        }
+
+        if (wasConflict && billingEmail) {
+          console.log(
+            `Handling Razorpay customer conflict for email: ${billingEmail}. Attempting to recover existing ID...`,
+          );
+          const recoveredId = await findRazorpayCustomerByEmail(
+            billingEmail,
+            basicAuth,
+          );
+          if (recoveredId) {
+            console.log(`Successfully recovered customer ID: ${recoveredId}`);
+            resolvedCustomerId = recoveredId;
+          } else {
+            console.error(
+              "Razorpay reported customer exists, but lookup failed to find them in the recent 100 records.",
+            );
+          }
+        }
+
+        // If we didn't resolve it (either not a conflict or recovery failed), return the error
+        if (!resolvedCustomerId) {
+          return jsonResponse(
+            502,
+            {
+              error: "Failed to create billing customer with Razorpay",
+              details: createCustomerErrorBody,
+            },
+            req,
+          );
+        }
+      } else {
+        const createdCustomer = (await createCustomerResponse.json()) as {
+          id?: string;
+        };
+        resolvedCustomerId = createdCustomer.id || null;
       }
 
-      const createdCustomer = (await createCustomerResponse.json()) as {
-        id?: string;
-      };
-
-      if (!createdCustomer.id) {
+      if (!resolvedCustomerId) {
         return jsonResponse(
           502,
           {
@@ -286,8 +367,6 @@ Deno.serve(async (req: Request) => {
           req,
         );
       }
-
-      resolvedCustomerId = createdCustomer.id;
     }
 
     if (!resolvedCustomerId) {
