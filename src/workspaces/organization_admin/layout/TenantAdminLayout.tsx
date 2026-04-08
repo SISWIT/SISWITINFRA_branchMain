@@ -1,9 +1,10 @@
-import { ReactNode, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import {
   X,
 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
+import { Skeleton } from "@/ui/shadcn/skeleton";
 import { useAuth } from "@/core/auth/useAuth";
 import { AdminSidebar } from "../components/AdminSidebar";
 import { AdminTopBar } from "../components/AdminTopBar";
@@ -15,10 +16,47 @@ interface TenantAdminLayoutProps {
   children?: ReactNode;
 }
 
+function AdminRouteContentFallback() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <Skeleton className="h-40 rounded-3xl bg-card/70" />
+        <Skeleton className="h-40 rounded-3xl bg-card/60" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Skeleton className="h-28 rounded-2xl bg-card/60" />
+        <Skeleton className="h-28 rounded-2xl bg-card/60" />
+        <Skeleton className="h-28 rounded-2xl bg-card/60" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+        <Skeleton className="h-80 rounded-3xl bg-card/60" />
+        <div className="space-y-4">
+          <Skeleton className="h-32 rounded-2xl bg-card/60" />
+          <Skeleton className="h-44 rounded-2xl bg-card/60" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TenantAdminLayout({ children }: TenantAdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { role } = useAuth();
+  const { pathname } = useLocation();
+  const hasMountedRef = useRef(false);
+  const [isRouteTransitioning, setIsRouteTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    setIsRouteTransitioning(true);
+    const timeoutId = window.setTimeout(() => setIsRouteTransitioning(false), 220);
+    return () => window.clearTimeout(timeoutId);
+  }, [pathname]);
 
   // If the user is a regular employee, redirect to their layout
   if (isTenantUserRole(role)) {
@@ -44,9 +82,20 @@ export function TenantAdminLayout({ children }: TenantAdminLayoutProps) {
         <AdminTopBar onOpenSidebar={() => setMobileMenuOpen(true)} />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-muted/0">
-          {children || <Outlet />}
-        </main>
+        <div className="relative flex-1 overflow-hidden">
+          <main className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8 bg-muted/0">
+            <Suspense fallback={<AdminRouteContentFallback />}>
+              {children || <Outlet />}
+            </Suspense>
+          </main>
+          {isRouteTransitioning && (
+            <div className="pointer-events-none absolute inset-0 z-10 bg-background/20 backdrop-blur-[1px] animate-in fade-in duration-150">
+              <div className="absolute inset-x-0 top-0 h-1 bg-primary/15">
+                <div className="h-full w-1/3 animate-pulse bg-primary/70" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Mobile Sidebar */}

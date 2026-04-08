@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation, useParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -51,8 +51,10 @@ export function AdminSidebar({
   const { organization, subscription } = useOrganization();
   const { signOut } = useAuth();
   const { planType } = usePlanLimits();
+  const { pathname } = useLocation();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const primaryColor = organization?.primary_color || "var(--primary)";
 
@@ -114,6 +116,23 @@ export function AdminSidebar({
       ]
     }
   ], [tenantSlug, subscription]);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!pendingHref) return;
+
+    const timeoutId = window.setTimeout(() => setPendingHref(null), 1500);
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingHref]);
+
+  const handleNavigationIntent = (href: string) => {
+    if (pathname !== href) {
+      setPendingHref(href);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -198,24 +217,28 @@ export function AdminSidebar({
                   <NavLink
                     key={item.href}
                     to={item.href}
-                    onClick={onNavigate}
+                    onMouseDown={() => handleNavigationIntent(item.href)}
+                    onClick={() => {
+                      handleNavigationIntent(item.href);
+                      onNavigate?.();
+                    }}
                     className={({ isActive }) => cn(
                       "flex items-center gap-3 px-3 py-2 rounded-xl transition-all group relative",
-                      isActive
+                      isActive || pendingHref === item.href
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       collapsed && "justify-center px-0"
                     )}
                     style={({ isActive }) => ({
-                      backgroundColor: isActive ? `${primaryColor}15` : undefined,
-                      color: isActive ? primaryColor : undefined,
+                      backgroundColor: isActive || pendingHref === item.href ? `${primaryColor}15` : undefined,
+                      color: isActive || pendingHref === item.href ? primaryColor : undefined,
                     })}
                   >
                     {({ isActive }) => (
                       <>
                         <Icon className={cn("h-4 w-4 shrink-0 transition-transform group-hover:scale-110")} />
                         {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                        {isActive && !collapsed && (
+                        {(isActive || pendingHref === item.href) && !collapsed && (
                           <div
                             className="absolute right-2 w-1 h-4 rounded-full"
                             style={{ backgroundColor: primaryColor }}

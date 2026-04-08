@@ -16,7 +16,6 @@ import {
   Briefcase,
   Bell,
   Clock3,
-  Activity,
   Layers,
   ArrowUpRight,
 } from "lucide-react";
