@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "../../../core/api/client";
 import { useOrganization } from "../../organization/hooks/useOrganization";
 
@@ -108,7 +108,6 @@ export function useOrganizationAdminDashboard() {
                 chartOrdersResult,
                 trendLeadsResult,
                 trendContractsResult,
-                _membershipsResult,
                 invitationsResult,
             ] = await Promise.all([
                 supabase.from("leads").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId),
@@ -162,16 +161,35 @@ export function useOrganizationAdminDashboard() {
                     .select("created_at")
                     .eq("tenant_id", tenantId)
                     .gte("created_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()),
-
-                supabase.from("organization_memberships")
-                    .select("*", { count: "exact", head: true })
-                    .eq("organization_id", tenantId),
                 
                 supabase.from("tenant_invitations")
                     .select("*", { count: "exact", head: true })
-                    .eq("organization_id", tenantId)
+                    .eq("tenant_id", tenantId)
                     .eq("status", "pending"),
             ]);
+
+            const failedResult = [
+                { label: "leads count", error: leadsCountResult.error },
+                { label: "contracts count", error: contractsCountResult.error },
+                { label: "quotes count", error: quotesCountResult.error },
+                { label: "orders count", error: ordersCountResult.error },
+                { label: "opportunities list", error: opportunitiesResult.error },
+                { label: "contracts list", error: contractsResult.error },
+                { label: "activities list", error: activitiesResult.error },
+                { label: "leads list", error: leadsResult.error },
+                { label: "audit logs", error: auditLogsResult.error },
+                { label: "lead chart", error: chartLeadsResult.error },
+                { label: "contract chart", error: chartContractsResult.error },
+                { label: "quote chart", error: chartQuotesResult.error },
+                { label: "order chart", error: chartOrdersResult.error },
+                { label: "lead trends", error: trendLeadsResult.error },
+                { label: "contract trends", error: trendContractsResult.error },
+                { label: "invitations count", error: invitationsResult.error },
+            ].find((result) => result.error);
+
+            if (failedResult?.error) {
+                throw new Error(`Failed to load ${failedResult.label}: ${failedResult.error.message}`);
+            }
 
             // Calculate trends
             const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -213,5 +231,7 @@ export function useOrganizationAdminDashboard() {
             };
         },
         enabled: !!tenantId,
+        staleTime: 30 * 1000,
+        placeholderData: keepPreviousData,
     });
 }

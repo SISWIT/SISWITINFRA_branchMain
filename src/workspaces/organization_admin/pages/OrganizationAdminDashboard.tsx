@@ -28,6 +28,7 @@ import { tenantAppPath } from "@/core/utils/routes";
 import { Badge } from "@/ui/shadcn/badge";
 import { Button } from "@/ui/shadcn/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
+import { Skeleton } from "@/ui/shadcn/skeleton";
 import {
   Table,
   TableBody,
@@ -42,12 +43,57 @@ import {
   type DashboardAuditLog
 } from "../hooks/useOrganizationAdminDashboard";
 
+function DashboardMetricSkeleton() {
+  return (
+    <Card className="border-border bg-card/60 backdrop-blur-sm">
+      <CardContent className="p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <Skeleton className="h-12 w-12 rounded-2xl" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-24" />
+          <div className="flex items-baseline gap-2">
+            <Skeleton className="h-9 w-14" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardTableSkeleton() {
+  return (
+    <Card className="border-border bg-card/60 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-9 w-24 rounded-xl" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OrganizationAdminDashboard() {
   const { user, fullName } = useAuth();
-  const { organization, memberships } = useOrganization();
+  const { organization, memberships, organizationLoading } = useOrganization();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { data: dashboardData, isLoading } = useOrganizationAdminDashboard();
+  const { data: dashboardData, isLoading, isError, refetch } = useOrganizationAdminDashboard();
 
   const primaryColor = organization?.primary_color || "var(--primary)";
   
@@ -61,6 +107,7 @@ export default function OrganizationAdminDashboard() {
   }, [user?.email, user?.user_metadata, fullName]);
 
   const orgName = organization?.name || "Your Organization";
+  const isDashboardHydrating = (organizationLoading || isLoading) && !dashboardData;
 
   // Process operational data
   const barChartData = useMemo(() => {
@@ -104,14 +151,94 @@ export default function OrganizationAdminDashboard() {
     return days;
   }, [dashboardData?.charts]);
 
-  if (isLoading || !dashboardData) {
+  if (isDashboardHydrating) {
     return (
-      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
-        <div 
+      <div className="space-y-8 animate-in fade-in duration-300">
+        <section className="rounded-[2rem] border border-border bg-card p-6 sm:p-8 lg:p-10 shadow-lg">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-3">
+              <Skeleton className="h-6 w-40 rounded-full" />
+              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-4 w-full max-w-md" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <Skeleton className="h-12 w-44 rounded-2xl" />
+              <Skeleton className="h-12 w-44 rounded-2xl" />
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <DashboardMetricSkeleton key={index} />
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-12">
+          <Card className="lg:col-span-8 border-border bg-card/60 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-8">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-52" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-7 w-24 rounded-full" />
+                <Skeleton className="h-7 w-28 rounded-full" />
+              </div>
+            </CardHeader>
+            <CardContent className="h-[400px] w-full">
+              <Skeleton className="h-full w-full rounded-2xl" />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-4 border-border bg-card/60 shadow-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-6 pb-6">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div key={index} className="flex gap-4">
+                  <Skeleton className="mt-1 h-2 w-2 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+              ))}
+              <Skeleton className="h-10 w-full rounded-xl" />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <DashboardTableSkeleton />
+          <DashboardTableSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !dashboardData) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4 text-center">
+        <div
           className="h-12 w-12 rounded-full border-4 border-t-transparent animate-spin"
           style={{ borderTopColor: primaryColor }}
         />
-        <p className="text-muted-foreground font-medium animate-pulse text-sm">Synchronizing command center data...</p>
+        <div className="space-y-1">
+          <p className="font-semibold">Unable to load command center data</p>
+          <p className="text-sm text-muted-foreground">
+            The dashboard metrics did not finish syncing. Retry to fetch the latest organization data.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => void refetch()}>
+          Retry Sync
+        </Button>
       </div>
     );
   }
