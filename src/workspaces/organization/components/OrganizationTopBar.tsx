@@ -10,7 +10,6 @@ import {
   Menu,
   Plus,
   Search,
-  Settings,
 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
@@ -252,10 +251,6 @@ export function OrganizationTopBar({ onOpenSidebar }: OrganizationTopBarProps) {
                 <p className="text-xs font-bold">{displayName}</p>
                 <p className="text-[10px] text-muted-foreground font-medium truncate mt-0.5">{user?.email}</p>
               </div>
-              <DropdownMenuItem className="text-xs font-medium py-2 cursor-pointer focus:bg-muted" onSelect={() => navigate("/organization/settings")}>
-                <Settings className="mr-2 h-3.5 w-3.5 opacity-60" /> Profile Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border/40" />
               <DropdownMenuItem className="text-xs font-medium py-2 cursor-pointer text-destructive focus:bg-destructive/10" onSelect={handleSignOut}>
                 <LogOut className="mr-2 h-3.5 w-3.5" /> Sign Out
               </DropdownMenuItem>
