@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, MailPlus, UserPlus, ShieldCheck, Clock3, AlertCircle, Lock } from "lucide-react";
+import { Loader2, MailPlus, UserPlus, ShieldCheck, Clock3, Lock } from "lucide-react";
 import { useSubscription } from "@/core/hooks/useSubscription";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/ui/shadcn/textarea";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganizationOwnerData } from "@/workspaces/organization/hooks/useOrganizationOwnerData";
-import { useToast } from "@/core/hooks/use-toast";
 import { cn } from "@/core/utils/utils";
+import { toast } from "sonner";
 const INVITE_EMAILS_DISABLED = (() => {
   const raw = String(import.meta.env.VITE_DISABLE_INVITE_EMAILS ?? "").trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes";
@@ -41,7 +41,6 @@ export default function OrganizationInvitationsPage() {
   const { inviteEmployee, inviteClient } = useAuth();
   const { organization, loading, employeeInvites, clientInvites, refresh } = useOrganizationOwnerData();
   const { isCancelled } = useSubscription();
-  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("employee");
 
@@ -73,16 +72,22 @@ export default function OrganizationInvitationsPage() {
     setSubmittingEmployee(false);
 
     if (error) {
-      toast({ variant: "destructive", title: "Employee invite failed", description: error });
+      toast.error("Employee invite failed", { description: error });
       return;
     }
     if (invitationUrl) await navigator.clipboard.writeText(invitationUrl).catch(() => undefined);
     if (emailError) {
-      toast({ variant: "destructive", title: "Invitation created, email failed", description: `${emailError} Share the copied link manually.` });
+      toast.warning("Invitation created, email failed", {
+        description: `${emailError} Share the copied link manually.`,
+      });
     } else if (INVITE_EMAILS_DISABLED) {
-      toast({ title: "Employee invitation created", description: "Email sending is disabled. Share the copied link manually." });
+      toast.success("Employee invitation created", {
+        description: "Email sending is disabled. Share the copied link manually.",
+      });
     } else {
-      toast({ title: "Employee invited", description: invitationUrl ? "Invitation sent and link copied." : "Invitation created and email dispatch requested." });
+      toast.success("Employee invited", {
+        description: invitationUrl ? "Invitation sent and link copied." : "Invitation created and email dispatch requested.",
+      });
     }
     setEmployeeEmail("");
     setCustomRoleName("");
@@ -104,16 +109,22 @@ export default function OrganizationInvitationsPage() {
     setSubmittingClient(false);
 
     if (error) {
-      toast({ variant: "destructive", title: "Client invite failed", description: error });
+      toast.error("Client invite failed", { description: error });
       return;
     }
     if (invitationUrl) await navigator.clipboard.writeText(invitationUrl).catch(() => undefined);
     if (emailError) {
-      toast({ variant: "destructive", title: "Invitation created, email failed", description: `${emailError} Share the copied link manually.` });
+      toast.warning("Invitation created, email failed", {
+        description: `${emailError} Share the copied link manually.`,
+      });
     } else if (INVITE_EMAILS_DISABLED) {
-      toast({ title: "Client invitation created", description: "Email sending is disabled. Share the copied link manually." });
+      toast.success("Client invitation created", {
+        description: "Email sending is disabled. Share the copied link manually.",
+      });
     } else {
-      toast({ title: "Client invited", description: invitationUrl ? "Invitation sent and link copied." : "Invitation created and email dispatch requested." });
+      toast.success("Client invited", {
+        description: invitationUrl ? "Invitation sent and link copied." : "Invitation created and email dispatch requested.",
+      });
     }
     setClientEmail("");
     setClientMessage("");

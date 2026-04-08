@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/core/api/client";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 
@@ -35,6 +35,17 @@ interface OrganizationSubscriptionMeta {
   plan_type?: string;
   trial_end_date?: string | null;
 }
+
+interface OrganizationOwnerDataSnapshot {
+  memberships: OrganizationOwnerMembership[];
+  employeeInvites: OrganizationOwnerInvite[];
+  clientInvites: OrganizationOwnerInvite[];
+  subscriptionMeta: OrganizationSubscriptionMeta | null;
+}
+
+// Preserve the last successful owner dataset per organization so page remounts
+// can reuse stable metrics while a background refresh runs.
+const ownerDataCache = new Map<string, OrganizationOwnerDataSnapshot>();
 
 function startOfDay(value: Date): Date {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
@@ -79,64 +90,125 @@ function getDaysLeftFromIso(value: string): number {
   return Math.ceil(milliseconds / (1000 * 60 * 60 * 24));
 }
 
-export function useOrganizationOwnerData() {
-  const { organization, subscription } = useOrganization();
+function getCachedSnapshot(organizationId: string | null | undefined): OrganizationOwnerDataSnapshot | null {
+  if (!organizationId) return null;
+  return ownerDataCache.get(organizationId) ?? null;
+}
 
-  const [memberships, setMemberships] = useState<OrganizationOwnerMembership[]>([]);
-  const [employeeInvites, setEmployeeInvites] = useState<OrganizationOwnerInvite[]>([]);
-  const [clientInvites, setClientInvites] = useState<OrganizationOwnerInvite[]>([]);
-  const [subscriptionMeta, setSubscriptionMeta] = useState<OrganizationSubscriptionMeta | null>(null);
-  const [loading, setLoading] = useState(false);
+export function useOrganizationOwnerData() {
+  const { organization, organizationLoading, subscription } = useOrganization();
+  const initialSnapshot = getCachedSnapshot(organization?.id);
+  const activeOrganizationIdRef = useRef<string | null>(organization?.id ?? null);
+  const requestCounterRef = useRef(0);
+
+  const [memberships, setMemberships] = useState<OrganizationOwnerMembership[]>(() => initialSnapshot?.memberships ?? []);
+  const [employeeInvites, setEmployeeInvites] = useState<OrganizationOwnerInvite[]>(() => initialSnapshot?.employeeInvites ?? []);
+  const [clientInvites, setClientInvites] = useState<OrganizationOwnerInvite[]>(() => initialSnapshot?.clientInvites ?? []);
+  const [subscriptionMeta, setSubscriptionMeta] = useState<OrganizationSubscriptionMeta | null>(() => initialSnapshot?.subscriptionMeta ?? null);
+  const [loading, setLoading] = useState(() => Boolean(organization?.id) && !initialSnapshot);
   const [dismissedAlertIds, setDismissedAlertIds] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
-    if (!organization?.id) {
-      setMemberships([]);
-      setEmployeeInvites([]);
-      setClientInvites([]);
-      setSubscriptionMeta(null);
+    const organizationId = organization?.id;
+    if (!organizationId) {
+      if (!organizationLoading) {
+        setMemberships([]);
+        setEmployeeInvites([]);
+        setClientInvites([]);
+        setSubscriptionMeta(null);
+        setLoading(false);
+      }
       return;
     }
 
+    const requestId = ++requestCounterRef.current;
     setLoading(true);
     try {
       const [membershipsResult, employeeInvitesResult, clientInvitesResult, subscriptionResult] = await Promise.all([
         supabase
           .from("organization_memberships")
           .select("id, email, role, account_state, is_active, department, employee_id, created_at, updated_at")
-          .eq("organization_id", organization.id)
+          .eq("organization_id", organizationId)
           .order("created_at", { ascending: false }),
         supabase
           .from("employee_invitations")
           .select("id, invited_email, role, status, expires_at, created_at")
-          .eq("organization_id", organization.id)
+          .eq("organization_id", organizationId)
           .order("created_at", { ascending: false })
           .limit(25),
         supabase
           .from("client_invitations")
           .select("id, invited_email, status, expires_at, created_at")
-          .eq("organization_id", organization.id)
+          .eq("organization_id", organizationId)
           .order("created_at", { ascending: false })
           .limit(25),
         supabase
           .from("organization_subscriptions")
           .select("status, plan_type, trial_end_date")
-          .eq("organization_id", organization.id)
+          .eq("organization_id", organizationId)
           .maybeSingle(),
       ]);
 
-      setMemberships(((membershipsResult.data ?? []) as Record<string, unknown>[]).map(normalizeMembership));
-      setEmployeeInvites(((employeeInvitesResult.data ?? []) as Record<string, unknown>[]).map(normalizeInvite));
-      setClientInvites(((clientInvitesResult.data ?? []) as Record<string, unknown>[]).map(normalizeInvite));
-      setSubscriptionMeta((subscriptionResult.data as OrganizationSubscriptionMeta | null) ?? null);
+      if (requestId !== requestCounterRef.current || activeOrganizationIdRef.current !== organizationId) {
+        return;
+      }
+
+      const nextSnapshot: OrganizationOwnerDataSnapshot = {
+        memberships: ((membershipsResult.data ?? []) as Record<string, unknown>[]).map(normalizeMembership),
+        employeeInvites: ((employeeInvitesResult.data ?? []) as Record<string, unknown>[]).map(normalizeInvite),
+        clientInvites: ((clientInvitesResult.data ?? []) as Record<string, unknown>[]).map(normalizeInvite),
+        subscriptionMeta: (subscriptionResult.data as OrganizationSubscriptionMeta | null) ?? null,
+      };
+
+      ownerDataCache.set(organizationId, nextSnapshot);
+      setMemberships(nextSnapshot.memberships);
+      setEmployeeInvites(nextSnapshot.employeeInvites);
+      setClientInvites(nextSnapshot.clientInvites);
+      setSubscriptionMeta(nextSnapshot.subscriptionMeta);
     } finally {
-      setLoading(false);
+      if (requestId === requestCounterRef.current && activeOrganizationIdRef.current === organizationId) {
+        setLoading(false);
+      }
     }
-  }, [organization?.id, subscription]);
+  }, [organization?.id, organizationLoading]);
 
   useEffect(() => {
+    activeOrganizationIdRef.current = organization?.id ?? null;
+  }, [organization?.id]);
+
+  useEffect(() => {
+    const organizationId = organization?.id;
+    if (organizationId) {
+      const cachedSnapshot = getCachedSnapshot(organizationId);
+      if (cachedSnapshot) {
+        setMemberships(cachedSnapshot.memberships);
+        setEmployeeInvites(cachedSnapshot.employeeInvites);
+        setClientInvites(cachedSnapshot.clientInvites);
+        setSubscriptionMeta(cachedSnapshot.subscriptionMeta);
+        setLoading(false);
+      } else {
+        setMemberships([]);
+        setEmployeeInvites([]);
+        setClientInvites([]);
+        setSubscriptionMeta(null);
+        setLoading(true);
+      }
+      return;
+    }
+
+    if (!organizationLoading) {
+      setMemberships([]);
+      setEmployeeInvites([]);
+      setClientInvites([]);
+      setSubscriptionMeta(null);
+      setLoading(false);
+    }
+  }, [organization?.id, organizationLoading]);
+
+  useEffect(() => {
+    if (organizationLoading || !organization?.id) return;
     void refresh();
-  }, [refresh]);
+  }, [organization?.id, organizationLoading, refresh]);
 
   const pendingClients = useMemo(
     () => memberships.filter((member) => member.role === "client" && member.account_state === "pending_approval"),
@@ -322,4 +394,3 @@ export function useOrganizationOwnerData() {
     refresh,
   };
 }
-
