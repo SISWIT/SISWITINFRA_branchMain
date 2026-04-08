@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Loader2, MoreHorizontal, Pencil, Search, Send, Trash2 } from "lucide-react";
 import { Input } from "@/ui/shadcn/input";
 import { Button } from "@/ui/shadcn/button";
+import { Skeleton } from "@/ui/shadcn/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Label } from "@/ui/shadcn/label";
 import type { Database } from "@/core/api/types";
@@ -65,6 +66,8 @@ export default function OrganizationUsersPage() {
     });
   }, [memberships, roleFilter, search, stateFilter]);
 
+  const isInitialMembersLoad = loading && memberships.length === 0;
+
   // --- Action handlers ---
   const handleRemoveMember = async () => {
     if (!memberToRemove) return;
@@ -120,10 +123,13 @@ export default function OrganizationUsersPage() {
           expiresAt,
         });
       } else {
+        const employeeRole: "admin" | "manager" | "employee" =
+          member.role === "admin" || member.role === "manager" ? member.role : "employee";
+
         result = await inviteEmployee({
           organizationId: organization.id,
           email: member.email,
-          role: member.role as any, // app_role enum
+          role: employeeRole,
           expiresAt,
         });
       }
@@ -158,15 +164,25 @@ export default function OrganizationUsersPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {roleDistribution.map((role) => (
-          <article 
-            key={role.role} 
-            className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-lg transition-transform hover:scale-[1.02]"
-          >
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{role.role}</p>
-            <p className="mt-2 font-mono text-3xl font-bold tracking-tight">{role.count}</p>
-          </article>
-        ))}
+        {isInitialMembersLoad
+          ? Array.from({ length: 5 }, (_, index) => (
+              <article
+                key={`role-skeleton-${index}`}
+                className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-lg"
+              >
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-3 h-9 w-14" />
+              </article>
+            ))
+          : roleDistribution.map((role) => (
+              <article
+                key={role.role}
+                className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-lg transition-transform hover:scale-[1.02]"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{role.role}</p>
+                <p className="mt-2 font-mono text-3xl font-bold tracking-tight">{role.count}</p>
+              </article>
+            ))}
       </section>
 
       <section className="p-6 rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md shadow-xl space-y-6">
@@ -201,7 +217,27 @@ export default function OrganizationUsersPage() {
           </Select>
         </div>
 
-        {filteredMembers.length === 0 ? (
+        {isInitialMembersLoad ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }, (_, index) => (
+              <article
+                key={`member-skeleton-${index}`}
+                className="grid items-center gap-4 rounded-2xl border border-border/20 bg-background/40 p-4 md:grid-cols-[1.5fr_120px_160px_100px_60px]"
+              >
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-7 w-20 rounded-full" />
+                <div className="flex justify-end">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : filteredMembers.length === 0 ? (
           <p className="text-sm text-muted-foreground">No members match the selected filters.</p>
         ) : (
           <div className="space-y-2">
