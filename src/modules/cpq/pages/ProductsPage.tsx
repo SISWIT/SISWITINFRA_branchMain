@@ -1,19 +1,15 @@
-import { useState, useEffect } from "react";
-import { Package, Plus, Edit, Trash2, IndianRupee } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Edit, IndianRupee, Package, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
-import { Button } from "@/ui/shadcn/button";
-import { Input } from "@/ui/shadcn/input";
-import { Badge } from "@/ui/shadcn/badge";
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/modules/cpq/hooks/useCPQ";
+
+import { useCreateProduct, useDeleteProduct, useProducts, useUpdateProduct } from "@/modules/cpq/hooks/useCPQ";
+import type { Product } from "@/core/types/cpq";
+import { useSearch } from "@/core/hooks/useSearch";
 import { useCRUD } from "@/core/rbac/usePermissions";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/ui/shadcn/dialog";
+import { ExportButton } from "@/ui/export-button";
+import { FilterBar } from "@/ui/filter-bar";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
+import { SearchBar } from "@/ui/search-bar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +20,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/shadcn/alert-dialog";
-import { Switch } from "@/ui/shadcn/switch";
+import { Badge } from "@/ui/shadcn/badge";
+import { Button } from "@/ui/shadcn/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/ui/shadcn/dialog";
+import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
-import { Textarea } from "@/ui/shadcn/textarea";
 import {
   Select,
   SelectContent,
@@ -34,12 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/shadcn/select";
-import type { Product } from "@/core/types/cpq";
-import { PlanLimitBanner } from "@/ui/plan-limit-banner";
-import { ExportButton } from "@/ui/export-button";
-import { useSearch } from "@/core/hooks/useSearch";
-import { SearchBar } from "@/ui/search-bar";
-import { FilterBar } from "@/ui/filter-bar";
+import { Switch } from "@/ui/shadcn/switch";
+import { Textarea } from "@/ui/shadcn/textarea";
 
 const PRODUCT_FILTERS = [
   {
@@ -82,7 +84,6 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  // Controlled form state for dialog (ensures values are submitted reliably)
   const [formName, setFormName] = useState("");
   const [formSku, setFormSku] = useState("");
   const [formCategory, setFormCategory] = useState<string>("CPQ");
@@ -95,7 +96,17 @@ export default function ProductsPage() {
   const deleteMutation = useDeleteProduct();
   const { canDelete } = useCRUD();
 
-  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<Product>(products ?? [], {
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filteredData,
+    resultCount,
+    totalCount,
+    filterDefs,
+  } = useSearch<Product>(products ?? [], {
     searchFields: ["name", "sku", "description"],
     filterDefs: PRODUCT_FILTERS,
     customFilters: {
@@ -103,33 +114,29 @@ export default function ProductsPage() {
     },
   });
 
-  // Sync controlled form state when dialog opens or editingProduct changes
   useEffect(() => {
-    if (isDialogOpen) {
-      if (editingProduct) {
-        setFormName(editingProduct.name || "");
-        setFormSku(editingProduct.sku || "");
-        setFormCategory(editingProduct.category || "CPQ");
-        setFormUnitPrice(
-          editingProduct.unit_price != null
-            ? String(editingProduct.unit_price)
-            : ""
-        );
-        setFormDescription(editingProduct.description || "");
-      } else {
-        setFormName("");
-        setFormSku("");
-        setFormCategory("CPQ");
-        setFormUnitPrice("");
-        setFormDescription("");
-      }
+    if (!isDialogOpen) {
+      return;
     }
-  }, [isDialogOpen, editingProduct]);
 
+    if (editingProduct) {
+      setFormName(editingProduct.name || "");
+      setFormSku(editingProduct.sku || "");
+      setFormCategory(editingProduct.category || "CPQ");
+      setFormUnitPrice(editingProduct.unit_price != null ? String(editingProduct.unit_price) : "");
+      setFormDescription(editingProduct.description || "");
+      return;
+    }
 
+    setFormName("");
+    setFormSku("");
+    setFormCategory("CPQ");
+    setFormUnitPrice("");
+    setFormDescription("");
+  }, [editingProduct, isDialogOpen]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const parsedPrice = parseFloat(formUnitPrice || "0");
     if (isNaN(parsedPrice) || parsedPrice < 0) {
       toast.error("Please enter a valid price");
@@ -146,12 +153,15 @@ export default function ProductsPage() {
     };
 
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, ...product }, {
-        onSuccess: () => {
-          setIsDialogOpen(false);
-          setEditingProduct(null);
+      updateMutation.mutate(
+        { id: editingProduct.id, ...product },
+        {
+          onSuccess: () => {
+            setIsDialogOpen(false);
+            setEditingProduct(null);
+          },
         },
-      });
+      );
     } else {
       createMutation.mutate(product, {
         onSuccess: () => {
@@ -170,30 +180,28 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-        <PlanLimitBanner resource="products" className="mb-4" />
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-3xl font-semibold">
-              Product Catalog
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Manage your products and pricing
-            </p>
-          </div>
+      <PlanLimitBanner resource="products" className="mb-4" />
 
-          <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold md:text-3xl">Product Catalog</h1>
+          <p className="text-sm text-muted-foreground md:text-base">Manage your products and pricing</p>
+        </div>
+
+        <div className="flex items-center gap-2">
           <ExportButton data={products ?? []} filename="siswit-products" sheetName="Products" isLoading={isLoading} />
           <Dialog
             open={isDialogOpen}
             onOpenChange={(open) => {
               setIsDialogOpen(open);
-              if (!open) setEditingProduct(null);
+              if (!open) {
+                setEditingProduct(null);
+              }
             }}
           >
             <DialogTrigger asChild>
               <Button
                 onClick={() => {
-                  // ensure form is reset when opening add dialog
                   setEditingProduct(null);
                 }}
               >
@@ -203,12 +211,15 @@ export default function ProductsPage() {
             </DialogTrigger>
             <DialogContent className="max-w-md" aria-describedby={undefined}>
               <DialogHeader>
-                <DialogTitle>
-                  {editingProduct ? "Edit Product" : "Add New Product"}
-                </DialogTitle>
+                <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
+                <DialogDescription>
+                  Add the core product details and the standard selling price.
+                </DialogDescription>
               </DialogHeader>
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <input type="hidden" name="category" value={formCategory} />
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name</Label>
                   <Input
@@ -216,9 +227,11 @@ export default function ProductsPage() {
                     name="name"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Enterprise CPQ Suite"
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="sku">SKU</Label>
                   <Input
@@ -226,28 +239,28 @@ export default function ProductsPage() {
                     name="sku"
                     value={formSku}
                     onChange={(e) => setFormSku(e.target.value)}
+                    placeholder="e.g. CPQ-ENT-001"
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={formCategory}
-                    onValueChange={(val: string) => setFormCategory(val)}
-                  >
+                  <Select value={formCategory} onValueChange={(value: string) => setFormCategory(value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="unit_price">Price (₹/user/month)</Label>
+                  <Label htmlFor="unit_price">Unit Price (INR)</Label>
                   <Input
                     id="unit_price"
                     name="unit_price"
@@ -255,9 +268,14 @@ export default function ProductsPage() {
                     step="0.01"
                     value={formUnitPrice}
                     onChange={(e) => setFormUnitPrice(e.target.value)}
+                    placeholder="e.g. 4999"
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Use the standard selling price for one item, product, service, license, or bundle.
+                  </p>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
@@ -265,127 +283,105 @@ export default function ProductsPage() {
                     name="description"
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Short summary of what this product includes and how it should be quoted."
                     rows={3}
                   />
                 </div>
+
                 <Button type="submit" className="w-full">
                   {editingProduct ? "Update" : "Create"} Product
                 </Button>
               </form>
             </DialogContent>
           </Dialog>
-          </div>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search products..." resultCount={resultCount} totalCount={totalCount} />
-            <ExportButton data={filteredData} filename="siswit-products" sheetName="Products" isLoading={isLoading} />
-          </div>
-          <FilterBar filters={filterDefs} activeFilters={activeFilters} onFilterChange={setFilter} onClearAll={clearFilters} />
-        </div>
-
-        {/* Inactive Toggle */}
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={showInactive}
-            onCheckedChange={setShowInactive}
-            id="show-inactive"
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search products..."
+            resultCount={resultCount}
+            totalCount={totalCount}
           />
-          <label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer">
-            Show inactive products
-          </label>
+          <ExportButton data={filteredData} filename="siswit-products" sheetName="Products" isLoading={isLoading} />
         </div>
+        <FilterBar filters={filterDefs} activeFilters={activeFilters} onFilterChange={setFilter} onClearAll={clearFilters} />
+      </div>
 
-        {/* Products Grid */}
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="h-48" />
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredData?.map((product) => (
-              <Card
-                key={product.id}
-                className="group transition-all hover:shadow-lg rounded-xl"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      {/* changed icon container smaller on mobile, normal on desktop  */}
-                      <div className="h-9 w-9 md:h-10 md:w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        {/* same changes to make it responsive */}
-                        <Package className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={showInactive} onCheckedChange={setShowInactive} id="show-inactive" />
+        <label htmlFor="show-inactive" className="cursor-pointer text-sm text-muted-foreground">
+          Show inactive products
+        </label>
+      </div>
 
-                      <div className="leading-tight">
-                        {/* text mid on mobile devices */}
-                        <CardTitle className="text-base md:text-lg font-semibold">
-                          {product.name}
-                        </CardTitle>
-                        {/* same changes */}
-                        <p className="text-[11px] md:text-xs text-muted-foreground">
-                          {product.sku}
-                        </p>
-                      </div>
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="h-48" />
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredData?.map((product) => (
+            <Card key={product.id} className="group rounded-xl transition-all hover:shadow-lg">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 md:h-10 md:w-10">
+                      <Package className="h-4 w-4 text-primary md:h-5 md:w-5" />
                     </div>
 
-                    <Badge
-                      variant={product.is_active ? "default" : "secondary"}
-                      className="text-[11px] md:text-xs"
-                    >
-                      {product.is_active ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="leading-tight">
+                      <CardTitle className="text-base font-semibold md:text-lg">{product.name}</CardTitle>
+                      <p className="text-[11px] text-muted-foreground md:text-xs">{product.sku}</p>
+                    </div>
                   </div>
-                </CardHeader>
 
-                <CardContent className="space-y-3">
-                  {/* reduced vertical spacing for compact mobile feel  */}
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {product.description}
-                  </p>
+                  <Badge
+                    variant={product.is_active ? "default" : "secondary"}
+                    className="text-[11px] md:text-xs"
+                  >
+                    {product.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </CardHeader>
 
-                  <div className="flex items-center justify-between">
+              <CardContent className="space-y-3">
+                <p className="line-clamp-2 text-sm text-muted-foreground">{product.description}</p>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-1">
                       <IndianRupee className="h-4 w-4 text-primary" />
-                      {/* price smaller on mobile */}
-                      <span className="text-lg md:text-xl font-semibold">
-                        {formatCurrency(product.unit_price)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {/* price text smaller on mobile */}
-                        /user/mo
-                      </span>
+                      <span className="text-lg font-semibold md:text-xl">{formatCurrency(product.unit_price)}</span>
                     </div>
-                    {/* badge text scaled down on mobile */}
-                    <Badge variant="outline" className="text-[11px] md:text-xs">
-                      {product.category}
-                    </Badge>
+                    <p className="text-xs text-muted-foreground">Standard quote price</p>
                   </div>
+                  <Badge variant="outline" className="text-[11px] md:text-xs">
+                    {product.category}
+                  </Badge>
+                </div>
 
-                  {/* Actions */}
-                  {/* Changed:
-                      - Buttons ALWAYS visible on mobile (no hover on touch devices)
-                      - Hover-based fade-in kept only for desktop */}
-                  <div className="flex gap-2 pt-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 h-8"
-                      onClick={() => {
-                        setEditingProduct(product);
-                        setIsDialogOpen(true);
-                      }}
-                    >
-                      {/* compact on mobile */}
-                      <Edit className="h-3.5 w-3.5 mr-1" />
-                      Edit
-                    </Button>
-                    {canDelete() && (
+                <div className="flex gap-2 pt-2 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 flex-1"
+                    onClick={() => {
+                      setEditingProduct(product);
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="mr-1 h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  {canDelete() && (
                     <AlertDialog
                       open={productToDelete?.id === product.id}
                       onOpenChange={(open) => !open && setProductToDelete(null)}
@@ -419,23 +415,21 @@ export default function ProductsPage() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-        {filteredData?.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No products found</h3>
-            <p className="text-muted-foreground">
-              Try adjusting your search or filters
-            </p>
-          </div>
-        )}
-      </div>
+      {filteredData?.length === 0 && (
+        <div className="py-12 text-center">
+          <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="text-lg font-medium">No products found</h3>
+          <p className="text-muted-foreground">Try adjusting your search or filters</p>
+        </div>
+      )}
+    </div>
   );
 }

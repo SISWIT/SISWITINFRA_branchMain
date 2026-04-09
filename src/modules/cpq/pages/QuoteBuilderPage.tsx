@@ -361,7 +361,7 @@ export default function QuoteBuilderPage() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <Label>Quote Template</Label>
@@ -460,9 +460,9 @@ export default function QuoteBuilderPage() {
                 <CardTitle>Quote Details</CardTitle>
                 <CardDescription>Pick the customer context and set the commercial defaults for this quote.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-2">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <div className="space-y-2 pt-2">
+                  <div className="space-y-2">
                     <Label>Account</Label>
                     <Select value={quoteData.account_id} onValueChange={handleAccountChange}>
                       <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
@@ -534,8 +534,8 @@ export default function QuoteBuilderPage() {
                 <CardTitle>Terms & Notes</CardTitle>
                 <CardDescription>Add customer-facing terms and internal-ready notes that belong with this quote.</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2 pt-2">
+              <CardContent className="grid gap-4 md:grid-cols-2 pt-2">
+                <div className="space-y-2">
                   <Label>Payment Terms</Label>
                   <Textarea
                     value={quoteData.terms}
@@ -651,99 +651,104 @@ export default function QuoteBuilderPage() {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card className="border-border/70 shadow-sm lg:sticky lg:top-6">
-              <CardHeader className="border-b border-border/60">
+          <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
+            <Card className="overflow-hidden border-border/70 shadow-sm lg:flex lg:max-h-[calc(100vh-8rem)] lg:flex-col">
+              <CardHeader className="shrink-0 border-b border-border/60">
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5" />
                   Quote Summary
                 </CardTitle>
                 <CardDescription>Review the financial breakdown before you save or submit.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {!isEditMode && selectedTemplate && (
-                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Template Source</p>
-                    <p className="mt-2 font-medium">{selectedTemplate.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {selectedTemplate.category || "Sales"} template with {selectedTemplate.item_count} default items
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Gross Amount</span>
-                    <span>{formatCurrency(grossTotal)}</span>
-                  </div>
-                  {totalItemDiscounts > 0 && (
-                    <div className="flex justify-between text-sm text-destructive italic">
-                      <span>Product Discounts</span>
-                      <span>-{formatCurrency(totalItemDiscounts)}</span>
+              <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  {!isEditMode && selectedTemplate && (
+                    <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Template Source</p>
+                      <p className="mt-2 font-medium">{selectedTemplate.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {selectedTemplate.category || "Sales"} template with {selectedTemplate.item_count} default items
+                      </p>
                     </div>
                   )}
+                  <div className="space-y-2 pt-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Gross Amount</span>
+                      <span>{formatCurrency(grossTotal)}</span>
+                    </div>
+                    {totalItemDiscounts > 0 && (
+                      <div className="flex justify-between text-sm text-destructive italic">
+                        <span>Product Discounts</span>
+                        <span>-{formatCurrency(totalItemDiscounts)}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between text-sm font-medium">
+                      <span>Subtotal</span>
+                      <span>{formatCurrency(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 text-sm">
+                      <span className="text-muted-foreground">Quote Discount ({quoteData.discount_percent}%)</span>
+                      <span className="text-sm text-destructive">-{formatCurrency(quoteDiscountAmount)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 text-sm">
+                      <span className="text-muted-foreground">GST ({quoteData.tax_percent}%)</span>
+                      <span className="text-sm">+{formatCurrency(taxAmount)}</span>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between text-lg font-bold text-primary">
+                      <span>Grand Total</span>
+                      <span>{formatCurrency(grandTotal)}</span>
+                    </div>
+                  </div>
+
                   <Separator />
-                  <div className="flex justify-between text-sm font-medium">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Line items</span>
+                      <span>{items.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Valid until</span>
+                      <span>{quoteData.valid_until || "-"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Status on save</span>
+                      <span>{isEditMode ? "Draft update" : "New draft"}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between pt-2 text-sm">
-                    <span className="text-muted-foreground">Quote Discount ({quoteData.discount_percent}%)</span>
-                    <span className="text-sm text-destructive">-{formatCurrency(quoteDiscountAmount)}</span>
-                  </div>
-                  <div className="flex justify-between pt-1 text-sm">
-                    <span className="text-muted-foreground">GST ({quoteData.tax_percent}%)</span>
-                    <span className="text-sm">+{formatCurrency(taxAmount)}</span>
-                  </div>
-                  <Separator className="my-2" />
-                  <div className="flex justify-between text-lg font-bold text-primary">
-                    <span>Grand Total</span>
-                    <span>{formatCurrency(grandTotal)}</span>
-                  </div>
+
+                  {!canSubmit && (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      Add at least one line item before submitting this quote for approval.
+                    </div>
+                  )}
                 </div>
 
-                <Separator />
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Line items</span>
-                    <span>{items.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Valid until</span>
-                    <span>{quoteData.valid_until || "-"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Status on save</span>
-                    <span>{isEditMode ? "Draft update" : "New draft"}</span>
+                <div className="shrink-0 border-t border-border/60 bg-background px-6 py-4">
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Actions</p>
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full bg-background"
+                      onClick={() => handleSaveQuote("draft")}
+                      disabled={isSaving}
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {isEditMode ? "Save Changes" : "Save Draft"}
+                    </Button>
+                    <Button
+                      className="w-full"
+                      onClick={() => handleSaveQuote("pending_approval")}
+                      disabled={isSaving || !canSubmit}
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit Quote
+                    </Button>
                   </div>
                 </div>
-
-                {!canSubmit && (
-                  <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                    Add at least one line item before submitting this quote for approval.
-                  </div>
-                )}
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleSaveQuote("draft")}
-                    disabled={isSaving}
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {isEditMode ? "Save Changes" : "Save Draft"}
-                  </Button>
-                  <Button
-                    className="w-full"
-                    onClick={() => handleSaveQuote("pending_approval")}
-                    disabled={isSaving || !canSubmit}
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    Submit Quote
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -753,4 +758,3 @@ export default function QuoteBuilderPage() {
     </div>
   );
 }
-
