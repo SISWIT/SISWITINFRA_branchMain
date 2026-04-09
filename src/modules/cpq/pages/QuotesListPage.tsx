@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { FileText, Plus, Eye, Edit, Trash2, Send, CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, Clock, Edit, Eye, FileStack, FileText, Plus, Send, Trash2, XCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/ui/shadcn/card";
-import { Button } from "@/ui/shadcn/button";
-import { Badge } from "@/ui/shadcn/badge";
-import { useQuotes, useUpdateQuoteStatus, useDeleteQuote } from "@/modules/cpq/hooks/useCPQ";
-import { useCRUD } from "@/core/rbac/usePermissions";
-import { Link, useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
+import { Link, useNavigate, useParams } from "react-router-dom";
+
+import { useDeleteQuote, useQuotes, useUpdateQuoteStatus } from "@/modules/cpq/hooks/useCPQ";
+import type { Quote, QuoteStatus } from "@/core/types/cpq";
+import { useSearch } from "@/core/hooks/useSearch";
+import { useCRUD } from "@/core/rbac/usePermissions";
+import { tenantAppPath } from "@/core/utils/routes";
+import { Badge } from "@/ui/shadcn/badge";
+import { Button } from "@/ui/shadcn/button";
+import { Card, CardContent } from "@/ui/shadcn/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,13 +22,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/shadcn/alert-dialog";
-import type { Quote, QuoteStatus } from "@/core/types/cpq";
-import { PlanLimitBanner } from "@/ui/plan-limit-banner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { ExportButton } from "@/ui/export-button";
-import { useSearch } from "@/core/hooks/useSearch";
-import { SearchBar } from "@/ui/search-bar";
 import { FilterBar } from "@/ui/filter-bar";
-import { tenantAppPath } from "@/core/utils/routes";
+import { PlanLimitBanner } from "@/ui/plan-limit-banner";
+import { SearchBar } from "@/ui/search-bar";
 
 const QUOTE_FILTERS = [
   {
@@ -64,7 +65,17 @@ export default function QuotesListPage() {
   const { canDelete } = useCRUD();
   const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
 
-  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<Quote>(quotes ?? [], {
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeFilters,
+    setFilter,
+    clearFilters,
+    filteredData,
+    resultCount,
+    totalCount,
+    filterDefs,
+  } = useSearch<Quote>(quotes ?? [], {
     searchFields: ["quote_number", "status"],
     filterDefs: QUOTE_FILTERS,
   });
@@ -83,147 +94,186 @@ export default function QuotesListPage() {
 
   return (
     <div className="space-y-6">
-        <PlanLimitBanner resource="quotes" className="mb-4" />
-        {/* Delete AlertDialog */}
-        <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. The quote will be permanently deleted.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => {
-                  if (quoteToDelete) deleteMutation.mutate(quoteToDelete);
-                  setQuoteToDelete(null);
-                }}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Quotes</h1>
-            <p className="text-muted-foreground">Manage and track all your quotes</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button asChild>
-              <Link to={tenantAppPath(tenantSlug, "cpq/quotes/new")}><Plus className="h-4 w-4 mr-2" />Create Quote</Link>
-            </Button>
-          </div>
-        </div>
+      <PlanLimitBanner resource="quotes" className="mb-4" />
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search by quote number..." resultCount={resultCount} totalCount={totalCount} />
-            <ExportButton data={filteredData} filename="siswit-quotes" sheetName="Quotes" isLoading={isLoading} />
-          </div>
-          <FilterBar filters={filterDefs} activeFilters={activeFilters} onFilterChange={setFilter} onClearAll={clearFilters} />
-        </div>
+      <AlertDialog open={!!quoteToDelete} onOpenChange={(open) => !open && setQuoteToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The quote will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (quoteToDelete) {
+                  deleteMutation.mutate(quoteToDelete);
+                }
+                setQuoteToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* Quotes Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quote #</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Opportunity</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Valid Until</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={7} className="h-16 animate-pulse bg-muted/20" />
-                    </TableRow>
-                  ))
-                ) : filteredData?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No quotes found</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredData?.map((quote) => {
-                    const statusConfig = STATUS_CONFIG[quote.status] || STATUS_CONFIG.draft;
-                    const StatusIcon = statusConfig.icon;
-                    return (
-                      <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}>
-                        <TableCell className="font-medium">{quote.quote_number || "—"}</TableCell>
-                        <TableCell>{quote.accounts?.name || "—"}</TableCell>
-                        <TableCell>{quote.opportunities?.name || "—"}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(quote.total || 0)}</TableCell>
-                        <TableCell>{quote.valid_until ? format(new Date(quote.valid_until), "MMM d, yyyy") : "—"}</TableCell>
-                        <TableCell>
-                          <Badge className={statusConfig.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {statusConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">Actions</Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}>
-                                <Eye className="h-4 w-4 mr-2" />View
-                              </DropdownMenuItem>
-                              {quote.status === "draft" && (
-                                <DropdownMenuItem onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}/edit`))}>
-                                  <Edit className="h-4 w-4 mr-2" />Edit
-                                </DropdownMenuItem>
-                              )}
-                              {quote.status === "draft" && (
-                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "pending_approval")}>
-                                  <Send className="h-4 w-4 mr-2" />Submit for Approval
-                                </DropdownMenuItem>
-                              )}
-                              {quote.status === "pending_approval" && (
-                                <>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "approved")}>
-                                    <CheckCircle className="h-4 w-4 mr-2" />Approve
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "rejected")}>
-                                    <XCircle className="h-4 w-4 mr-2" />Reject
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {quote.status === "approved" && (
-                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "sent")}>
-                                  <Send className="h-4 w-4 mr-2" />Mark as Sent
-                                </DropdownMenuItem>
-                              )}
-                              {canDelete() && (
-                              <DropdownMenuItem onClick={() => handleDelete(quote.id)} className="text-destructive">
-                                <Trash2 className="h-4 w-4 mr-2" />Delete
-                              </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Quotes</h1>
+          <p className="text-muted-foreground">Manage and track all your quotes</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to={tenantAppPath(tenantSlug, "cpq/templates")}>
+              <FileStack className="mr-2 h-4 w-4" />
+              Create From Template
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to={tenantAppPath(tenantSlug, "cpq/quotes/new")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Quote
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search by quote number..."
+            resultCount={resultCount}
+            totalCount={totalCount}
+          />
+          <ExportButton data={filteredData} filename="siswit-quotes" sheetName="Quotes" isLoading={isLoading} />
+        </div>
+        <FilterBar
+          filters={filterDefs}
+          activeFilters={activeFilters}
+          onFilterChange={setFilter}
+          onClearAll={clearFilters}
+        />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Quote #</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead>Opportunity</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Valid Until</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                [...Array(5)].map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell colSpan={7} className="h-16 animate-pulse bg-muted/20" />
+                  </TableRow>
+                ))
+              ) : filteredData?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-12 text-center">
+                    <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                    <p className="text-muted-foreground">No quotes found</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredData?.map((quote) => {
+                  const statusConfig = STATUS_CONFIG[quote.status] || STATUS_CONFIG.draft;
+                  const StatusIcon = statusConfig.icon;
+
+                  return (
+                    <TableRow
+                      key={quote.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}
+                    >
+                      <TableCell className="font-medium">{quote.quote_number || "-"}</TableCell>
+                      <TableCell>{quote.accounts?.name || "-"}</TableCell>
+                      <TableCell>{quote.opportunities?.name || "-"}</TableCell>
+                      <TableCell className="font-semibold">{formatCurrency(quote.total || 0)}</TableCell>
+                      <TableCell>
+                        {quote.valid_until ? format(new Date(quote.valid_until), "MMM d, yyyy") : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusConfig.color}>
+                          <StatusIcon className="mr-1 h-3 w-3" />
+                          {statusConfig.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              Actions
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </DropdownMenuItem>
+                            {quote.status === "draft" && (
+                              <DropdownMenuItem
+                                onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}/edit`))}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {quote.status === "draft" && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "pending_approval")}>
+                                <Send className="mr-2 h-4 w-4" />
+                                Submit for Approval
+                              </DropdownMenuItem>
+                            )}
+                            {quote.status === "pending_approval" && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "approved")}>
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "rejected")}>
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reject
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {quote.status === "approved" && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(quote.id, "sent")}>
+                                <Send className="mr-2 h-4 w-4" />
+                                Mark as Sent
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete() && (
+                              <DropdownMenuItem onClick={() => handleDelete(quote.id)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
-

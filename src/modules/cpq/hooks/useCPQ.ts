@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/core/api/client";
 import type { Database } from "@/core/api/types";
 import { useModuleScope } from "@/core/hooks/useModuleScope";
-import type { Product, Quote, QuoteItem, QuoteStatus } from "@/core/types/cpq";
+import type { Product, Quote, QuoteItem, QuoteStatus, QuoteTemplate, QuoteTemplateItem } from "@/core/types/cpq";
 import { canReadAllTenantRows, isOwnerScopedRole } from "@/core/types/roles";
 import {
   applyModuleMutationScope,
@@ -20,6 +20,20 @@ import { useCreateNotification } from "@/core/hooks/useCreateNotification";
 type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
 type QuoteInsert = Database["public"]["Tables"]["quotes"]["Insert"];
 type QuoteLineItemInsert = Database["public"]["Tables"]["quote_line_items"]["Insert"];
+type QuoteTemplateInsert = Database["public"]["Tables"]["quote_templates"]["Insert"];
+type QuoteTemplateItemInsert = Database["public"]["Tables"]["quote_template_items"]["Insert"];
+type QuoteTemplateDraftItem = Partial<QuoteTemplateItem> &
+  Pick<QuoteTemplateItem, "product_name" | "quantity" | "unit_price">;
+type QuoteTemplateCreateInput = Omit<
+  Partial<QuoteTemplate>,
+  "id" | "created_at" | "updated_at" | "estimated_total" | "item_count" | "items"
+> & {
+  items?: QuoteTemplateDraftItem[];
+};
+type QuoteTemplateUpdateInput = Omit<Partial<QuoteTemplate>, "items"> & {
+  id: string;
+  items?: QuoteTemplateDraftItem[];
+};
 
 
 // ===== QUOTE STATUS VALIDATION =====
@@ -73,6 +87,28 @@ function calculateQuoteTotals(
     discountAmount: quoteDiscountAmount,
     taxAmount,
     totalAmount,
+  };
+}
+
+function normalizeOptionalText(value: string | null | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function summarizeTemplate(items: QuoteTemplateDraftItem[], discountPercent = 0, taxPercent = 0) {
+  const computed = calculateQuoteTotals(items, discountPercent, taxPercent);
+
+  return {
+    estimatedTotal: computed.totalAmount,
+    itemCount: items.length,
   };
 }
 
@@ -266,6 +302,245 @@ export function useDeleteProduct() {
     },
     onError: (error: unknown) => {
       toast.error("Error deleting product: " + getErrorMessage(error));
+    },
+  });
+}
+
+// ===== QUOTE TEMPLATES =====
+export function useQuoteTemplates() {
+  const { scope, enabled, tenantId, userId } = useModuleScope();
+
+  return useQuery({
+    queryKey: ["quote_templates", tenantId, userId],
+    enabled,
+    queryFn: async () => {
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("quote_templates").select("*"),
+        scope,
+        { ownerColumns: [], hasSoftDelete: true },
+      );
+
+      const { data, error } = await scopedQuery.order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as QuoteTemplate[];
+    },
+  });
+}
+
+export function useQuoteTemplateItems(templateId: string) {
+  const { scope, enabled, tenantId, userId } = useModuleScope();
+
+  return useQuery({
+    queryKey: ["quote_template_items", templateId, tenantId, userId],
+    enabled: enabled && Boolean(templateId),
+    queryFn: async () => {
+      const scopedQuery = applyModuleReadScope(
+        supabase.from("quote_template_items").select("*").eq("quote_template_id", templateId),
+        scope,
+        { ownerColumns: [], hasSoftDelete: true },
+      );
+
+      const { data, error } = await scopedQuery.order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as QuoteTemplateItem[];
+    },
+  });
+}
+
+export function useCreateQuoteTemplate() {
+  const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useModuleScope();
+
+  return useMutation({
+    mutationFn: async (template: QuoteTemplateCreateInput) => {
+      const items = template.items ?? [];
+      const summary = summarizeTemplate(items, template.discount_percent ?? 0, template.tax_percent ?? 18);
+
+      const payloadBase = {
+        name: template.name || "",
+        description: normalizeOptionalText(template.description),
+        category: normalizeOptionalText(template.category),
+        notes: normalizeOptionalText(template.notes),
+        terms: normalizeOptionalText(template.terms),
+        validity_days: template.validity_days ?? 30,
+        discount_percent: template.discount_percent ?? 0,
+        tax_percent: template.tax_percent ?? 18,
+        estimated_total: summary.estimatedTotal,
+        item_count: summary.itemCount,
+        is_active: template.is_active ?? true,
+        is_public: template.is_public ?? false,
+      } satisfies Omit<QuoteTemplateInsert, "organization_id" | "tenant_id">;
+
+      const payload = buildModuleCreatePayload<QuoteTemplateInsert>(
+        payloadBase as QuoteTemplateInsert,
+        scope,
+        { ownerColumn: null, createdByColumn: "created_by" },
+      );
+
+      const { data, error } = await supabase.from("quote_templates").insert(payload).select().single();
+      if (error) throw error;
+
+      if (items.length > 0) {
+        const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
+        const itemPayload: QuoteTemplateItemInsert[] = items.map((item, index) => ({
+          quote_template_id: data.id,
+          organization_id: requiredOrganizationId,
+          tenant_id: requiredOrganizationId,
+          product_id: item.product_id || null,
+          product_name: item.product_name || "",
+          description: normalizeOptionalText(item.description),
+          quantity: Number(item.quantity ?? 1),
+          unit_price: Number(item.unit_price ?? 0),
+          discount_percent: Number(item.discount_percent ?? 0),
+          total: calculateQuoteItemTotal(item),
+          sort_order: index,
+        }));
+
+        const itemsResult = await supabase.from("quote_template_items").insert(itemPayload);
+        if (itemsResult.error) throw itemsResult.error;
+      }
+
+      void safeWriteAuditLog({
+        action: "quote_template_create",
+        entityType: "quote_template",
+        entityId: data.id,
+        tenantId,
+        userId,
+        newValues: data,
+      });
+
+      return data as QuoteTemplate;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quote_templates"] });
+      toast.success("Quote template created successfully");
+    },
+    onError: (error: unknown) => {
+      toast.error("Error creating quote template: " + getErrorMessage(error));
+    },
+  });
+}
+
+export function useUpdateQuoteTemplate() {
+  const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useModuleScope();
+
+  return useMutation({
+    mutationFn: async (template: QuoteTemplateUpdateInput) => {
+      const items = template.items ?? [];
+      const summary = summarizeTemplate(items, template.discount_percent ?? 0, template.tax_percent ?? 18);
+      const payload: Database["public"]["Tables"]["quote_templates"]["Update"] = {
+        updated_at: new Date().toISOString(),
+        name: template.name,
+        description: normalizeOptionalText(template.description),
+        category: normalizeOptionalText(template.category),
+        notes: normalizeOptionalText(template.notes),
+        terms: normalizeOptionalText(template.terms),
+        validity_days: template.validity_days,
+        discount_percent: template.discount_percent,
+        tax_percent: template.tax_percent,
+        estimated_total: summary.estimatedTotal,
+        item_count: summary.itemCount,
+        is_active: template.is_active,
+        is_public: template.is_public,
+      };
+
+      const scopedQuery = applyModuleMutationScope(
+        supabase.from("quote_templates").update(payload).eq("id", template.id),
+        scope,
+        { ownerColumns: [] },
+      );
+
+      const { data, error } = await scopedQuery.select().single();
+      if (error) throw error;
+
+      const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
+      const { error: deleteItemsError } = await supabase
+        .from("quote_template_items")
+        .delete()
+        .eq("quote_template_id", template.id)
+        .eq("organization_id", requiredOrganizationId);
+      if (deleteItemsError) throw deleteItemsError;
+
+      if (items.length > 0) {
+        const itemPayload: QuoteTemplateItemInsert[] = items.map((item, index) => ({
+          quote_template_id: template.id,
+          organization_id: requiredOrganizationId,
+          tenant_id: requiredOrganizationId,
+          product_id: item.product_id || null,
+          product_name: item.product_name || "",
+          description: normalizeOptionalText(item.description),
+          quantity: Number(item.quantity ?? 1),
+          unit_price: Number(item.unit_price ?? 0),
+          discount_percent: Number(item.discount_percent ?? 0),
+          total: calculateQuoteItemTotal(item),
+          sort_order: index,
+        }));
+
+        const itemsResult = await supabase.from("quote_template_items").insert(itemPayload);
+        if (itemsResult.error) throw itemsResult.error;
+      }
+
+      void safeWriteAuditLog({
+        action: "quote_template_update",
+        entityType: "quote_template",
+        entityId: template.id,
+        tenantId,
+        userId,
+        newValues: payload,
+      });
+
+      return data as QuoteTemplate;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["quote_templates"] });
+      queryClient.invalidateQueries({ queryKey: ["quote_template_items", variables.id] });
+      toast.success("Quote template updated successfully");
+    },
+    onError: (error: unknown) => {
+      toast.error("Error updating quote template: " + getErrorMessage(error));
+    },
+  });
+}
+
+export function useDeleteQuoteTemplate() {
+  const queryClient = useQueryClient();
+  const { scope, tenantId, userId } = useModuleScope();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const accessQuery = applyModuleMutationScope(
+        supabase.from("quote_templates").select("id").eq("id", id),
+        scope,
+        { ownerColumns: [] },
+      );
+
+      const accessResult = await accessQuery.maybeSingle();
+      if (accessResult.error || !accessResult.data) {
+        throw new Error("Quote template not found or not accessible");
+      }
+
+      const { error } = await applyModuleMutationScope(
+        supabase.from("quote_templates").delete().eq("id", id),
+        scope,
+        { ownerColumns: [] },
+      );
+      if (error) throw error;
+
+      void safeWriteAuditLog({
+        action: "quote_template_delete",
+        entityType: "quote_template",
+        entityId: id,
+        tenantId,
+        userId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quote_templates"] });
+      toast.success("Quote template deleted successfully");
+    },
+    onError: (error: unknown) => {
+      toast.error("Error deleting quote template: " + getErrorMessage(error));
     },
   });
 }

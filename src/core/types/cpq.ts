@@ -29,6 +29,41 @@ export interface QuoteOpportunity {
 export type { Product, QuoteItem } from "./shared";
 export type Quote = SharedQuote<QuoteStatus, QuoteAccount, QuoteContact, QuoteOpportunity>;
 
+export interface QuoteTemplateItem {
+  id: string;
+  quote_template_id: string;
+  product_id?: string;
+  product_name: string;
+  description?: string;
+  quantity: number;
+  unit_price: number;
+  discount_percent?: number;
+  total?: number;
+  sort_order?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  terms?: string;
+  notes?: string;
+  validity_days: number;
+  discount_percent: number;
+  tax_percent: number;
+  estimated_total: number;
+  item_count: number;
+  is_active: boolean;
+  is_public: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  items?: QuoteTemplateItem[];
+}
+
 // Status colors
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
   draft: 'bg-secondary text-secondary-foreground',

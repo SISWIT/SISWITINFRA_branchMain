@@ -3504,6 +3504,204 @@ export type Database = {
           },
         ]
       }
+      quote_template_items: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          description: string | null
+          discount_percent: number
+          id: string
+          organization_id: string
+          product_id: string | null
+          product_name: string | null
+          quantity: number
+          quote_template_id: string
+          sort_order: number
+          tenant_id: string
+          total: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          discount_percent?: number
+          id?: string
+          organization_id: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number
+          quote_template_id: string
+          sort_order?: number
+          tenant_id: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          discount_percent?: number
+          id?: string
+          organization_id?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number
+          quote_template_id?: string
+          sort_order?: number
+          tenant_id?: string
+          total?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_template_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_template_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_template_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_template_items_quote_template_id_fkey"
+            columns: ["quote_template_id"]
+            isOneToOne: false
+            referencedRelation: "quote_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_template_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_template_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_templates: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          description: string | null
+          discount_percent: number
+          estimated_total: number
+          id: string
+          is_active: boolean
+          is_public: boolean
+          item_count: number
+          name: string
+          notes: string | null
+          organization_id: string
+          tax_percent: number
+          tenant_id: string
+          terms: string | null
+          updated_at: string
+          validity_days: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          discount_percent?: number
+          estimated_total?: number
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          item_count?: number
+          name: string
+          notes?: string | null
+          organization_id: string
+          tax_percent?: number
+          tenant_id: string
+          terms?: string | null
+          updated_at?: string
+          validity_days?: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          description?: string | null
+          discount_percent?: number
+          estimated_total?: number
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          item_count?: number
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          tax_percent?: number
+          tenant_id?: string
+          terms?: string | null
+          updated_at?: string
+          validity_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotes: {
         Row: {
           account_id: string | null
@@ -4180,6 +4378,10 @@ export type Database = {
       }
       app_is_platform_super_admin: {
         Args: { p_user_id?: string }
+        Returns: boolean
+      }
+      app_is_teammate: {
+        Args: { p_target_id: string; p_viewer_id: string }
         Returns: boolean
       }
       app_user_can_select_portal_record:
