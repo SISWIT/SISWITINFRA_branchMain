@@ -226,6 +226,7 @@ function mapOpportunity(row: OpportunityRowWithCreatedBy): Opportunity {
     expected_revenue: row.expected_revenue ?? undefined,
     close_date: row.close_date ?? undefined,
     lead_source: asLeadSource(row.lead_source),
+    description: row.next_step ?? undefined,
     next_step: row.next_step ?? undefined,
     is_closed: row.is_closed ?? undefined,
     is_won: row.is_won ?? undefined,

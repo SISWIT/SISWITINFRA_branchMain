@@ -332,14 +332,15 @@ export default function AccountsPage() {
 
         {/* account form */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-h-[85vh] max-w-3xl overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>
                 {editingAccount ? "Edit Account" : "Add Account"}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-6">
               {/* basic info */}
               <Section title="Basic Info">
                 <Grid cols={2}>
@@ -439,9 +440,10 @@ export default function AccountsPage() {
                   }
                 />
               </Section>
+              </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>

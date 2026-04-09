@@ -42,6 +42,7 @@ import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
 import { SearchBar } from "@/ui/search-bar";
 import { FilterBar } from "@/ui/filter-bar";
+import type { Opportunity, OpportunityStage } from "@/core/types/crm";
 
 const OPP_FILTERS = [
   {
@@ -77,27 +78,6 @@ const OPP_CUSTOM_FILTERS = {
   },
 };
 
-// Exactly matches Schema Enums
-export type OpportunityStage = 
-  | "new" 
-  | "qualified" 
-  | "proposal" 
-  | "negotiation" 
-  | "closed_won" 
-  | "closed_lost";
-
-export interface OpportunityRow {
-  id: string;
-  name: string;
-  account_id: string | null;
-  amount: number | null;
-  stage: OpportunityStage;
-  close_date: string | null;
-  probability: number | null;
-  description: string | null;
-  created_at: string;
-}
-
 const STAGE_LABELS: Record<string, string> = {
   new: "New",
   qualified: "Qualified",
@@ -116,6 +96,15 @@ const STAGE_COLORS: Record<string, string> = {
   closed_lost: "bg-destructive/15 text-destructive",
 };
 
+function parseOpportunityDate(value?: string) {
+  if (!value) return null;
+
+  const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const parsedDate = new Date(normalizedValue);
+
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
 export default function OpportunitiesPage() {
   const { data: opportunities = [], isLoading } = useOpportunities();
   const { data: accounts = [] } = useAccounts();
@@ -124,7 +113,7 @@ export default function OpportunitiesPage() {
   const deleteOpp = useDeleteOpportunity();
   const { canDelete } = useCRUD();
 
-  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<OpportunityRow>(opportunities as unknown as OpportunityRow[], {
+  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<Opportunity>(opportunities, {
     searchFields: ["name", "stage"],
     filterDefs: OPP_FILTERS,
     customFilters: OPP_CUSTOM_FILTERS,
@@ -141,7 +130,7 @@ export default function OpportunitiesPage() {
   });
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingOpp, setEditingOpp] = useState<OpportunityRow | null>(null);
+  const [editingOpp, setEditingOpp] = useState<Opportunity | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -167,16 +156,18 @@ export default function OpportunitiesPage() {
     setDialogOpen(true);
   };
 
-  const openEditDialog = (opp: OpportunityRow) => {
+  const openEditDialog = (opp: Opportunity) => {
+    const parsedCloseDate = parseOpportunityDate(opp.close_date);
+
     setEditingOpp(opp);
     setFormData({
       name: opp.name,
       account_id: opp.account_id || "",
       amount: opp.amount ? opp.amount.toString() : "",
       stage: opp.stage,
-      close_date: opp.close_date ? format(new Date(opp.close_date), "yyyy-MM-dd") : "",
+      close_date: parsedCloseDate ? format(parsedCloseDate, "yyyy-MM-dd") : "",
       probability: opp.probability ? opp.probability.toString() : "",
-      description: opp.description || "",
+      description: opp.description || opp.next_step || "",
     });
     setDialogOpen(true);
   };
@@ -220,7 +211,7 @@ export default function OpportunitiesPage() {
     {
       key: "name",
       header: "Opportunity Name",
-      cell: (row: OpportunityRow) => (
+      cell: (row: Opportunity) => (
         <div className="flex items-center gap-2">
           <div className="bg-primary/10 p-2 rounded-full">
             <Target className="h-4 w-4 text-primary" />
@@ -232,7 +223,7 @@ export default function OpportunitiesPage() {
     {
       key: "stage",
       header: "Stage",
-      cell: (row: OpportunityRow) => (
+      cell: (row: Opportunity) => (
         <Badge className={STAGE_COLORS[row.stage] || "bg-secondary text-secondary-foreground"}>
           {STAGE_LABELS[row.stage] || row.stage}
         </Badge>
@@ -241,7 +232,7 @@ export default function OpportunitiesPage() {
     {
       key: "amount",
       header: "Value",
-      cell: (row: OpportunityRow) => (
+      cell: (row: Opportunity) => (
         <span className="font-medium text-foreground">
           {formatCurrency(row.amount)}
         </span>
@@ -250,21 +241,21 @@ export default function OpportunitiesPage() {
     {
       key: "close_date",
       header: "Close Date",
-      cell: (row: OpportunityRow) => (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          <span>
-            {row.close_date && !isNaN(new Date(row.close_date).getTime())
-              ? format(new Date(row.close_date), "MMM d, yyyy")
-              : "-"}
-          </span>
-        </div>
-      ),
+      cell: (row: Opportunity) => {
+        const parsedCloseDate = parseOpportunityDate(row.close_date);
+
+        return (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            <span>{parsedCloseDate ? format(parsedCloseDate, "MMM d, yyyy") : "-"}</span>
+          </div>
+        );
+      },
     },
     {
       key: "actions",
       header: "",
-      cell: (row: OpportunityRow) => (
+      cell: (row: Opportunity) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -309,7 +300,7 @@ export default function OpportunitiesPage() {
         </div>
 
         <DataTable
-          data={filteredData as OpportunityRow[]}
+          data={filteredData}
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}

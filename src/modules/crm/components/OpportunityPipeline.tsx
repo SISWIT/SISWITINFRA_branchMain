@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/ui/shadcn/card";
 import { Badge } from "@/ui/shadcn/badge";
 import { cn } from "@/core/utils/utils";
@@ -22,8 +22,20 @@ const STAGES: { key: OpportunityStage; label: string }[] = [
   { key: "closed_lost", label: "Closed Lost" },
 ];
 
+function getStageStatus(stage: OpportunityStage) {
+  return {
+    is_closed: stage === "closed_won" || stage === "closed_lost",
+    is_won: stage === "closed_won",
+  };
+}
+
 export function OpportunityPipeline({ opportunities, onOpportunityClick }: OpportunityPipelineProps) {
   const updateOpportunity = useUpdateOpportunity();
+  const [pipelineOpportunities, setPipelineOpportunities] = useState(opportunities);
+
+  useEffect(() => {
+    setPipelineOpportunities(opportunities);
+  }, [opportunities]);
 
   const groupedOpportunities = useMemo(() => {
     const groups: Record<OpportunityStage, Opportunity[]> = {
@@ -35,15 +47,16 @@ export function OpportunityPipeline({ opportunities, onOpportunityClick }: Oppor
       closed_lost: [],
     };
 
-    opportunities.forEach((opp) => {
+    pipelineOpportunities.forEach((opp) => {
       groups[opp.stage].push(opp);
     });
 
     return groups;
-  }, [opportunities]);
+  }, [pipelineOpportunities]);
 
   const handleDragStart = (e: React.DragEvent, opp: Opportunity) => {
     e.dataTransfer.setData("opportunityId", opp.id);
+    e.dataTransfer.setData("opportunityStage", opp.stage);
     e.dataTransfer.effectAllowed = "move";
   };
 
@@ -55,9 +68,37 @@ export function OpportunityPipeline({ opportunities, onOpportunityClick }: Oppor
   const handleDrop = (e: React.DragEvent, stage: OpportunityStage) => {
     e.preventDefault();
     const opportunityId = e.dataTransfer.getData("opportunityId");
-    if (opportunityId) {
-      updateOpportunity.mutate({ id: opportunityId, stage });
-    }
+    const sourceStage = e.dataTransfer.getData("opportunityStage") as OpportunityStage | "";
+
+    if (!opportunityId || sourceStage === stage) return;
+
+    const previousOpportunities = pipelineOpportunities;
+    const nextStageStatus = getStageStatus(stage);
+
+    setPipelineOpportunities((current) =>
+      current.map((opp) =>
+        opp.id === opportunityId
+          ? {
+              ...opp,
+              stage,
+              ...nextStageStatus,
+            }
+          : opp,
+      ),
+    );
+
+    updateOpportunity.mutate(
+      {
+        id: opportunityId,
+        stage,
+        ...nextStageStatus,
+      },
+      {
+        onError: () => {
+          setPipelineOpportunities(previousOpportunities);
+        },
+      },
+    );
   };
 
   const stageTotal = (stage: OpportunityStage) => {

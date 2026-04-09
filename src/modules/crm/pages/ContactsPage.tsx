@@ -238,11 +238,12 @@ export default function ContactsPage() {
         />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
+          <DialogContent className="max-h-[85vh] max-w-md overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>{editingContact ? "Edit Contact" : "Add Contact"}</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>First Name</Label>
@@ -324,8 +325,9 @@ export default function ContactsPage() {
                   placeholder="Add context..."
                 />
               </div>
+              </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleSubmit} disabled={createContact.isPending || updateContact.isPending}>
                 {editingContact ? "Update" : "Create"}
