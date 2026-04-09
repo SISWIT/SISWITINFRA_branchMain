@@ -6,11 +6,9 @@ import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/core/api/client";
 import { useContract, useContractTemplates, useCreateContract, useUpdateContract } from "@/modules/clm/hooks/useCLM";
 import { useQuote } from "@/modules/cpq/hooks/useCPQ";
-import { useAccounts } from "@/modules/crm/hooks/useCRM";
+import { useAccounts, useContacts } from "@/modules/crm/hooks/useCRM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Separator } from "@/ui/shadcn/separator";
 import { Badge } from "@/ui/shadcn/badge";
@@ -105,20 +103,7 @@ export default function ContractBuilderPage() {
   const createContract = useCreateContract();
   const updateContract = useUpdateContract();
   const { data: accounts } = useAccounts();
-
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", contractData.account_id],
-    enabled: !!contractData.account_id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("id, first_name, last_name")
-        .eq("account_id", contractData.account_id)
-        .order("first_name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: contacts = [] } = useContacts(contractData.account_id || undefined);
 
   // Apply template content
   const applyTemplate = (templateId: string) => {

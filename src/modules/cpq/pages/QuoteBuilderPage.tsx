@@ -5,11 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
 import { useProducts, useCreateQuote, useQuote, useUpdateQuote, useQuoteItems } from "@/modules/cpq/hooks/useCPQ";
-import { useAccounts } from "@/modules/crm/hooks/useCRM";
+import { useAccounts, useContacts, useOpportunities } from "@/modules/crm/hooks/useCRM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Separator } from "@/ui/shadcn/separator";
 
@@ -28,7 +25,6 @@ export default function QuoteBuilderPage() {
   const navigate = useNavigate();
   const { id: quoteId } = useParams();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
   const opportunityId = searchParams.get("opportunity_id");
   const accountId = searchParams.get("account_id");
   const isEditMode = !!quoteId;
@@ -90,30 +86,8 @@ export default function QuoteBuilderPage() {
   }, [isEditMode, existingItems, isLoadingItems]);
 
   const { data: accounts } = useAccounts();
-
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts-list", quoteData.account_id, user?.id],
-    queryFn: async () => {
-      if (!quoteData.account_id || !user?.id) return [];
-      const { data, error } = await supabase
-        .from("contacts").select("id, first_name, last_name").eq("account_id", quoteData.account_id).order("first_name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!quoteData.account_id && !!user,
-  });
-
-  const { data: opportunities } = useQuery({
-    queryKey: ["opportunities-list", quoteData.account_id, user?.id],
-    queryFn: async () => {
-      if (!quoteData.account_id || !user?.id) return [];
-      const { data, error } = await supabase
-        .from("opportunities").select("id, name, amount").eq("account_id", quoteData.account_id).order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!quoteData.account_id,
-  });
+  const { data: contacts = [] } = useContacts(quoteData.account_id || undefined);
+  const { data: opportunities = [] } = useOpportunities(quoteData.account_id || undefined);
 
   const selectedAccountDetails = accounts?.find(a => a.id === quoteData.account_id);
 
