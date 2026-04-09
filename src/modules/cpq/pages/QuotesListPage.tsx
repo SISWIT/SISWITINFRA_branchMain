@@ -6,7 +6,7 @@ import { Button } from "@/ui/shadcn/button";
 import { Badge } from "@/ui/shadcn/badge";
 import { useQuotes, useUpdateQuoteStatus, useDeleteQuote } from "@/modules/cpq/hooks/useCPQ";
 import { useCRUD } from "@/core/rbac/usePermissions";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/shadcn/dropdown-menu";
@@ -20,12 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/shadcn/alert-dialog";
-import type { QuoteStatus } from "@/core/types/cpq";
+import type { Quote, QuoteStatus } from "@/core/types/cpq";
 import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
 import { SearchBar } from "@/ui/search-bar";
 import { FilterBar } from "@/ui/filter-bar";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const QUOTE_FILTERS = [
   {
@@ -55,6 +56,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: Lucide
 
 export default function QuotesListPage() {
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
 
   const { data: quotes, isLoading } = useQuotes();
   const updateStatusMutation = useUpdateQuoteStatus();
@@ -62,8 +64,7 @@ export default function QuotesListPage() {
   const { canDelete } = useCRUD();
   const [quoteToDelete, setQuoteToDelete] = useState<string | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<any>(quotes ?? [], {
+  const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<Quote>(quotes ?? [], {
     searchFields: ["quote_number", "status"],
     filterDefs: QUOTE_FILTERS,
   });
@@ -113,7 +114,7 @@ export default function QuotesListPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button asChild>
-              <Link to="/dashboard/cpq/quotes/new"><Plus className="h-4 w-4 mr-2" />Create Quote</Link>
+              <Link to={tenantAppPath(tenantSlug, "cpq/quotes/new")}><Plus className="h-4 w-4 mr-2" />Create Quote</Link>
             </Button>
           </div>
         </div>
@@ -156,11 +157,11 @@ export default function QuotesListPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredData?.map((quote: any) => {
+                  filteredData?.map((quote) => {
                     const statusConfig = STATUS_CONFIG[quote.status] || STATUS_CONFIG.draft;
                     const StatusIcon = statusConfig.icon;
                     return (
-                      <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}`)}>
+                      <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}>
                         <TableCell className="font-medium">{quote.quote_number || "—"}</TableCell>
                         <TableCell>{quote.accounts?.name || "—"}</TableCell>
                         <TableCell>{quote.opportunities?.name || "—"}</TableCell>
@@ -178,11 +179,11 @@ export default function QuotesListPage() {
                               <Button variant="ghost" size="sm">Actions</Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}`)}>
+                              <DropdownMenuItem onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`))}>
                                 <Eye className="h-4 w-4 mr-2" />View
                               </DropdownMenuItem>
                               {quote.status === "draft" && (
-                                <DropdownMenuItem onClick={() => navigate(`/dashboard/cpq/quotes/${quote.id}/edit`)}>
+                                <DropdownMenuItem onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}/edit`))}>
                                   <Edit className="h-4 w-4 mr-2" />Edit
                                 </DropdownMenuItem>
                               )}

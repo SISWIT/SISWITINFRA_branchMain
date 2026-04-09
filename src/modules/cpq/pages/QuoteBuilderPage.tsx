@@ -9,6 +9,7 @@ import { useProducts, useCreateQuote, useQuote, useUpdateQuote, useQuoteItems } 
 import { useAccounts, useContacts, useOpportunities } from "@/modules/crm/hooks/useCRM";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Separator } from "@/ui/shadcn/separator";
+import { tenantAppPath } from "@/core/utils/routes";
 
 interface LocalQuoteItem {
   id?: string;
@@ -23,7 +24,7 @@ interface LocalQuoteItem {
 
 export default function QuoteBuilderPage() {
   const navigate = useNavigate();
-  const { id: quoteId } = useParams();
+  const { id: quoteId, tenantSlug = "" } = useParams<{ id?: string; tenantSlug: string }>();
   const [searchParams] = useSearchParams();
   const opportunityId = searchParams.get("opportunity_id");
   const accountId = searchParams.get("account_id");
@@ -48,6 +49,10 @@ export default function QuoteBuilderPage() {
 
   const [items, setItems] = useState<LocalQuoteItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState("");
+
+  const updateQuoteData = (updates: Partial<typeof quoteData>) => {
+    setQuoteData((prev) => ({ ...prev, ...updates }));
+  };
 
   const { data: existingQuote, isLoading: isLoadingQuote } = useQuote(isEditMode ? quoteId! : "");
   const { data: existingItems, isLoading: isLoadingItems } = useQuoteItems(isEditMode ? quoteId! : "");
@@ -92,7 +97,7 @@ export default function QuoteBuilderPage() {
   const selectedAccountDetails = accounts?.find(a => a.id === quoteData.account_id);
 
   const handleAccountChange = (newAccountId: string) => {
-    setQuoteData(prev => ({ ...prev, account_id: newAccountId, contact_id: "", opportunity_id: "" }));
+    updateQuoteData({ account_id: newAccountId, contact_id: "", opportunity_id: "" });
   };
 
   const grossTotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
@@ -161,12 +166,12 @@ export default function QuoteBuilderPage() {
     if (isEditMode && quoteId) {
       updateQuoteMutation.mutate(
         { id: quoteId, ...quotePayload },
-        { onSuccess: () => navigate(`/dashboard/cpq/quotes/${quoteId}`) }
+        { onSuccess: () => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quoteId}`)) }
       );
     } else {
       createQuoteMutation.mutate(
         { ...quotePayload, items },
-        { onSuccess: (quote) => navigate(`/dashboard/cpq/quotes/${quote.id}`) }
+        { onSuccess: (quote) => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quote.id}`)) }
       );
     }
   };
@@ -188,10 +193,10 @@ export default function QuoteBuilderPage() {
               Editing is only available while a quote is still a draft, so the workflow stays consistent.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button onClick={() => navigate(`/dashboard/cpq/quotes/${quoteId}`)}>
+              <Button onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${quoteId}`))}>
                 View Quote
               </Button>
-              <Button variant="outline" onClick={() => navigate("/dashboard/cpq/quotes")}>
+              <Button variant="outline" onClick={() => navigate(tenantAppPath(tenantSlug, "cpq/quotes"))}>
                 Back to Quotes
               </Button>
             </div>
@@ -263,7 +268,12 @@ export default function QuoteBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Contact</Label>
-                    <Select value={quoteData.contact_id} onValueChange={(v) => setQuoteData({ ...quoteData, contact_id: v })} disabled={!quoteData.account_id}>
+                    <Select
+                      key={`contact-${quoteData.account_id || "none"}`}
+                      value={quoteData.contact_id}
+                      onValueChange={(v) => updateQuoteData({ contact_id: v })}
+                      disabled={!quoteData.account_id}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
                       <SelectContent>
                         {contacts?.map((c) => <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>)}
@@ -272,7 +282,12 @@ export default function QuoteBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Opportunity</Label>
-                    <Select value={quoteData.opportunity_id} onValueChange={(v) => setQuoteData({ ...quoteData, opportunity_id: v })} disabled={!quoteData.account_id}>
+                    <Select
+                      key={`opportunity-${quoteData.account_id || "none"}`}
+                      value={quoteData.opportunity_id}
+                      onValueChange={(v) => updateQuoteData({ opportunity_id: v })}
+                      disabled={!quoteData.account_id}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select opportunity" /></SelectTrigger>
                       <SelectContent>
                         {opportunities?.map((opp) => <SelectItem key={opp.id} value={opp.id}>{opp.name}</SelectItem>)}
@@ -281,7 +296,7 @@ export default function QuoteBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Valid Until</Label>
-                    <Input type="date" value={quoteData.valid_until} onChange={(e) => setQuoteData({ ...quoteData, valid_until: e.target.value })} />
+                    <Input type="date" value={quoteData.valid_until} onChange={(e) => updateQuoteData({ valid_until: e.target.value })} />
                   </div>
                 </div>
               </CardContent>
@@ -362,14 +377,14 @@ export default function QuoteBuilderPage() {
                   <div className="flex items-center justify-between pt-2">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground whitespace-nowrap">Addl. Disc %</Label>
-                      <Input type="number" value={quoteData.discount_percent} onChange={(e) => setQuoteData({ ...quoteData, discount_percent: parseFloat(e.target.value) || 0 })} className="h-7 w-14 text-xs" />
+                      <Input type="number" value={quoteData.discount_percent} onChange={(e) => updateQuoteData({ discount_percent: parseFloat(e.target.value) || 0 })} className="h-7 w-14 text-xs" />
                     </div>
                     <span className="text-sm text-destructive">-{formatCurrency(quoteDiscountAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs text-muted-foreground whitespace-nowrap">Tax (GST) %</Label>
-                      <Input type="number" value={quoteData.tax_percent} onChange={(e) => setQuoteData({ ...quoteData, tax_percent: parseFloat(e.target.value) || 0 })} className="h-7 w-14 text-xs" />
+                      <Input type="number" value={quoteData.tax_percent} onChange={(e) => updateQuoteData({ tax_percent: parseFloat(e.target.value) || 0 })} className="h-7 w-14 text-xs" />
                     </div>
                     <span className="text-sm">+{formatCurrency(taxAmount)}</span>
                   </div>

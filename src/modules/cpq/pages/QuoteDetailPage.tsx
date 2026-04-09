@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { Separator } from "@/ui/shadcn/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { QuotePDFTemplate } from "@/modules/cpq/components/QuotePDFTemplate";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground" },
@@ -22,7 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function QuoteDetailPage() {
-  const { id } = useParams();
+  const { id, tenantSlug = "" } = useParams<{ id: string; tenantSlug: string }>();
   const navigate = useNavigate();
   const componentRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +55,7 @@ export default function QuoteDetailPage() {
       <div className="text-center py-12">
         <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold">Quote not found</h2>
-        <Button variant="link" onClick={() => navigate("/dashboard/cpq/quotes")}>Go back to quotes</Button>
+        <Button variant="link" onClick={() => navigate(tenantAppPath(tenantSlug, "cpq/quotes"))}>Go back to quotes</Button>
       </div>
     );
   }
@@ -86,7 +87,7 @@ export default function QuoteDetailPage() {
         <div className="flex gap-2">
           {quote.status === "draft" && (
             <>
-              <Button variant="outline" onClick={() => navigate(`/dashboard/cpq/quotes/${id}/edit`)}>
+              <Button variant="outline" onClick={() => navigate(tenantAppPath(tenantSlug, `cpq/quotes/${id}/edit`))}>
                 <Edit className="h-4 w-4 mr-2" />Edit
               </Button>
               <Button onClick={() => updateStatusMutation.mutate({ id: id || "", status: "pending_approval" })}>
@@ -244,7 +245,7 @@ export default function QuoteDetailPage() {
 
               {quote.status === "approved" && (
                 <Button className="w-full" asChild>
-                  <Link to={`/dashboard/clm/contracts/new?quote_id=${quote.id}`}>
+                  <Link to={tenantAppPath(tenantSlug, `clm/contracts/new?quote_id=${quote.id}`)}>
                     <ArrowRight className="h-4 w-4 mr-2" />Convert to Contract
                   </Link>
                 </Button>
