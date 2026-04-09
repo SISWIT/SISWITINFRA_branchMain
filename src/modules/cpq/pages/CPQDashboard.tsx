@@ -5,6 +5,7 @@ import { useQuotes, useProducts } from "@/modules/cpq/hooks/useCPQ";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link, useParams } from "react-router-dom";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const COLORS = ["hsl(250, 85%, 60%)", "hsl(199, 89%, 48%)", "hsl(45, 93%, 47%)", "hsl(25, 95%, 53%)", "hsl(142, 71%, 45%)", "hsl(0, 72%, 50%)"];
 
@@ -66,7 +67,7 @@ export default function CPQDashboard() {
             className="w-full sm:w-auto"
             asChild
           > 
-            <Link to={`/${tenantSlug}/app/cpq/products`}>
+            <Link to={tenantAppPath(tenantSlug ?? "", "cpq/products")}>
               Manage Products
             </Link>
           </Button>
@@ -76,7 +77,7 @@ export default function CPQDashboard() {
             className="w-full sm:w-auto"
             asChild
           >
-            <Link to={`/${tenantSlug}/app/cpq/quotes/new`}>
+            <Link to={tenantAppPath(tenantSlug ?? "", "cpq/quotes/new")}>
               Create Quote
             </Link>
           </Button>
@@ -149,27 +150,27 @@ export default function CPQDashboard() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link to={`/${tenantSlug}/app/cpq/quotes/new`}>
+              <Link to={tenantAppPath(tenantSlug ?? "", "cpq/quotes/new")}>
                 <Calculator className="h-6 w-6" />
                 <span>New Quote</span>
               </Link>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link to={`/${tenantSlug}/app/cpq/products`}>
+              <Link to={tenantAppPath(tenantSlug ?? "", "cpq/products")}>
                 <Package className="h-6 w-6" />
                 <span>Products</span>
               </Link>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link to={`/${tenantSlug}/app/cpq/quotes`}>
+              <Link to={tenantAppPath(tenantSlug ?? "", "cpq/quotes")}>
                 <FileText className="h-6 w-6" />
                 <span>All Quotes</span>
               </Link>
             </Button>
             <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link to={`/${tenantSlug}/app/dashboard`}>
+              <Link to={tenantAppPath(tenantSlug ?? "", "cpq/templates")}>
                 <DollarSign className="h-6 w-6" />
-                <span>Pricing Rules</span>
+                <span>Templates</span>
               </Link>
             </Button>
           </div>

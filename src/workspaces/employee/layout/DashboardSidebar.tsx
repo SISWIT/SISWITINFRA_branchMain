@@ -85,6 +85,7 @@ const buildMenuItems = (tenantSlug: string): SidebarSection[] => [
       { title: "Dashboard", icon: LayoutDashboard, path: tenantAppPath(tenantSlug, "cpq") },
       { title: "Products", icon: Package, path: tenantAppPath(tenantSlug, "cpq/products") },
       { title: "Quotes", icon: FileText, path: tenantAppPath(tenantSlug, "cpq/quotes") },
+      { title: "Templates", icon: FileText, path: tenantAppPath(tenantSlug, "cpq/templates") },
     ],
   },
   {

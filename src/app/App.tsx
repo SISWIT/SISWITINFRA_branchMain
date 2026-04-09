@@ -108,6 +108,7 @@ const ContactsPage = lazy(() => import("../modules/crm/pages/ContactsPage"));
 const ActivitiesPage = lazy(() => import("../modules/crm/pages/ActivitiesPage"));
 
 const CPQDashboard = lazy(() => import("../modules/cpq/pages/CPQDashboard"));
+const CPQTemplatesHubPage = lazy(() => import("../modules/cpq/pages/CPQTemplatesHubPage"));
 const ProductsPage = lazy(() => import("../modules/cpq/pages/ProductsPage"));
 const QuoteDetailPage = lazy(() => import("../modules/cpq/pages/QuoteDetailPage"));
 const QuotesListPage = lazy(() => import("../modules/cpq/pages/QuotesListPage"));
@@ -322,6 +323,7 @@ function AppRoutes() {
 
           <Route path="cpq" element={<ModuleGate module="cpq"><CPQDashboard /></ModuleGate>} />
           <Route path="cpq/products" element={<ModuleGate module="cpq"><ProductsPage /></ModuleGate>} />
+          <Route path="cpq/templates" element={<ModuleGate module="cpq"><CPQTemplatesHubPage /></ModuleGate>} />
           <Route path="cpq/quotes" element={<ModuleGate module="cpq"><QuotesListPage /></ModuleGate>} />
           <Route path="cpq/quotes/new" element={<ModuleGate module="cpq"><QuoteBuilderPage /></ModuleGate>} />
           <Route path="cpq/quotes/:id" element={<ModuleGate module="cpq"><QuoteDetailPage /></ModuleGate>} />
