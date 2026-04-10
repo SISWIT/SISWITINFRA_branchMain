@@ -89,6 +89,7 @@ export default function ProductsPage() {
   const [formCategory, setFormCategory] = useState<string>("CPQ");
   const [formUnitPrice, setFormUnitPrice] = useState<string>("");
   const [formDescription, setFormDescription] = useState<string>("");
+  const [formIsActive, setFormIsActive] = useState(true);
 
   const { data: products, isLoading } = useProducts({ includeInactive: showInactive });
   const createMutation = useCreateProduct();
@@ -125,6 +126,7 @@ export default function ProductsPage() {
       setFormCategory(editingProduct.category || "CPQ");
       setFormUnitPrice(editingProduct.unit_price != null ? String(editingProduct.unit_price) : "");
       setFormDescription(editingProduct.description || "");
+      setFormIsActive(editingProduct.is_active ?? true);
       return;
     }
 
@@ -133,6 +135,7 @@ export default function ProductsPage() {
     setFormCategory("CPQ");
     setFormUnitPrice("");
     setFormDescription("");
+    setFormIsActive(true);
   }, [editingProduct, isDialogOpen]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -149,7 +152,7 @@ export default function ProductsPage() {
       description: formDescription,
       unit_price: parsedPrice,
       category: formCategory,
-      is_active: true,
+      is_active: formIsActive,
     };
 
     if (editingProduct) {
@@ -209,88 +212,108 @@ export default function ProductsPage() {
                 <span className="hidden md:inline">Add Product</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md" aria-describedby={undefined}>
-              <DialogHeader>
+            <DialogContent
+              className="flex max-h-[90vh] w-[95vw] max-w-xl flex-col overflow-hidden p-0"
+              aria-describedby={undefined}
+            >
+              <DialogHeader className="border-b border-border/60 px-6 py-4">
                 <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
                 <DialogDescription>
                   Add the core product details and the standard selling price.
                 </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                 <input type="hidden" name="category" value={formCategory} />
 
-                <div className="space-y-2">
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="e.g. Enterprise CPQ Suite"
-                    required
-                  />
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Product Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      placeholder="e.g. Enterprise CPQ Suite"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sku">SKU</Label>
+                    <Input
+                      id="sku"
+                      name="sku"
+                      value={formSku}
+                      onChange={(e) => setFormSku(e.target.value)}
+                      placeholder="e.g. CPQ-ENT-001"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select value={formCategory} onValueChange={(value: string) => setFormCategory(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_price">Unit Price (INR)</Label>
+                    <Input
+                      id="unit_price"
+                      name="unit_price"
+                      type="number"
+                      step="0.01"
+                      value={formUnitPrice}
+                      onChange={(e) => setFormUnitPrice(e.target.value)}
+                      placeholder="e.g. 4999"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use the standard selling price for one item, product, service, license, or bundle.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      placeholder="Short summary of what this product includes and how it should be quoted."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="is_active">Product Status</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Inactive products stay hidden from standard quote pickers until reactivated.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:justify-start">
+                      <span className="text-sm font-medium">{formIsActive ? "Active" : "Inactive"}</span>
+                      <Switch id="is_active" checked={formIsActive} onCheckedChange={setFormIsActive} />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    name="sku"
-                    value={formSku}
-                    onChange={(e) => setFormSku(e.target.value)}
-                    placeholder="e.g. CPQ-ENT-001"
-                  />
+                <div className="border-t border-border/60 bg-background/95 px-6 py-4">
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                    {editingProduct ? "Update" : "Create"} Product
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={formCategory} onValueChange={(value: string) => setFormCategory(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unit_price">Unit Price (INR)</Label>
-                  <Input
-                    id="unit_price"
-                    name="unit_price"
-                    type="number"
-                    step="0.01"
-                    value={formUnitPrice}
-                    onChange={(e) => setFormUnitPrice(e.target.value)}
-                    placeholder="e.g. 4999"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use the standard selling price for one item, product, service, license, or bundle.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="Short summary of what this product includes and how it should be quoted."
-                    rows={3}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  {editingProduct ? "Update" : "Create"} Product
-                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -368,11 +391,11 @@ export default function ProductsPage() {
                   </Badge>
                 </div>
 
-                <div className="flex gap-2 pt-2 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                <div className="flex flex-wrap gap-2 pt-2 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 flex-1"
+                    className="h-8 min-w-[110px] flex-1"
                     onClick={() => {
                       setEditingProduct(product);
                       setIsDialogOpen(true);
@@ -380,6 +403,17 @@ export default function ProductsPage() {
                   >
                     <Edit className="mr-1 h-3.5 w-3.5" />
                     Edit
+                  </Button>
+                  <Button
+                    variant={product.is_active ? "outline" : "default"}
+                    size="sm"
+                    className="h-8 min-w-[110px] flex-1"
+                    disabled={updateMutation.isPending}
+                    onClick={() => {
+                      updateMutation.mutate({ id: product.id, is_active: !(product.is_active ?? true) });
+                    }}
+                  >
+                    {product.is_active ? "Deactivate" : "Activate"}
                   </Button>
                   {canDelete() && (
                     <AlertDialog

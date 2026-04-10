@@ -318,9 +318,15 @@ export default function QuoteBuilderPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-1 md:p-6">
-      <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mt-0.5 shrink-0">
-          <ArrowLeft className="h-5 w-5" />
+      <div className="space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-fit px-1 text-muted-foreground hover:text-foreground"
+          onClick={() => navigate(tenantAppPath(tenantSlug, "cpq/quotes"))}
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back to Quotes
         </Button>
         <div className="space-y-1">
           <h1 className="text-xl font-semibold md:text-3xl">{isEditMode ? "Edit Quote" : "Create Quote"}</h1>

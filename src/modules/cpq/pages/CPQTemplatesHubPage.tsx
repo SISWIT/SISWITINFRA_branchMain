@@ -122,6 +122,7 @@ export default function CPQTemplatesHubPage() {
   const [editingTemplate, setEditingTemplate] = useState<QuoteTemplate | null>(null);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [formData, setFormData] = useState<TemplateFormState>(EMPTY_FORM);
+  const [validityInput, setValidityInput] = useState(String(EMPTY_FORM.validity_days));
   const [draftItems, setDraftItems] = useState<TemplateDraftItem[]>([]);
 
   const editingTemplateId = editingTemplate?.id ?? "";
@@ -142,6 +143,7 @@ export default function CPQTemplatesHubPage() {
       terms: editingTemplate.terms || "Net 30 days",
       notes: editingTemplate.notes || "",
     });
+    setValidityInput(String(editingTemplate.validity_days));
   }, [dialogOpen, editingTemplate]);
 
   useEffect(() => {
@@ -213,6 +215,7 @@ export default function CPQTemplatesHubPage() {
     setEditingTemplate(null);
     setSelectedProductId("");
     setFormData(EMPTY_FORM);
+    setValidityInput(String(EMPTY_FORM.validity_days));
     setDraftItems([]);
     setDialogOpen(true);
   };
@@ -266,8 +269,14 @@ export default function CPQTemplatesHubPage() {
       return;
     }
 
+    const normalizedValidityDays =
+      Number.isFinite(formData.validity_days) && formData.validity_days > 0
+        ? Math.trunc(formData.validity_days)
+        : 30;
+
     const payload = {
       ...formData,
+      validity_days: normalizedValidityDays,
       items: draftItems.map((item, index) => ({
         product_id: item.product_id,
         product_name: item.product_name,
@@ -534,9 +543,9 @@ export default function CPQTemplatesHubPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-hidden border-border/70 p-0 sm:max-w-5xl">
-          <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="max-h-[calc(90vh-72px)] space-y-6 overflow-y-auto p-6">
+        <DialogContent className="flex h-[92vh] max-h-[92vh] w-[96vw] max-w-6xl flex-col overflow-hidden border-border/70 p-0">
+          <div className="min-h-0 flex-1 grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="min-h-0 space-y-6 overflow-y-auto p-6">
               <DialogHeader className="space-y-2 text-left">
                 <DialogTitle className="text-2xl">
                   {editingTemplate ? "Refine Quote Template" : "Create Quote Template"}
@@ -574,10 +583,39 @@ export default function CPQTemplatesHubPage() {
                   <Label>Validity (Days)</Label>
                   <Input
                     type="number"
-                    value={formData.validity_days}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, validity_days: Number(event.target.value || 0) || 30 }))
-                    }
+                    min={1}
+                    value={validityInput}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setValidityInput(nextValue);
+
+                      if (nextValue.trim() === "") {
+                        setFormData((prev) => ({ ...prev, validity_days: 0 }));
+                        return;
+                      }
+
+                      const parsedValue = Number(nextValue);
+                      if (!Number.isFinite(parsedValue)) {
+                        return;
+                      }
+
+                      setFormData((prev) => ({
+                        ...prev,
+                        validity_days: Math.max(0, Math.trunc(parsedValue)),
+                      }));
+                    }}
+                    onBlur={() => {
+                      const parsedValue = Number(validityInput);
+                      if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+                        setValidityInput("30");
+                        setFormData((prev) => ({ ...prev, validity_days: 30 }));
+                        return;
+                      }
+
+                      const normalizedValue = Math.trunc(parsedValue);
+                      setValidityInput(String(normalizedValue));
+                      setFormData((prev) => ({ ...prev, validity_days: normalizedValue }));
+                    }}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
@@ -730,12 +768,12 @@ export default function CPQTemplatesHubPage() {
               </div>
             </div>
 
-            <aside className="border-t border-border/70 bg-muted/20 p-6 lg:border-l lg:border-t-0">
+            <aside className="min-h-0 overflow-y-auto border-t border-border/70 bg-muted/20 p-6 lg:border-l lg:border-t-0">
               <div className="space-y-5">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Live Preview</p>
                   <h3 className="mt-2 text-2xl font-semibold">{formData.name || "Untitled Template"}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  <p className="text-sm leading-6 text-muted-foreground">
                     {formData.description || "Describe the deal motion this template supports so the team knows when to use it."}
                   </p>
                 </div>
@@ -746,7 +784,7 @@ export default function CPQTemplatesHubPage() {
                       <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Quote Defaults</p>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Validity</span>
-                        <span>{formData.validity_days} days</span>
+                        <span>{validityInput.trim() === "" ? "-" : `${formData.validity_days} days`}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Discount</span>
@@ -779,17 +817,19 @@ export default function CPQTemplatesHubPage() {
                 </div>
 
                 <Card className="border-border/70 bg-background shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Default Terms & Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 text-sm leading-6">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Terms</p>
-                      <p className="mt-2 text-foreground/90">{formData.terms || "No payment terms yet."}</p>
+                  <CardContent className="space-y-3 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Default Terms & Notes</p>
+                    <div className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">Terms</span>
+                      <span className="max-w-[65%] text-right text-foreground/90">
+                        {formData.terms || "No payment terms yet."}
+                      </span>
                     </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Notes</p>
-                      <p className="mt-2 text-foreground/90">{formData.notes || "No customer notes yet."}</p>
+                    <div className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-muted-foreground">Notes</span>
+                      <span className="max-w-[65%] text-right text-foreground/90">
+                        {formData.notes || "No customer notes yet."}
+                      </span>
                     </div>
                   </CardContent>
                 </Card>
@@ -797,7 +837,7 @@ export default function CPQTemplatesHubPage() {
             </aside>
           </div>
 
-          <DialogFooter className="border-t border-border/70 bg-background px-6 py-4">
+          <DialogFooter className="shrink-0 border-t border-border/70 bg-background px-6 py-4">
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
