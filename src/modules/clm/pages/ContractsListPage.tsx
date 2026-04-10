@@ -144,9 +144,11 @@ export default function ContractsListPage() {
                             <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}`)}>
                               <Eye className="h-4 w-4 mr-2" />View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}/edit`)}>
-                              <Edit className="h-4 w-4 mr-2" />Edit
-                            </DropdownMenuItem>
+                            {contract.status === "draft" && (
+                              <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/${contract.id}/edit`)}>
+                                <Edit className="h-4 w-4 mr-2" />Edit
+                              </DropdownMenuItem>
+                            )}
                             {contract.status === "approved" && (
                               <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/app/clm/esign/${contract.id}`)}>
                                 <PenTool className="h-4 w-4 mr-2" />Send for Signature

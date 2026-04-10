@@ -31,7 +31,7 @@ import {
   MoreHorizontal, 
   Pencil, 
   Trash2, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   CheckCircle2, 
   Circle,
   Phone,
@@ -49,6 +49,10 @@ import {
 import { format } from "date-fns";
 import { Badge } from "@/ui/shadcn/badge";
 import { Checkbox } from "@/ui/shadcn/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
+import { parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 
 // --- TYPES ---
 // Matches Schema: public.Enums.activity_type
@@ -219,7 +223,7 @@ export default function ActivitiesPage() {
           const isOverdue = date < new Date() && !row.is_completed;
           return (
             <div className={`flex items-center gap-2 ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-              <Calendar className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3" />
               <span>{format(date, "MMM d, yyyy")}</span>
             </div>
           );
@@ -344,11 +348,28 @@ export default function ActivitiesPage() {
 
                   <div className="grid gap-2">
                     <Label>Due Date</Label>
-                    <Input
-                      type="date"
-                      value={formData.due_date}
-                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.due_date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.due_date ? format(parseISO(formData.due_date), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.due_date ? parseISO(formData.due_date) : undefined}
+                          onSelect={(date) => setFormData({ ...formData, due_date: date ? format(date, "yyyy-MM-dd") : "" })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="flex items-center space-x-2 my-2">

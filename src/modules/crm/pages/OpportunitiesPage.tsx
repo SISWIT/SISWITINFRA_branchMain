@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/shadcn/select";
-import { Eye, MoreHorizontal, Pencil, Trash2, Target, IndianRupee, Calendar } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2, Target, IndianRupee, Calendar as CalendarIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,10 @@ import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
 import { SearchBar } from "@/ui/search-bar";
 import { FilterBar } from "@/ui/filter-bar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
+import { parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 import type { Opportunity, OpportunityStage } from "@/core/types/crm";
 
 const OPP_FILTERS = [
@@ -268,7 +272,7 @@ export default function OpportunitiesPage() {
 
         return (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-3 w-3" />
+            <CalendarIcon className="h-3 w-3" />
             <span>{parsedCloseDate ? format(parsedCloseDate, "MMM d, yyyy") : "-"}</span>
           </div>
         );
@@ -393,11 +397,28 @@ export default function OpportunitiesPage() {
                     </div>
                     <div className="grid gap-2">
                       <Label>Close Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.close_date}
-                        onChange={(e) => setFormData({ ...formData, close_date: e.target.value })}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.close_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.close_date ? format(parseISO(formData.close_date), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.close_date ? parseISO(formData.close_date) : undefined}
+                            onSelect={(date) => setFormData({ ...formData, close_date: date ? format(date, "yyyy-MM-dd") : "" })}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 

@@ -705,8 +705,10 @@ export function useCreateContractScan() {
 
   return useMutation({
     mutationFn: async (scan: Omit<Partial<ContractScan>, "id" | "created_at" | "updated_at">) => {
-      const contractId = scan.contract_id || "";
-      await ensureContractAccessible(contractId, scope);
+      const contractId = scan.contract_id || null;
+      if (contractId) {
+        await ensureContractAccessible(contractId, scope);
+      }
       const { organizationId: requiredOrganizationId } = requireOrganizationScope(scope);
 
       const payload = buildModuleCreatePayload<ContractScanInsert>(
@@ -742,7 +744,11 @@ export function useCreateContractScan() {
       return data as ContractScan;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["contract_scans", variables.contract_id] });
+        if (variables.contract_id) {
+          queryClient.invalidateQueries({ queryKey: ["contract_scans", variables.contract_id] });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["contract_scans", "global"] });
+        }
       toast.success("Contract scan uploaded successfully");
     },
     onError: (error: unknown) => {

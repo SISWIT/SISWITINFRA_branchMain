@@ -1,9 +1,11 @@
-# Fixes - 2026-04-10 Employee Panel
+# Technical Update Log - SISWIT Core Modules
 
-**Author:** Sunny
+**Date:** April 10 - April 11, 2026 (02:35 AM)  
+**Employee ID:** DEV01  
+**Author:** Sunny  
 
-**Scope:**
-Standalone continuation log for Employee Panel updates from April 10 onward.
+**Executive Scope:**  
+Comprehensive technical log documenting the implementation of systematic structural fixes, UI/UX enhancements, functionality debugging, and row-level security stability across the SISWIT Employee Panel module ecosystem (including CRM, CPQ, and CLM logic).
 
 ---
 
@@ -639,3 +641,166 @@ Currency visuals are now consistent across the requested CRM surfaces (Dashboard
   - Opened `CRM > Opportunities` and confirmed amount label/icon and value formatting use `₹`
   - Confirmed `New Opportunity` label now renders as `Value (₹)` (not raw `\u20B9`)
   - Opened `CRM > Sales Pipeline` and confirmed stage totals/card amounts use `₹`
+
+## 16. Feature Implementation: Shadcn DatePicker Enhancements
+
+**Date:** 2026-04-11
+
+**Issue:** 
+Date format parsing error during contract/opportunity creation, caused by native HTML5 `<input type="date">` relying on browser locales without a consistent local `DD/MM/YYYY` visual guide, leading to input translation bugs (e.g. `04122026` treated as MM/DD/YYYY).
+
+**Root Cause:**
+Reliance on browser's native `<input type="date">` heuristic which parses differently depending on locale configurations and OS settings, breaking manual date inputs in standard Indian contexts.
+
+**Implemented Fixes:**
+- Replaced the native `<Input type="date">` with a highly robust DatePicker composed of Shadcn UI `Popover`, `Calendar`, and `Button` components.
+- Integrated `date-fns` `parseISO` and `format` specifically forcing internal `YYYY-MM-DD` payload generation while presenting users a formatted `PPP` localized view with an interactive monthly calendar UI.
+- Replicated this robust and standardized UI component to eliminate typing bugs across CLM, CRM, and CPQ creation flows.
+
+**Files Updated:**
+
+- `src/modules/clm/pages/ContractBuilderPage.tsx`
+- `src/modules/crm/pages/OpportunitiesPage.tsx`
+- `src/modules/crm/pages/ActivitiesPage.tsx`
+- `src/modules/cpq/pages/QuoteBuilderPage.tsx`
+
+**Outcome:**
+Users interact with a visual calendar minimizing formatting errors, displaying localized date strings visually while transmitting strict ISO dates to the local state.
+
+**Validation:**
+
+- `npx eslint src/modules/clm/pages/ContractBuilderPage.tsx src/modules/crm/pages/OpportunitiesPage.tsx src/modules/crm/pages/ActivitiesPage.tsx src/modules/cpq/pages/QuoteBuilderPage.tsx`
+
+**Verification:**
+
+- Manually verified on April 11, 2026:
+  - Opened New Contract page: The date field safely pops open restricting non-valid typed data. Start/End/Close dates correctly submit strict ISO structures without localization transposition issues.
+  - Opened New Opportunity page: Confirmed Shadcn DatePicker works accurately.
+  - Opened New Activity page: Confirmed Shadcn DatePicker works accurately.
+  - Opened Quote Builder page: Confirmed Shadcn DatePicker works accurately.
+
+## 17. Bug Fix: Document Scan Uploads (RLS & 400 Bad Request)
+
+**Date:** 2026-04-11
+
+**Issue:** 
+Uploading a contract scan as an Employee triggered a `400 Bad Request` at the `/rest/v1/contract_scans` endpoint, accompanied by an infinite loading spinner.
+
+**Root Cause:**
+1. RLS policies on the `contract-scans` storage bucket and `contract_scans` table were artificially restricted to Manager+ roles. 
+2. The `contract_id` payload mapping in `useCreateContractScan` erroneously casted empty variables as `""` (empty string) instead of `null`, rejecting the PostgreSQL UUID strict typecast.
+3. The `<FileUpload />` component swallowed the error boundary safely, but `ContractScanPage.tsx` failed to display a toast error to inform the user it failed.
+
+**Implemented Fixes:**
+- Created `066_fix_clm_scans_rls.sql` granting upload permissions to all authorized organization members.
+- Corrected `contract_id` casting in `useCLM.ts`.
+- Inserted `toast.error` catch logic in `ContractScanPage.tsx` so users aren't left with silent failures.
+
+### **Note on Deep Fixing:** The Contract Scan component requires further deep-fixing in the future to complete the analysis features comprehensively.
+
+**Files Updated:**
+
+- `supabase/migrations/066_fix_clm_scans_rls.sql`
+- `src/modules/clm/hooks/useCLM.ts`
+- `src/modules/clm/pages/ContractScanPage.tsx`
+
+**Outcome:**
+Users can upload contract scans successfully regardless of their specific access permission within the workspace as long as they are authenticated, without silent UI blocking.
+
+**Validation:**
+
+- `npx eslint src/modules/clm/pages/ContractScanPage.tsx src/modules/clm/hooks/useCLM.ts`
+
+**Verification:**
+
+- Manually tested 2026-04-11:
+  - Scanned dummy contract upload succeeds without infinite spinners.
+
+## 18. Bug Fix: Approved Contracts Action Inconsistency
+
+**Date:** 2026-04-11
+
+**Issue:** 
+Contracts in an "Approved" or non-draft status incorrectly displayed an "Edit" action which navigated to an invalid endpoint or confused UX by displaying read-only forms.
+
+**Root Cause:**
+The Actions dropdown in `ContractsListPage.tsx` blindly rendered the Edit button without evaluating the `contract.status`.
+
+**Implemented Fixes:**
+- Conditionally hid the `<DropdownMenuItem>` for the "Edit" action so it exclusively renders only if the contract status is strict `"draft"`.
+
+**Files Updated:**
+
+- `src/modules/clm/pages/ContractsListPage.tsx`
+
+**Outcome:**
+Approved contracts present a clean action palette, eliminating misleading buttons natively from the UI list overview.
+
+**Validation:**
+
+- `npx eslint src/modules/clm/pages/ContractsListPage.tsx`
+
+**Verification:**
+
+- Manually verified on April 11, 2026:
+  - Ensured the primary Contracts View only allows drafts to be edited directly.
+
+## 19. Currency Symbol Localization (CLM Module Integration)
+
+**Date:** 2026-04-11
+
+**Issue:** 
+The CLM Dashboard and Contracts Overview screens hardcoded the `$` (USD) currency formatting, causing a visual conflict with Indian locale standards `₹` (INR) utilized in the CRM/CPQ modules.
+
+**Root Cause:**
+Values rendered in `CLMDashboard.tsx` and `ContractsPage.tsx` passed `currency: "USD"` into their specific `Intl.NumberFormat` instances rather than honoring standard local conversions or matching previous CRM standardization formats.
+
+**Implemented Fixes:**
+- Replaced `currency: "USD"` and `en-US` with `currency: "INR"` and `en-IN` inside the `formatCurrency` utilities in CLM core pages.
+
+**Files Updated:**
+
+- `src/modules/clm/pages/CLMDashboard.tsx`
+- `src/modules/clm/pages/ContractsPage.tsx`
+
+**Outcome:**
+The CLM module is now consistently reporting all contract values using `₹` inline with CRM.
+
+**Validation:**
+
+- `npx eslint src/modules/clm/pages/CLMDashboard.tsx src/modules/clm/pages/ContractsPage.tsx`
+
+**Verification:**
+
+- Manually verified on April 11, 2026:
+  - Checked the Dashboard pie/bar charts value tooltips for the INR representation.
+
+## 20. Bug Fix: SPA Navigation Desync & Suspense Freezes
+
+**Date:** 2026-04-11
+
+**Issue:** 
+Transitioning between sidebar links registered an immediate URL change, but the central page component lagged or failed to repaint the new DOM (appearing like an indefinite freeze).
+
+**Root Cause:**
+React Router `Outlet` loading logic was deferring to lazy-loaded JavaScript chunks without a localized `<Suspense>` fallback boundary wrapping the primary viewport routing structure.
+
+**Implemented Fixes:**
+- Wrapped the `<Outlet />` component in the `DashboardLayout.tsx` directly inside a localized `<Suspense>` component.
+- Implemented a centered visual `Loader2` fallback state to signal to the user that chunk-loading or nested component rendering is in active progress.
+
+**Files Updated:**
+
+- `src/workspaces/employee/layout/DashboardLayout.tsx`
+
+**Outcome:**
+Users immediately perceive transitioning UI feedback across module boundaries via the centralized spinner. Force refreshes are no longer required to prompt component repaints.
+
+**Validation:**
+
+- `npx eslint src/workspaces/employee/layout/DashboardLayout.tsx`
+
+**Verification:**
+
+- Manually verified on April 11, 2026:
+  - Verified navigation links trigger instantaneous active-state UI updates inside the central viewport.

@@ -1,5 +1,6 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, Suspense } from "react";
 import { Outlet } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { EmployeeTopBar } from "./EmployeeTopBar";
 import { Sheet, SheetContent } from "@/ui/shadcn/sheet";
@@ -41,8 +42,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden relative z-10 bg-background/20 backdrop-blur-3xl">
         <EmployeeTopBar onOpenSidebar={() => setMobileMenuOpen(true)} />
         
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-muted/0">
-          {children || <Outlet />}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-muted/0 relative">
+          <Suspense fallback={
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-50">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            </div>
+          }>
+            {children || <Outlet />}
+          </Suspense>
         </main>
       </div>
 

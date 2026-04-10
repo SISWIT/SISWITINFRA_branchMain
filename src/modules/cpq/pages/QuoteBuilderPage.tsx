@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
-import { ArrowLeft, Calculator, FileStack, Package, Plus, Save, Send, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Calculator, FileStack, Package, Plus, Save, Send, Sparkles, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
@@ -21,6 +21,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/ui/shadcn/separator";
 import { Textarea } from "@/ui/shadcn/textarea";
 import { tenantAppPath } from "@/core/utils/routes";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 import type { QuoteTemplate, QuoteTemplateItem } from "@/core/types/cpq";
 
 interface LocalQuoteItem {
@@ -513,7 +517,28 @@ export default function QuoteBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Valid Until</Label>
-                    <Input type="date" value={quoteData.valid_until} onChange={(e) => updateQuoteData({ valid_until: e.target.value })} />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !quoteData.valid_until && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {quoteData.valid_until ? format(parseISO(quoteData.valid_until), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={quoteData.valid_until ? parseISO(quoteData.valid_until) : undefined}
+                          onSelect={(date) => updateQuoteData({ valid_until: date ? format(date, "yyyy-MM-dd") : "" })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2">
                     <Label>Quote Discount %</Label>

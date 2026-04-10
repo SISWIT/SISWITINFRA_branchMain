@@ -33,7 +33,7 @@ export default function CLMDashboard() {
   const { data: stats } = useCLMDashboardStats();
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", notation: "compact", maximumFractionDigits: 1 }).format(value);
   };
 
   const statusData = stats?.contractsByStatus

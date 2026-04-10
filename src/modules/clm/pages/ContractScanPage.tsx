@@ -92,6 +92,7 @@ export default function ContractScanPage() {
     } catch (err) {
       setIsScanning(false);
       console.error("Failed to save scan record:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to upload document scan.");
     }
   };
 
