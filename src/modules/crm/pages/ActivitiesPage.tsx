@@ -11,6 +11,7 @@ import { Button } from "@/ui/shadcn/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from "@/ui/shadcn/select";
 import { 
+  Eye,
   MoreHorizontal, 
   Pencil, 
   Trash2, 
@@ -89,6 +91,7 @@ export default function ActivitiesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<ActivityRow | null>(null);
+  const [viewingActivity, setViewingActivity] = useState<ActivityRow | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -124,6 +127,10 @@ export default function ActivitiesPage() {
       is_completed: row.is_completed || false,
     });
     setDialogOpen(true);
+  };
+
+  const openViewDialog = (row: ActivityRow) => {
+    setViewingActivity(row);
   };
 
   const handleSubmit = async () => {
@@ -227,18 +234,22 @@ export default function ActivitiesPage() {
       cell: (row: ActivityRow) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(row)}>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openViewDialog(row); }}>
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openEditDialog(row); }}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
             {canDelete() && (
             <DropdownMenuItem
-              onClick={() => deleteActivity.mutate(row.id)}
+              onClick={(event) => { event.stopPropagation(); deleteActivity.mutate(row.id); }}
               className="text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -263,101 +274,189 @@ export default function ActivitiesPage() {
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}
+          onRowClick={openViewDialog}
           addLabel="Add Activity"
           searchPlaceholder="Search activities..."
         />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-md flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>{editingActivity ? "Edit Activity" : "New Activity"}</DialogTitle>
+              <DialogDescription>
+                Capture tasks, outreach, and meeting context so team follow-ups stay organized and consistent.
+              </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Subject</Label>
-                <Input
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  placeholder="e.g. Call with John"
-                />
-              </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Subject</Label>
+                    <Input
+                      value={formData.subject}
+                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      placeholder="e.g. Call with John"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(v) => setFormData({ ...formData, type: v as ActivityType })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="call">Call</SelectItem>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="meeting">Meeting</SelectItem>
-                      <SelectItem value="task">Task</SelectItem>
-                      <SelectItem value="note">Note</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Type</Label>
+                      <Select
+                        value={formData.type}
+                        onValueChange={(v) => setFormData({ ...formData, type: v as ActivityType })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="call">Call</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="meeting">Meeting</SelectItem>
+                          <SelectItem value="task">Task</SelectItem>
+                          <SelectItem value="note">Note</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Priority</Label>
+                      <Select
+                        value={formData.priority}
+                        onValueChange={(v) => setFormData({ ...formData, priority: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Due Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.due_date}
+                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2 my-2">
+                    <Checkbox 
+                      id="completed" 
+                      checked={formData.is_completed}
+                      onCheckedChange={(checked) => 
+                        setFormData({ ...formData, is_completed: checked as boolean })
+                      }
+                    />
+                    <Label htmlFor="completed" className="font-normal cursor-pointer">
+                      Mark as completed
+                    </Label>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Details..."
+                    />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Priority</Label>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(v) => setFormData({ ...formData, priority: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </div>
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createActivity.isPending || updateActivity.isPending}>
+                  {editingActivity ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(viewingActivity)} onOpenChange={(open) => !open && setViewingActivity(null)}>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-xl flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4">
+              <DialogTitle>Activity Details</DialogTitle>
+              <DialogDescription>
+                Full context and timeline for this activity record.
+              </DialogDescription>
+            </DialogHeader>
+
+            {viewingActivity && (
+              <>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                    <p className="text-lg font-semibold">{viewingActivity.subject}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {(() => {
+                        const Icon = TYPE_ICONS[viewingActivity.type] || Circle;
+                        return (
+                          <Badge className={`flex items-center gap-1 ${TYPE_COLORS[viewingActivity.type] || "bg-secondary text-secondary-foreground"}`}>
+                            <Icon className="h-3 w-3" />
+                            <span className="capitalize">{viewingActivity.type}</span>
+                          </Badge>
+                        );
+                      })()}
+                      <Badge variant={viewingActivity.is_completed ? "default" : "secondary"}>
+                        {viewingActivity.is_completed ? "Completed" : "Pending"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Priority</p>
+                      <p className="mt-2 text-sm capitalize">{viewingActivity.priority || "medium"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Due Date</p>
+                      <p className="mt-2 text-sm">
+                        {viewingActivity.due_date ? format(new Date(viewingActivity.due_date), "MMM d, yyyy") : "-"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Created</p>
+                      <p className="mt-2 text-sm">{format(new Date(viewingActivity.created_at), "MMM d, yyyy")}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background p-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Description</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {viewingActivity.description || "No activity notes available."}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid gap-2">
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 my-2">
-                <Checkbox 
-                  id="completed" 
-                  checked={formData.is_completed}
-                  onCheckedChange={(checked) => 
-                    setFormData({ ...formData, is_completed: checked as boolean })
-                  }
-                />
-                <Label htmlFor="completed" className="font-normal cursor-pointer">
-                  Mark as completed
-                </Label>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Details..."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} disabled={createActivity.isPending || updateActivity.isPending}>
-                {editingActivity ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
+                <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                  <Button type="button" variant="outline" onClick={() => setViewingActivity(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setViewingActivity(null);
+                      openEditDialog(viewingActivity);
+                    }}
+                  >
+                    Edit Activity
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </div>

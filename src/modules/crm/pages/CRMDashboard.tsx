@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { Users, Building2, Target, DollarSign, TrendingUp, FileText } from "lucide-react";
+import { Users, Building2, Target, IndianRupee, TrendingUp, FileText } from "lucide-react";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { useDashboardStats, useOpportunities } from "@/modules/crm/hooks/useCRM";
 import { OpportunityPipeline } from "@/modules/crm/components/OpportunityPipeline";
@@ -14,9 +14,9 @@ export default function CRMDashboard() {
   const { data: opportunities = [] } = useOpportunities();
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(value);
@@ -54,7 +54,7 @@ export default function CRMDashboard() {
             title="Pipeline Value"
             value={formatCurrency(stats?.pipelineValue || 0)}
             subtitle={`Expected: ${formatCurrency(stats?.expectedRevenue || 0)}`}
-            icon={DollarSign}
+            icon={IndianRupee}
           />
         </Link>
       </div>
@@ -64,7 +64,7 @@ export default function CRMDashboard() {
           <StatsCard title="Won Deals" value={stats?.wonDeals || 0} icon={TrendingUp} />
         </Link>
         <Link to={`/${tenantSlug}/app/crm/opportunities?filter=won`}>
-          <StatsCard title="Won Value" value={formatCurrency(stats?.wonValue || 0)} icon={DollarSign} />
+          <StatsCard title="Won Value" value={formatCurrency(stats?.wonValue || 0)} icon={IndianRupee} />
         </Link>
         <StatsCard title="Win Rate" value={`${(stats?.winRate || 0).toFixed(1)}%`} icon={Target} />
         <Link to={`/${tenantSlug}/app/crm/activities`}>

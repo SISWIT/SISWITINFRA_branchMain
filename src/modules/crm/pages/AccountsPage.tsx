@@ -17,6 +17,7 @@ import { Button } from "@/ui/shadcn/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -26,6 +27,7 @@ import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
 
 import {
+  Eye,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -108,6 +110,7 @@ export default function AccountsPage() {
   // ui state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null);
+  const [viewingAccount, setViewingAccount] = useState<AccountRow | null>(null);
 
   // form state
   const [formData, setFormData] = useState({
@@ -168,6 +171,10 @@ export default function AccountsPage() {
     setDialogOpen(true);
   };
 
+  const openViewDialog = (acc: AccountRow) => {
+    setViewingAccount(acc);
+  };
+
   // submit handler
   const handleSubmit = async () => {
     try {
@@ -201,6 +208,9 @@ export default function AccountsPage() {
       }
     }
   };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
 
   // table columns
   const columns = [
@@ -272,25 +282,31 @@ export default function AccountsPage() {
       cell: (acc: AccountRow) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost">
+            <Button size="icon" variant="ghost" onClick={(event) => event.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(acc)}>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openViewDialog(acc); }}>
+              <Eye className="mr-2 h-4 w-4" /> View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openEditDialog(acc); }}>
               <Pencil className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() =>
+              onClick={(event) => {
+                event.stopPropagation();
+                return (
                 navigate(`/dashboard/cpq/quotes/new?account_id=${acc.id}`)
-              }
+                );
+              }}
             >
               <FileText className="mr-2 h-4 w-4" /> Create Quote
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {canDelete() && (
             <DropdownMenuItem
-              onClick={() => deleteAccount.mutate(acc.id)}
+              onClick={(event) => { event.stopPropagation(); deleteAccount.mutate(acc.id); }}
               className="text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -326,21 +342,32 @@ export default function AccountsPage() {
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}
+          onRowClick={openViewDialog}
           addLabel="Add Account"
           searchable={false}
         />
 
         {/* account form */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-h-[85vh] max-w-3xl overflow-hidden p-0">
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-3xl flex-col overflow-hidden p-0">
             <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>
                 {editingAccount ? "Edit Account" : "Add Account"}
               </DialogTitle>
+              <DialogDescription>
+                Capture account profile, contact channels, and commercial context so follow-ups stay consistent for the sales team.
+              </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div className="space-y-6">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div className="space-y-6">
               {/* basic info */}
               <Section title="Basic Info">
                 <Grid cols={2}>
@@ -440,22 +467,110 @@ export default function AccountsPage() {
                   }
                 />
               </Section>
+                </div>
               </div>
-            </div>
 
-            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  createAccount.isPending || updateAccount.isPending
-                }
-              >
-                {editingAccount ? "Update Account" : "Create Account"}
-              </Button>
-            </DialogFooter>
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    createAccount.isPending || updateAccount.isPending
+                  }
+                >
+                  {editingAccount ? "Update Account" : "Create Account"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(viewingAccount)} onOpenChange={(open) => !open && setViewingAccount(null)}>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-2xl flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b border-border/60 px-6 pb-4 pt-6 pr-12">
+              <DialogTitle>Account Details</DialogTitle>
+            </DialogHeader>
+
+            {viewingAccount && (
+              <>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold">{viewingAccount.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{viewingAccount.industry || "Industry not specified"}</p>
+                      </div>
+                      {viewingAccount.website && (
+                        <a
+                          href={viewingAccount.website.startsWith("http") ? viewingAccount.website : `https://${viewingAccount.website}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                        >
+                          <Globe className="h-4 w-4" />
+                          Visit Website
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Email</p>
+                      <p className="mt-2 text-sm">{viewingAccount.email || "-"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Phone</p>
+                      <p className="mt-2 text-sm">{viewingAccount.phone || "-"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Annual Revenue</p>
+                      <p className="mt-2 text-sm">{viewingAccount.annual_revenue != null ? formatCurrency(viewingAccount.annual_revenue) : "-"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Employees</p>
+                      <p className="mt-2 text-sm">{viewingAccount.employee_count ?? "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background p-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Address</p>
+                    <p className="mt-2 text-sm">
+                      {[
+                        viewingAccount.address,
+                        viewingAccount.city,
+                        viewingAccount.state,
+                        viewingAccount.postal_code,
+                        viewingAccount.country,
+                      ].filter(Boolean).join(", ") || "-"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background p-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Description</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {viewingAccount.description || "No account description available."}
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                  <Button variant="outline" onClick={() => setViewingAccount(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setViewingAccount(null);
+                      openEditDialog(viewingAccount);
+                    }}
+                  >
+                    Edit Account
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </div>

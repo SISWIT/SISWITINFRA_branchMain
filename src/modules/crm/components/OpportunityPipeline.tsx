@@ -5,7 +5,7 @@ import { cn } from "@/core/utils/utils";
 import type { Opportunity, OpportunityStage } from "@/core/types/crm";
 import { OPPORTUNITY_STAGE_COLORS } from "@/core/types/crm";
 import { useUpdateOpportunity } from "@/modules/crm/hooks/useCRM";
-import { Building2, DollarSign, Calendar } from "lucide-react";
+import { Building2, IndianRupee, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
 interface OpportunityPipelineProps {
@@ -106,9 +106,9 @@ export function OpportunityPipeline({ opportunities, onOpportunityClick }: Oppor
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(value);
@@ -156,7 +156,7 @@ export function OpportunityPipeline({ opportunities, onOpportunityClick }: Oppor
                   )}
                   
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                    <DollarSign className="h-3 w-3" />
+                    <IndianRupee className="h-3 w-3" />
                     <span>{formatCurrency(opp.amount || 0)}</span>
                     <span className="text-primary">({opp.probability}%)</span>
                   </div>

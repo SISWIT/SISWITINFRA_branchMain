@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -16,7 +17,7 @@ import {
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
 import { Textarea } from "@/ui/shadcn/textarea";
-import { MoreHorizontal, Pencil, Trash2, User, Mail, Phone } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2, User, Mail, Phone } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,7 @@ export default function ContactsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRow | null>(null);
+  const [viewingContact, setViewingContact] = useState<ContactRow | null>(null);
 
   const { data: accounts = [] } = useAccounts();
 
@@ -106,6 +108,10 @@ export default function ContactsPage() {
     setDialogOpen(true);
   };
 
+  const openViewDialog = (contact: ContactRow) => {
+    setViewingContact(contact);
+  };
+
   const handleSubmit = async () => {
     try {
       contactSchema.parse(formData);
@@ -124,6 +130,9 @@ export default function ContactsPage() {
       }
     }
   };
+
+  const getAccountName = (accountId: string | null) =>
+    accounts.find((acc) => acc.id === accountId)?.name || "-";
 
   const columns = [
     {
@@ -188,18 +197,22 @@ export default function ContactsPage() {
       cell: (contact: ContactRow) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(contact)}>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openViewDialog(contact); }}>
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openEditDialog(contact); }}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
             {canDelete() && (
             <DropdownMenuItem
-              onClick={() => deleteContact.mutate(contact.id)}
+              onClick={(event) => { event.stopPropagation(); deleteContact.mutate(contact.id); }}
               className="text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -233,106 +246,186 @@ export default function ContactsPage() {
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}
+          onRowClick={openViewDialog}
           addLabel="Add Contact"
           searchable={false}
         />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-h-[85vh] max-w-md overflow-hidden p-0">
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-x1 flex-col overflow-hidden p-0">
             <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>{editingContact ? "Edit Contact" : "Add Contact"}</DialogTitle>
+              <DialogDescription>
+                Capture contact profile and engagement context so follow-ups stay consistent for the sales team.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div className="grid gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>First Name</Label>
-                  <Input
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    placeholder="John"
-                  />
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>First Name</Label>
+                      <Input
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        placeholder="John"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Last Name</Label>
+                      <Input
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        placeholder="Doe"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="john@example.com"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Job Title</Label>
+                      <Input
+                        value={formData.job_title}
+                        onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                        placeholder="Manager"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Phone</Label>
+                      <Input
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="+1 234..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Department</Label>
+                    <Input
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      placeholder="Sales"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Account</Label>
+                    <Select value={formData.account_id} onValueChange={(v) => setFormData({ ...formData, account_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Add context..."
+                    />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Last Name</Label>
-                  <Input
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    placeholder="Doe"
-                  />
+              </div>
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createContact.isPending || updateContact.isPending}>
+                  {editingContact ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(viewingContact)} onOpenChange={(open) => !open && setViewingContact(null)}>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-xl flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4">
+              <DialogTitle>Contact Details</DialogTitle>
+              <DialogDescription>
+                Full profile and communication details for this contact.
+              </DialogDescription>
+            </DialogHeader>
+
+            {viewingContact && (
+              <>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                    <p className="text-lg font-semibold">
+                      {viewingContact.first_name} {viewingContact.last_name}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {viewingContact.job_title || "No job title"}{viewingContact.department ? ` | ${viewingContact.department}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Email</p>
+                      <p className="mt-2 text-sm">{viewingContact.email || "-"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Phone</p>
+                      <p className="mt-2 text-sm">{viewingContact.phone || "-"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Account</p>
+                      <p className="mt-2 text-sm">{getAccountName(viewingContact.account_id)}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Added</p>
+                      <p className="mt-2 text-sm">{viewingContact.created_at ? format(new Date(viewingContact.created_at), "MMM d, yyyy") : "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background p-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Notes</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {viewingContact.description || "No contact notes available."}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid gap-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="john@example.com"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Job Title</Label>
-                  <Input
-                    value={formData.job_title}
-                    onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
-                    placeholder="Manager"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Phone</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1 234..."
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                  <Label>Department</Label>
-                  <Input
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    placeholder="Sales"
-                  />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Account</Label>
-                <Select value={formData.account_id} onValueChange={(v) => setFormData({ ...formData, account_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        {acc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Notes</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Add context..."
-                />
-              </div>
-              </div>
-            </div>
-            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={createContact.isPending || updateContact.isPending}>
-                {editingContact ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
+                <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                  <Button variant="outline" onClick={() => setViewingContact(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setViewingContact(null);
+                      openEditDialog(viewingContact);
+                    }}
+                  >
+                    Edit Contact
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </div>

@@ -14,6 +14,7 @@ import { Button } from "@/ui/shadcn/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -28,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/shadcn/select";
-import { MoreHorizontal, Pencil, Trash2, Target, DollarSign, Calendar } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2, Target, IndianRupee, Calendar } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,7 +70,7 @@ const OPP_FILTERS = [
 ];
 
 const OPP_CUSTOM_FILTERS = {
-  amount_range: (item: OpportunityRow, value: string) => {
+  amount_range: (item: Opportunity, value: string) => {
     const amt = item.amount ?? 0;
     if (value === "under_1l") return amt < 100000;
     if (value === "1l_10l") return amt >= 100000 && amt <= 1000000;
@@ -77,6 +78,19 @@ const OPP_CUSTOM_FILTERS = {
     return true;
   },
 };
+
+const OPP_FILTERS_RUPEE = OPP_FILTERS.map((filter) =>
+  filter.key === "amount_range"
+    ? {
+        ...filter,
+        options: [
+          { label: "Under \u20B91L", value: "under_1l" },
+          { label: "\u20B91L - \u20B910L", value: "1l_10l" },
+          { label: "Above \u20B910L", value: "above_10l" },
+        ],
+      }
+    : filter,
+);
 
 const STAGE_LABELS: Record<string, string> = {
   new: "New",
@@ -115,7 +129,7 @@ export default function OpportunitiesPage() {
 
   const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<Opportunity>(opportunities, {
     searchFields: ["name", "stage"],
-    filterDefs: OPP_FILTERS,
+    filterDefs: OPP_FILTERS_RUPEE,
     customFilters: OPP_CUSTOM_FILTERS,
   });
 
@@ -131,6 +145,7 @@ export default function OpportunitiesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingOpp, setEditingOpp] = useState<Opportunity | null>(null);
+  const [viewingOpp, setViewingOpp] = useState<Opportunity | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -172,6 +187,10 @@ export default function OpportunitiesPage() {
     setDialogOpen(true);
   };
 
+  const openViewDialog = (opp: Opportunity) => {
+    setViewingOpp(opp);
+  };
+
   const handleSubmit = async () => {
     try {
       opportunitySchema.parse(formData);
@@ -198,14 +217,17 @@ export default function OpportunitiesPage() {
     }
   };
 
-  const formatCurrency = (amount: number | null) => {
-    if (!amount) return "-";
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount == null) return "-";
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  const getAccountName = (opp: Opportunity) =>
+    opp.account?.name || accounts.find((acc) => acc.id === opp.account_id)?.name || "-";
 
   const columns = [
     {
@@ -258,18 +280,22 @@ export default function OpportunitiesPage() {
       cell: (row: Opportunity) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(row)}>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openViewDialog(row); }}>
+              <Eye className="mr-2 h-4 w-4" />
+              View
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(event) => { event.stopPropagation(); openEditDialog(row); }}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </DropdownMenuItem>
             {canDelete() && (
             <DropdownMenuItem
-              onClick={() => deleteOpp.mutate(row.id)}
+              onClick={(event) => { event.stopPropagation(); deleteOpp.mutate(row.id); }}
               className="text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -304,112 +330,203 @@ export default function OpportunitiesPage() {
           columns={columns}
           loading={isLoading}
           onAdd={openCreateDialog}
+          onRowClick={openViewDialog}
           addLabel="Add Opportunity"
           searchable={false}
         />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-md flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6 pr-12">
               <DialogTitle>{editingOpp ? "Edit Opportunity" : "New Opportunity"}</DialogTitle>
+              <DialogDescription>
+                Capture deal value, timeline, and stage context so pipeline follow-ups stay consistent for the sales team.
+              </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Opportunity Name</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Software License Q1"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Account</Label>
-                <Select value={formData.account_id} onValueChange={(v) => setFormData({ ...formData, account_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        {acc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Value ($)</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmit();
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Opportunity Name</Label>
                     <Input
-                      type="number"
-                      className="pl-9"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      placeholder="0.00"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Software License Q1"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Account</Label>
+                    <Select value={formData.account_id} onValueChange={(v) => setFormData({ ...formData, account_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>{"Value (\u20B9)"}</Label>
+                      <div className="relative">
+                        <IndianRupee className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          className="pl-9"
+                          value={formData.amount}
+                          onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Close Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.close_date}
+                        onChange={(e) => setFormData({ ...formData, close_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Stage</Label>
+                      <Select
+                        value={formData.stage}
+                        onValueChange={(v) => setFormData({ ...formData, stage: v as OpportunityStage })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(STAGE_LABELS).map(([key, label]) => (
+                            <SelectItem key={key} value={key as OpportunityStage}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Probability (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.probability}
+                        onChange={(e) => setFormData({ ...formData, probability: e.target.value })}
+                        placeholder="20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Details..."
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Close Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.close_date}
-                    onChange={(e) => setFormData({ ...formData, close_date: e.target.value })}
-                  />
-                </div>
               </div>
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createOpp.isPending || updateOpp.isPending}>
+                  {editingOpp ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Stage</Label>
-                  <Select
-                    value={formData.stage}
-                    onValueChange={(v) => setFormData({ ...formData, stage: v as OpportunityStage })}
+        <Dialog open={Boolean(viewingOpp)} onOpenChange={(open) => !open && setViewingOpp(null)}>
+          <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-xl flex-col overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b border-border/60 px-6 py-4">
+              <DialogTitle>Opportunity Details</DialogTitle>
+              <DialogDescription>
+                Full deal context, value, and timeline for this opportunity.
+              </DialogDescription>
+            </DialogHeader>
+
+            {viewingOpp && (
+              <>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                    <p className="text-lg font-semibold">{viewingOpp.name}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge className={STAGE_COLORS[viewingOpp.stage] || "bg-secondary text-secondary-foreground"}>
+                        {STAGE_LABELS[viewingOpp.stage] || viewingOpp.stage}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Probability: {viewingOpp.probability ?? 0}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Account</p>
+                      <p className="mt-2 text-sm">{getAccountName(viewingOpp)}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Value</p>
+                      <p className="mt-2 text-sm">{formatCurrency(viewingOpp.amount)}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Close Date</p>
+                      <p className="mt-2 text-sm">
+                        {(() => {
+                          const parsedCloseDate = parseOpportunityDate(viewingOpp.close_date);
+                          return parsedCloseDate ? format(parsedCloseDate, "MMM d, yyyy") : "-";
+                        })()}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background p-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Created</p>
+                      <p className="mt-2 text-sm">{format(new Date(viewingOpp.created_at), "MMM d, yyyy")}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background p-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Description</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {viewingOpp.description || viewingOpp.next_step || "No opportunity notes available."}
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                  <Button type="button" variant="outline" onClick={() => setViewingOpp(null)}>
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setViewingOpp(null);
+                      openEditDialog(viewingOpp);
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(STAGE_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key as OpportunityStage}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Probability (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.probability}
-                    onChange={(e) => setFormData({ ...formData, probability: e.target.value })}
-                    placeholder="20"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Details..."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={createOpp.isPending || updateOpp.isPending}>
-                {editingOpp ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
+                    Edit Opportunity
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </div>
