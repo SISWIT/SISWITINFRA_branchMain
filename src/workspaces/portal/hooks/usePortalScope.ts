@@ -22,7 +22,7 @@ export function usePortalScope() {
     );
   }, [memberships, organization?.id, user?.id]);
 
-  const portalEmail = membership?.email?.trim() || null;
+  const portalEmail = membership?.email?.trim().toLowerCase() || null;
   const contactId = membership?.contact_id || null;
   const accountId = membership?.account_id || null;
 

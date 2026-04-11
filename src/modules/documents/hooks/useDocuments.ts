@@ -57,6 +57,75 @@ function isMissingTableError(error: unknown): boolean {
   return (error as { code?: string }).code === "42P01";
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function buildPortalSignatureUrl(workspaceSlug: string, signatureId: string): string {
+  const path = `/${workspaceSlug}/app/portal/pending-signatures/${signatureId}?type=document`;
+  const origin = globalThis.location?.origin;
+  return origin ? `${origin}${path}` : path;
+}
+
+async function sendDocumentSignatureRequestEmail(input: {
+  recipientEmail: string;
+  recipientName?: string | null;
+  documentName: string;
+  workspaceSlug: string;
+  signatureId: string;
+  accessToken?: string | null;
+}): Promise<boolean> {
+  try {
+    const signUrl = buildPortalSignatureUrl(input.workspaceSlug, input.signatureId);
+    const safeRecipientName = input.recipientName?.trim() || "there";
+    const safeDocumentName = input.documentName.trim() || "Document";
+    const subject = `Signature requested: ${safeDocumentName}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+        <p>Hi ${escapeHtml(safeRecipientName)},</p>
+        <p>You have received a new signature request for <strong>${escapeHtml(safeDocumentName)}</strong>.</p>
+        <p>
+          <a href="${signUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;">
+            Review & Sign Document
+          </a>
+        </p>
+        <p>If the button does not work, copy this link:</p>
+        <p><a href="${signUrl}">${signUrl}</a></p>
+      </div>
+    `;
+
+    const accessTokenFromInput = input.accessToken ?? null;
+    let accessToken = accessTokenFromInput;
+    if (!accessToken) {
+      const { data: authData } = await supabase.auth.getSession();
+      accessToken = authData.session?.access_token ?? null;
+    }
+    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+
+    const { error } = await supabase.functions.invoke("send-email", {
+      headers,
+      body: {
+        to: input.recipientEmail.trim().toLowerCase(),
+        subject,
+        html,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error("Failed to send direct document signature email:", error);
+    return false;
+  }
+}
+
 async function syncAutoDocumentStatusFromSignatures(documentId: string, organizationId: string): Promise<void> {
   const { data, error } = await supabase
     .from("document_esignatures")
@@ -104,7 +173,7 @@ async function syncAutoDocumentStatusFromSignatures(documentId: string, organiza
 // ===== DOCUMENT TEMPLATES =====
 export function useDocumentTemplates() {
   const { user, role } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, organizationLoading } = useOrganization();
   const scope: ModuleScopeContext = {
     organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
@@ -113,8 +182,9 @@ export function useDocumentTemplates() {
 
   return useQuery({
     queryKey: ["document_templates", user?.id, organization?.id],
-    enabled: !!user,
-    refetchOnWindowFocus: true,
+    enabled: !!user?.id && !!organization?.id && !organizationLoading,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -322,7 +392,7 @@ export function useDeleteDocumentTemplate() {
 // ===== AUTO DOCUMENTS =====
 export function useAutoDocuments() {
   const { user, role } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, organizationLoading } = useOrganization();
   const scope: ModuleScopeContext = {
     organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
@@ -331,8 +401,9 @@ export function useAutoDocuments() {
 
   return useQuery({
     queryKey: ["auto_documents", user?.id, organization?.id],
-    enabled: !!user,
-    refetchOnWindowFocus: true,
+    enabled: !!user?.id && !!organization?.id && !organizationLoading,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -357,7 +428,7 @@ export function useAutoDocuments() {
 
 export function useAutoDocument(id: string) {
   const { user, role } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, organizationLoading } = useOrganization();
   const scope: ModuleScopeContext = {
     organizationId: organization?.id ?? null,
     userId: user?.id ?? null,
@@ -366,7 +437,8 @@ export function useAutoDocument(id: string) {
 
   return useQuery({
     queryKey: ["auto_document", id, user?.id, organization?.id],
-    enabled: !!id && !!user,
+    enabled: !!id && !!user?.id && !!organization?.id && !organizationLoading,
+    staleTime: 30_000,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -585,12 +657,13 @@ export function useDeleteAutoDocument() {
 // ===== DOCUMENT E-SIGNATURES =====
 export function useDocumentESignatures(documentId?: string) {
   const { user, role } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, organizationLoading } = useOrganization();
 
   return useQuery({
     queryKey: ["document_esignatures", documentId || "all", user?.id, organization?.id],
-    enabled: !!user,
-    refetchOnWindowFocus: true,
+    enabled: !!user?.id && !organizationLoading && (isPlatformRole(role) || !!organization?.id),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -628,7 +701,7 @@ export function useDocumentESignatures(documentId?: string) {
 
 export function useCreateDocumentESignature() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { organization } = useOrganization();
   const { notify } = useCreateNotification();
 
@@ -639,15 +712,22 @@ export function useCreateDocumentESignature() {
       }
 
       let resolvedOrganizationId = organization?.id ?? null;
-      if (!resolvedOrganizationId) {
-        const { data: documentRef } = await supabase
-          .from("auto_documents")
-          .select("organization_id")
-          .eq("id", signature.document_id)
-          .maybeSingle();
+      let documentName = "Document";
 
+      const { data: documentRef, error: documentRefError } = await supabase
+        .from("auto_documents")
+        .select("organization_id,name")
+        .eq("id", signature.document_id)
+        .maybeSingle();
+
+      if (documentRefError) {
+        throw documentRefError;
+      }
+
+      if (!resolvedOrganizationId) {
         resolvedOrganizationId = (documentRef as { organization_id?: string } | null)?.organization_id ?? null;
       }
+      documentName = (documentRef as { name?: string } | null)?.name?.trim() || "Document";
 
       if (!resolvedOrganizationId) {
         throw new Error("Organization context is required");
@@ -658,7 +738,9 @@ export function useCreateDocumentESignature() {
         organization_id: resolvedOrganizationId,
         tenant_id: resolvedOrganizationId,
         recipient_name: signature.recipient_name || "",
-        recipient_email: signature.recipient_email || "",
+        recipient_email: signature.recipient_email?.trim().toLowerCase() || "",
+        signer_name: signature.recipient_name || "",
+        signer_email: signature.recipient_email?.trim().toLowerCase() || "",
         status: signature.status || "pending",
         expires_at: signature.expires_at || null,
         sent_at: new Date().toISOString(),
@@ -687,17 +769,30 @@ export function useCreateDocumentESignature() {
       }
 
       if (resolvedOrganizationId && signature.recipient_email) {
-        void safeEnqueueJob(enqueueEmailSendJob, {
-          organizationId: resolvedOrganizationId,
-          to: signature.recipient_email,
-          template: "document_signature_request",
-          payload: {
-            document_id: signature.document_id,
-            signature_id: data.id,
-            recipient_name: signature.recipient_name ?? null,
-          },
-          createdBy: user?.id ?? null,
+        const workspaceSlug = organization?.slug || resolvedOrganizationId;
+        const sentDirectly = await sendDocumentSignatureRequestEmail({
+          recipientEmail: signature.recipient_email,
+          recipientName: signature.recipient_name ?? null,
+          documentName,
+          workspaceSlug,
+          signatureId: data.id,
+          accessToken: session?.access_token ?? null,
         });
+
+        if (!sentDirectly) {
+          void safeEnqueueJob(enqueueEmailSendJob, {
+            organizationId: resolvedOrganizationId,
+            to: signature.recipient_email,
+            template: "document_signature_request",
+            payload: {
+              document_id: signature.document_id,
+              signature_id: data.id,
+              recipient_name: signature.recipient_name ?? null,
+              portal_sign_url: buildPortalSignatureUrl(workspaceSlug, data.id),
+            },
+            createdBy: user?.id ?? null,
+          });
+        }
       }
 
       void safeWriteAuditLog({
@@ -760,13 +855,28 @@ export function useUpdateDocumentESignature() {
         throw new Error("Document not found or not accessible");
       }
 
-      const { data, error } = await supabase
-        .from("document_esignatures")
-        .update(payload)
-        .eq("id", id)
-        .eq("document_id", document_id)
-        .select()
-        .single();
+      const updateSignature = async (updatePayload: Partial<DocumentESignature>) =>
+        supabase
+          .from("document_esignatures")
+          .update(updatePayload)
+          .eq("id", id)
+          .eq("document_id", document_id)
+          .select()
+          .single();
+
+      let { data, error } = await updateSignature(payload);
+
+      // Backward-compat: some environments don't yet have document_esignatures.rejection_reason.
+      // Retry once without the field so reject action still succeeds while migration is pending.
+      if (
+        error &&
+        Object.prototype.hasOwnProperty.call(payload, "rejection_reason") &&
+        error.message.includes("rejection_reason")
+      ) {
+        const fallbackPayload = { ...payload } as Partial<DocumentESignature>;
+        delete (fallbackPayload as { rejection_reason?: string }).rejection_reason;
+        ({ data, error } = await updateSignature(fallbackPayload));
+      }
 
       if (error) {
         throw error;
@@ -861,12 +971,54 @@ export function useSendDocumentReminder() {
 
       return data as DocumentESignature;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["document_esignatures"] });
+    onMutate: async (signatureId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["document_esignatures"] });
+
+      const previousEntries = queryClient.getQueriesData<DocumentESignatureWithDocument[]>({
+        queryKey: ["document_esignatures"],
+      });
+
+      const optimisticTimestamp = new Date().toISOString();
+      queryClient.setQueriesData<DocumentESignatureWithDocument[]>(
+        { queryKey: ["document_esignatures"] },
+        (current) =>
+          current?.map((signature) =>
+            signature.id === signatureId
+              ? {
+                  ...signature,
+                  reminder_count: (signature.reminder_count || 0) + 1,
+                  last_reminder_at: optimisticTimestamp,
+                }
+              : signature,
+          ) ?? current,
+      );
+
+      return { previousEntries };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueriesData<DocumentESignatureWithDocument[]>(
+        { queryKey: ["document_esignatures"] },
+        (current) =>
+          current?.map((signature) =>
+            signature.id === data.id
+              ? {
+                  ...signature,
+                  reminder_count: data.reminder_count,
+                  last_reminder_at: data.last_reminder_at,
+                }
+              : signature,
+          ) ?? current,
+      );
       toast.success("Reminder sent");
     },
-    onError: (error) => {
+    onError: (error, _signatureId, context) => {
+      context?.previousEntries?.forEach(([queryKey, previousData]) => {
+        queryClient.setQueryData(queryKey, previousData);
+      });
       toast.error("Error sending reminder: " + error.message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["document_esignatures"], refetchType: "inactive" });
     },
   });
 }
@@ -874,11 +1026,12 @@ export function useSendDocumentReminder() {
 // ===== DOCUMENT VERSIONS =====
 export function useDocumentVersions(documentId: string) {
   const { user, role } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, organizationLoading } = useOrganization();
 
   return useQuery({
     queryKey: ["document_versions", documentId, user?.id, organization?.id],
-    enabled: !!documentId && !!user,
+    enabled: !!documentId && !!user?.id && !!organization?.id && !organizationLoading,
+    staleTime: 30_000,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");
@@ -981,10 +1134,12 @@ export function useCreateDocumentVersion() {
 // ===== DOCUMENT PERMISSIONS =====
 export function useDocumentPermissions(documentId: string) {
   const { user } = useAuth();
+  const { organization, organizationLoading } = useOrganization();
 
   return useQuery({
-    queryKey: ["document_permissions", documentId, user?.id],
-    enabled: !!documentId && !!user,
+    queryKey: ["document_permissions", documentId, user?.id, organization?.id],
+    enabled: !!documentId && !!user?.id && !!organization?.id && !organizationLoading,
+    staleTime: 30_000,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User not authenticated");

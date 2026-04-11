@@ -1,72 +1,192 @@
 "use client";
 
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileSignature, CheckCircle2, Clock, XCircle, FileText } from "lucide-react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, Clock, FileSignature, FileText, Loader2, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Badge } from "@/ui/shadcn/badge";
 import { Separator } from "@/ui/shadcn/separator";
 import { supabase } from "@/core/api/client";
+import { getSignedUrl } from "@/core/utils/upload";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePortalScope } from "@/workspaces/portal/hooks/usePortalScope";
+
+type SignatureKind = "contract" | "document";
+
+interface PortalSignatureRecord {
+  id: string;
+  kind: SignatureKind;
+  status: string;
+  createdAt: string | null;
+  signedAt: string | null;
+  title: string;
+  previewContent: string | null;
+  previewFileUrl: string | null;
+  previewFileName: string | null;
+}
+
+function normalizeSignatureType(value: string | null): SignatureKind | null {
+  if (value === "contract" || value === "document") {
+    return value;
+  }
+  return null;
+}
 
 export default function CustomerSignaturePage() {
   const { organizationId, portalEmail, isReady } = usePortalScope();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const selectedType = normalizeSignatureType(searchParams.get("type"));
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: signature, isLoading } = useQuery({
-    queryKey: ["portal-signature", id, organizationId, portalEmail],
+    queryKey: ["portal-signature", id, organizationId, portalEmail, selectedType || "auto"],
     enabled: !!id && isReady,
     queryFn: async () => {
       if (!id || !organizationId || !portalEmail) throw new Error("Missing context");
-      const { data, error } = await supabase
-        .from("contract_esignatures")
-        .select("*, contracts:contracts(*)")
-        .eq("id", id)
-        .eq("organization_id", organizationId)
-        .eq("signer_email", portalEmail)
-        .single();
-      if (error) throw error;
-      return data;
+
+      const fetchContractSignature = async (): Promise<PortalSignatureRecord | null> => {
+        const { data, error } = await supabase
+          .from("contract_esignatures")
+          .select("id, status, signed_at, created_at, contracts:contracts(name,contract_number,content)")
+          .eq("id", id)
+          .eq("organization_id", organizationId)
+          .ilike("signer_email", portalEmail)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return null;
+
+        const contract = (data as { contracts?: { name?: string | null; contract_number?: string | null; content?: string | null } | null }).contracts;
+        return {
+          id: data.id,
+          kind: "contract",
+          status: data.status || "pending",
+          createdAt: data.created_at,
+          signedAt: data.signed_at,
+          title: contract?.name || contract?.contract_number || "Contract",
+          previewContent: contract?.content || null,
+          previewFileUrl: null,
+          previewFileName: null,
+        };
+      };
+
+      const fetchDocumentSignature = async (): Promise<PortalSignatureRecord | null> => {
+        const { data, error } = await supabase
+          .from("document_esignatures")
+          .select("id, status, signed_at, created_at, document:auto_documents(name,content,file_path,file_name)")
+          .eq("id", id)
+          .eq("organization_id", organizationId)
+          .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return null;
+
+        const document = (data as {
+          document?: {
+            name?: string | null;
+            content?: string | null;
+            file_path?: string | null;
+            file_name?: string | null;
+          } | null;
+        }).document;
+        let previewFileUrl: string | null = null;
+
+        if (document?.file_path) {
+          try {
+            previewFileUrl = await getSignedUrl("documents", document.file_path);
+          } catch (previewError) {
+            console.error("Failed to build signed URL for document preview", previewError);
+          }
+        }
+
+        return {
+          id: data.id,
+          kind: "document",
+          status: data.status || "pending",
+          createdAt: data.created_at,
+          signedAt: data.signed_at,
+          title: document?.name || "Document",
+          previewContent: document?.content || null,
+          previewFileUrl,
+          previewFileName: document?.file_name || null,
+        };
+      };
+
+      if (selectedType === "contract") {
+        return fetchContractSignature();
+      }
+      if (selectedType === "document") {
+        return fetchDocumentSignature();
+      }
+
+      const contractRecord = await fetchContractSignature();
+      if (contractRecord) return contractRecord;
+      return fetchDocumentSignature();
     },
   });
 
   const signMutation = useMutation({
     mutationFn: async () => {
-      if (!id || !organizationId || !portalEmail) return;
+      if (!id || !organizationId || !portalEmail || !signature) return;
+
+      if (signature.kind === "contract") {
+        const { error } = await supabase
+          .from("contract_esignatures")
+          .update({ status: "signed", signed_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("organization_id", organizationId)
+          .ilike("signer_email", portalEmail);
+        if (error) throw error;
+        return;
+      }
+
       const { error } = await supabase
-        .from("contract_esignatures")
+        .from("document_esignatures")
         .update({ status: "signed", signed_at: new Date().toISOString() })
         .eq("id", id)
         .eq("organization_id", organizationId)
-        .eq("signer_email", portalEmail);
+        .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Document signed successfully");
       queryClient.invalidateQueries({ queryKey: ["portal-signature", id] });
+      queryClient.invalidateQueries({ queryKey: ["portal-pending-signatures"] });
     },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async () => {
-      if (!id || !organizationId || !portalEmail) return;
+      if (!id || !organizationId || !portalEmail || !signature) return;
+
+      if (signature.kind === "contract") {
+        const { error } = await supabase
+          .from("contract_esignatures")
+          .update({ status: "rejected" })
+          .eq("id", id)
+          .eq("organization_id", organizationId)
+          .ilike("signer_email", portalEmail);
+        if (error) throw error;
+        return;
+      }
+
       const { error } = await supabase
-        .from("contract_esignatures")
+        .from("document_esignatures")
         .update({ status: "rejected" })
         .eq("id", id)
         .eq("organization_id", organizationId)
-        .eq("signer_email", portalEmail);
+        .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Document signature rejected");
       queryClient.invalidateQueries({ queryKey: ["portal-signature", id] });
+      queryClient.invalidateQueries({ queryKey: ["portal-pending-signatures"] });
     },
   });
 
@@ -89,6 +209,16 @@ export default function CustomerSignaturePage() {
   }
 
   const isPending = signature.status === "pending";
+  const hasFilePreview = Boolean(signature.previewFileUrl);
+
+  const handleViewDocument = () => {
+    if (!signature.previewFileUrl) {
+      toast.error("Document file is not available.");
+      return;
+    }
+
+    window.open(signature.previewFileUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -103,8 +233,10 @@ export default function CustomerSignaturePage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>{signature.contracts?.name || "Contract"}</CardTitle>
-              <CardDescription>Request sent on {signature.created_at ? format(new Date(signature.created_at), "PPP") : "—"}</CardDescription>
+              <CardTitle>{signature.title}</CardTitle>
+              <CardDescription>
+                Request sent on {signature.createdAt ? format(new Date(signature.createdAt), "PPP") : "—"}
+              </CardDescription>
             </div>
             <Badge variant={isPending ? "outline" : "secondary"} className={signature.status === "signed" ? "bg-success/20 text-success-foreground" : ""}>
               {(signature.status || "pending").charAt(0).toUpperCase() + (signature.status || "pending").slice(1)}
@@ -114,15 +246,18 @@ export default function CustomerSignaturePage() {
         <CardContent className="space-y-6">
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Document Preview
+              <FileText className="h-4 w-4" /> Document
             </h3>
-            <div className="max-h-[400px] overflow-y-auto rounded border bg-background p-4 text-sm prose prose-sm dark:prose-invert">
-              {signature.contracts?.content ? (
-                <pre className="whitespace-pre-wrap font-sans">{signature.contracts.content}</pre>
-              ) : (
-                <p className="text-muted-foreground italic">No content preview available for this document.</p>
-              )}
+            <div className="rounded border bg-background p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium truncate">{signature.title}</p>
+                <p className="text-sm text-muted-foreground">Open the document in a new tab to review before signing.</p>
+              </div>
+              <Button variant="outline" onClick={handleViewDocument} disabled={!hasFilePreview}>
+                View Document
+              </Button>
             </div>
+            {!hasFilePreview && <p className="text-xs text-muted-foreground">Document file preview is not available for this record.</p>}
           </div>
 
           <Separator />
@@ -146,7 +281,7 @@ export default function CustomerSignaturePage() {
               <CheckCircle2 className="h-5 w-5" />
               <div>
                 <p className="font-semibold">Document Signed</p>
-                <p className="text-sm">You signed this document on {signature.signed_at ? format(new Date(signature.signed_at), "PPP p") : "—"}</p>
+                <p className="text-sm">You signed this document on {signature.signedAt ? format(new Date(signature.signedAt), "PPP p") : "—"}</p>
               </div>
             </div>
           ) : (

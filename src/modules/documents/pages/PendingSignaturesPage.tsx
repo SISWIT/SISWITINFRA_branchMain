@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/ui/shadcn/button";
 import {
@@ -10,9 +10,11 @@ import {
 } from "@/modules/documents/hooks/useDocuments";
 import { AlertCircle, Clock, Mail, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const PendingSignaturesPage = () => {
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const sendReminderMutation = useSendDocumentReminder();
   const {
     data: signatures = [],
@@ -20,6 +22,7 @@ const PendingSignaturesPage = () => {
     refetch,
   } = useDocumentESignatures();
   const [isSendingBulkReminders, setIsSendingBulkReminders] = useState(false);
+  const [activeReminderId, setActiveReminderId] = useState<string | null>(null);
 
   const pendingSignatures = useMemo(
     () => signatures.filter((signature) => signature.status === "pending"),
@@ -45,12 +48,13 @@ const PendingSignaturesPage = () => {
   }, [pendingSignatures]);
 
   const handleRemind = async (signatureId: string) => {
+    setActiveReminderId(signatureId);
     try {
       await sendReminderMutation.mutateAsync(signatureId);
-      toast.success("Reminder sent successfully");
-      refetch(); // Refresh to update reminder counts
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send reminder");
+    } finally {
+      setActiveReminderId((current) => (current === signatureId ? null : current));
     }
   };
 
@@ -82,8 +86,6 @@ const PendingSignaturesPage = () => {
         );
       }
 
-      // Always refetch to show updated counts regardless of partial failures
-      refetch();
     } catch (err) {
       toast.error("An unexpected error occurred during bulk operations");
     } finally {
@@ -102,13 +104,14 @@ const PendingSignaturesPage = () => {
             Track outstanding recipients and send reminders.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => refetch()}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => refetch()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
           <Button
             variant="hero"
+            className="flex-1 sm:flex-none"
             onClick={handleSendBulkReminders}
             disabled={isSendingBulkReminders || pendingSignatures.length === 0}
           >
@@ -222,22 +225,24 @@ const PendingSignaturesPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 lg:ml-4">
+                  <div className="flex w-full flex-wrap gap-2 lg:ml-4 lg:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={() => handleRemind(signature.id)}
-                      disabled={sendReminderMutation.isPending}
+                      disabled={isSendingBulkReminders || activeReminderId === signature.id}
                     >
                       <Mail className="mr-1 h-4 w-4" />
-                      Remind
+                      {activeReminderId === signature.id ? "Sending..." : "Remind"}
                     </Button>
                     <Button
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={() =>
                         signature.document_id &&
                         navigate(
-                          `/dashboard/documents/${signature.document_id}/esign`,
+                          tenantAppPath(tenantSlug, `documents/${signature.document_id}/esign`),
                         )
                       }
                       disabled={!signature.document_id}

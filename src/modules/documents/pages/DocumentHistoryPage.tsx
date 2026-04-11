@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: string; label: string }> = {
   draft: { icon: FileText, bg: "bg-secondary", text: "text-secondary-foreground", label: "Draft" },
@@ -32,6 +33,7 @@ const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: 
 
 const DocumentHistoryPage = () => {
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const { data: documents = [], isLoading } = useAutoDocuments();
   const { data: signatures = [] } = useDocumentESignatures();
 
@@ -215,13 +217,21 @@ const DocumentHistoryPage = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/documents/${document.id}/esign`)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(tenantAppPath(tenantSlug, `documents/${document.id}/esign`))}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDownloadDocument(document.id)}>
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/documents/${document.id}/esign`)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(tenantAppPath(tenantSlug, `documents/${document.id}/esign`))}
+                          >
                             E-Sign
                           </Button>
                         </div>

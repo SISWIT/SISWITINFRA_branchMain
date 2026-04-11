@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileStack, Search, Eye, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, FileStack, Loader2, Search } from "lucide-react";
 import { Card, CardContent } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
@@ -13,13 +13,13 @@ import { usePortalScope } from "@/workspaces/portal/hooks/usePortalScope";
 interface CustomerDocument {
   id: string;
   name: string | null;
-  document_type: string | null;
+  type: string | null;
   status: string | null;
   created_at: string | null;
 }
 
 export default function CustomerDocumentsPage() {
-  const { organizationId, organizationLoading, userId, isReady } = usePortalScope();
+  const { organizationId, organizationLoading, userId, portalEmail, isReady } = usePortalScope();
   const [searchQuery, setSearchQuery] = useState("");
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,30 +34,76 @@ export default function CustomerDocumentsPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      const createdDocsPromise = supabase
         .from("auto_documents")
-        .select("*")
+        .select("id,name,type,status,created_at")
         .eq("organization_id", organizationId)
         .eq("created_by", userId)
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        setDocuments(data);
+      const assignedDocsPromise = portalEmail
+        ? supabase
+            .from("document_esignatures")
+            .select("document:auto_documents(id,name,type,status,created_at)")
+            .eq("organization_id", organizationId)
+            .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`)
+        : Promise.resolve({ data: [], error: null });
+
+      const [createdDocsRes, assignedDocsRes] = await Promise.all([createdDocsPromise, assignedDocsPromise]);
+
+      if (createdDocsRes.error || assignedDocsRes.error) {
+        setDocuments([]);
+        setIsLoading(false);
+        return;
       }
+
+      const merged = new Map<string, CustomerDocument>();
+
+      (createdDocsRes.data || []).forEach((doc) => {
+        merged.set(doc.id, {
+          id: doc.id,
+          name: doc.name,
+          type: doc.type,
+          status: doc.status,
+          created_at: doc.created_at,
+        });
+      });
+
+      (assignedDocsRes.data || []).forEach((row) => {
+        const doc = (row as { document?: CustomerDocument | null }).document;
+        if (!doc) return;
+        if (!merged.has(doc.id)) {
+          merged.set(doc.id, doc);
+        }
+      });
+
+      const sorted = Array.from(merged.values()).sort((a, b) => {
+        const aTs = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTs = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTs - aTs;
+      });
+
+      setDocuments(sorted);
       setIsLoading(false);
     };
 
     if (!organizationLoading) {
       void fetchDocuments();
     }
-  }, [organizationId, organizationLoading, userId]);
+  }, [organizationId, organizationLoading, userId, portalEmail]);
 
-  const filteredDocuments = documents?.filter((doc) => {
-    const matchesSearch =
-      doc.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.document_type?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  }) || [];
+  const filteredDocuments = useMemo(
+    () =>
+      documents.filter((doc) => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+        return (
+          (doc.name || "").toLowerCase().includes(query) ||
+          (doc.type || "").toLowerCase().includes(query)
+        );
+      }),
+    [documents, searchQuery],
+  );
 
   if (organizationLoading || isLoading || !isReady) {
     return (
@@ -72,7 +118,7 @@ export default function CustomerDocumentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">My Documents</h1>
-          <p className="text-muted-foreground">View and manage your documents</p>
+          <p className="text-muted-foreground">View your generated and assigned documents</p>
         </div>
       </div>
 
@@ -94,7 +140,7 @@ export default function CustomerDocumentsPage() {
             <div className="text-center py-12">
               <FileStack className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No documents found</h3>
-              <p className="text-muted-foreground">You don't have any documents yet.</p>
+              <p className="text-muted-foreground">You don't have any generated or assigned documents yet.</p>
             </div>
           ) : (
             <Table>
@@ -111,13 +157,13 @@ export default function CustomerDocumentsPage() {
                 {filteredDocuments.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">{doc.name || "Unnamed"}</TableCell>
-                    <TableCell>{doc.document_type || "N/A"}</TableCell>
+                    <TableCell className="capitalize">{doc.type || "N/A"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{doc.status || "Draft"}</Badge>
                     </TableCell>
                     <TableCell>{doc.created_at ? new Date(doc.created_at).toLocaleDateString() : "N/A"}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" disabled>
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>

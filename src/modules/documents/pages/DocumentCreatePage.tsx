@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
@@ -29,6 +29,7 @@ import {
   User,
 } from "lucide-react";
 import { FileUpload } from "@/ui/file-upload";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const steps = [
   { id: 1, title: "Select Template", icon: FileText },
@@ -38,6 +39,7 @@ const steps = [
 
 const DocumentCreatePage = () => {
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { organizationId } = useModuleScope();
@@ -149,7 +151,7 @@ const DocumentCreatePage = () => {
         file_size: formData.fileSize ? parseInt(formData.fileSize) : undefined,
       });
 
-      navigate(`/dashboard/documents/${createdDocument.id}/esign`);
+      navigate(tenantAppPath(tenantSlug, `documents/${createdDocument.id}/esign`));
     } catch {
       // Error is surfaced through mutation toast.
     } finally {
@@ -160,7 +162,7 @@ const DocumentCreatePage = () => {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <Link to="/dashboard/documents" className="mb-4 inline-flex items-center text-muted-foreground hover:text-foreground">
+        <Link to={tenantAppPath(tenantSlug, "documents")} className="mb-4 inline-flex items-center text-muted-foreground hover:text-foreground">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Documents
         </Link>
@@ -201,7 +203,7 @@ const DocumentCreatePage = () => {
             ) : templates.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center">
                 <p className="text-muted-foreground">No templates found. Create one first to generate a document.</p>
-                <Link to="/dashboard/documents/templates">
+                <Link to={tenantAppPath(tenantSlug, "documents/templates")}>
                   <Button variant="outline" className="mt-4">
                     Go to Templates
                   </Button>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Textarea } from "@/ui/shadcn/textarea";
@@ -40,6 +40,7 @@ import type { DocumentTemplate, DocumentType } from "@/core/types/documents";
 import { useCRUD } from "@/core/rbac/usePermissions";
 import { toast } from "sonner";
 import { Clock, Copy, Edit, FileStack, FileText, MoreVertical, Plus, Search, Trash2, User } from "lucide-react";
+import { tenantAppPath } from "@/core/utils/routes";
 
 const templateTypes: DocumentType[] = ["proposal", "invoice", "agreement", "report", "policy", "manual", "other"];
 import { PlanLimitBanner } from "@/ui/plan-limit-banner";
@@ -54,6 +55,7 @@ const emptyFormState = {
 
 const DocumentTemplatesPage = () => {
   const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const { data: templates = [], isLoading } = useDocumentTemplates();
   const { data: documents = [] } = useAutoDocuments();
   const createTemplateMutation = useCreateDocumentTemplate();
@@ -334,7 +336,9 @@ const DocumentTemplatesPage = () => {
                 <Button
                   size="sm"
                   className="flex-1"
-                  onClick={() => navigate(`/dashboard/documents/create?templateId=${template.id}`)}
+                  onClick={() =>
+                    navigate(`${tenantAppPath(tenantSlug, "documents/create")}?templateId=${template.id}`)
+                  }
                 >
                   Use Template
                 </Button>

@@ -7,6 +7,7 @@ import { Input } from "@/ui/shadcn/input";
 import { Label } from "@/ui/shadcn/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
 import { Textarea } from "@/ui/shadcn/textarea";
+import { tenantAppPath } from "@/core/utils/routes";
 import { useContacts } from "@/modules/crm/hooks/useCRM";
 import {
   useAutoDocument,
@@ -39,7 +40,7 @@ type DocumentContent = {
 };
 
 const DocumentESignPage = () => {
-  const { id: documentId } = useParams<{ id: string }>();
+  const { id: documentId, tenantSlug = "" } = useParams<{ id: string; tenantSlug: string }>();
   const { data: document, isLoading: isDocumentLoading } = useAutoDocument(documentId || "");
   const { data: signatures = [], isLoading: isSignaturesLoading, refetch } = useDocumentESignatures(documentId);
   const { data: contacts = [] } = useContacts();
@@ -210,7 +211,7 @@ const DocumentESignPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Link to="/dashboard/documents/history" className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <Link to={tenantAppPath(tenantSlug, "documents/history")} className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back to History
           </Link>

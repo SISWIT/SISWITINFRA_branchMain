@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/ui/shadcn/button";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
@@ -10,7 +10,9 @@ import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
 import { SearchBar } from "@/ui/search-bar";
 import { FilterBar } from "@/ui/filter-bar";
-import { getFileUrl } from "@/core/utils/upload";
+import { getSignedUrl } from "@/core/utils/upload";
+import { tenantAppPath } from "@/core/utils/routes";
+import { toast } from "sonner";
 
 const DOC_FILTERS = [
   {
@@ -36,38 +38,8 @@ const DOC_FILTERS = [
   },
 ];
 
-const quickActions = [
-  {
-    icon: FilePlus,
-    title: "Create Document",
-    description: "Generate a new document from template",
-    path: "/dashboard/documents/create",
-    color: "from-primary to-primary/60",
-  },
-  {
-    icon: FileText,
-    title: "Manage Templates",
-    description: "Edit and create document templates",
-    path: "/dashboard/documents/templates",
-    color: "from-accent to-accent/60",
-  },
-  {
-    icon: History,
-    title: "View History",
-    description: "Document generation history and logs",
-    path: "/dashboard/documents/history",
-    color: "from-chart-3 to-chart-3/60",
-  },
-  {
-    icon: Send,
-    title: "Pending Signatures",
-    description: "Documents awaiting signature",
-    path: "/dashboard/documents/pending",
-    color: "from-chart-4 to-chart-4/60",
-  },
-];
-
 const DocumentsDashboard = () => {
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const { data: documents = [], isLoading: isDocumentsLoading } = useAutoDocuments();
   const { data: signatures = [], isLoading: isSignaturesLoading } = useDocumentESignatures();
   const isLoading = isDocumentsLoading || isSignaturesLoading;
@@ -88,11 +60,52 @@ const DocumentsDashboard = () => {
 
   const recentDocuments = documents.slice(0, 5);
 
+  const handleOpenDocumentFile = async (filePath: string) => {
+    try {
+      const signedUrl = await getSignedUrl("documents", filePath);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("Failed to open document file", error);
+      toast.error("Unable to open this document file right now.");
+    }
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { searchQuery, setSearchQuery, activeFilters, setFilter, clearFilters, filteredData, resultCount, totalCount, filterDefs } = useSearch<any>(documents, {
     searchFields: ["name", "type", "status"],
     filterDefs: DOC_FILTERS,
   });
+
+  const quickActions = [
+    {
+      icon: FilePlus,
+      title: "Create Document",
+      description: "Generate a new document from template",
+      path: tenantAppPath(tenantSlug, "documents/create"),
+      color: "from-primary to-primary/60",
+    },
+    {
+      icon: FileText,
+      title: "Manage Templates",
+      description: "Edit and create document templates",
+      path: tenantAppPath(tenantSlug, "documents/templates"),
+      color: "from-accent to-accent/60",
+    },
+    {
+      icon: History,
+      title: "View History",
+      description: "Document generation history and logs",
+      path: tenantAppPath(tenantSlug, "documents/history"),
+      color: "from-chart-3 to-chart-3/60",
+    },
+    {
+      icon: Send,
+      title: "Pending Signatures",
+      description: "Documents awaiting signature",
+      path: tenantAppPath(tenantSlug, "documents/pending"),
+      color: "from-chart-4 to-chart-4/60",
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -103,7 +116,7 @@ const DocumentsDashboard = () => {
           <p className="text-muted-foreground">Create, manage, and deliver documents at scale.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/dashboard/documents/create">
+          <Link to={tenantAppPath(tenantSlug, "documents/create")}>
             <Button variant="hero">
               <FilePlus className="mr-2 h-4 w-4" />
               Create Document
@@ -156,7 +169,7 @@ const DocumentsDashboard = () => {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Recent Documents</h2>
-          <Link to="/dashboard/documents/history">
+          <Link to={tenantAppPath(tenantSlug, "documents/history")}>
             <Button variant="ghost" size="sm">
               View All
               <ArrowRight className="ml-1 h-4 w-4" />
@@ -191,11 +204,11 @@ const DocumentsDashboard = () => {
                       {document.status}
                     </span>
                     {document.file_path && (
-                      <Button size="sm" variant="ghost" onClick={() => window.open(getFileUrl("documents", document.file_path as string), "_blank")}>
+                      <Button size="sm" variant="ghost" onClick={() => void handleOpenDocumentFile(document.file_path as string)}>
                         <Paperclip className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Link to={`/dashboard/documents/${document.id}/esign`}>
+                    <Link to={tenantAppPath(tenantSlug, `documents/${document.id}/esign`)}>
                       <Button size="sm" variant="outline">
                         <Send className="mr-1 h-3.5 w-3.5" />
                         E-Sign
