@@ -9,6 +9,7 @@ export interface UploadResult {
   path: string;
   size: number;
   name: string;
+  fileHash?: string;
 }
 
 /** Allowed MIME types for upload validation. */

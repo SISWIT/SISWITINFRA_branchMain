@@ -679,18 +679,24 @@ export function useUpdateESignature() {
 // ===== CONTRACT SCANS =====
 export function useContractScans(contractId: string) {
   const { scope, enabled, tenantId, userId } = useModuleScope();
+  const isGlobalScope = contractId === "global";
 
   return useQuery({
     queryKey: ["contract_scans", contractId, tenantId, userId],
     enabled: enabled && Boolean(contractId),
     queryFn: async () => {
-      await ensureContractAccessible(contractId, scope);
+      if (!isGlobalScope) {
+        await ensureContractAccessible(contractId, scope);
+      }
 
-      const scopedQuery = applyModuleReadScope(
-        supabase.from("contract_scans").select("*").eq("contract_id", contractId),
-        scope,
-        { ownerColumns: ["created_by"], hasSoftDelete: true },
-      );
+      const scanQuery = isGlobalScope
+        ? supabase.from("contract_scans").select("*").is("contract_id", null)
+        : supabase.from("contract_scans").select("*").eq("contract_id", contractId);
+
+      const scopedQuery = applyModuleReadScope(scanQuery, scope, {
+        ownerColumns: ["created_by"],
+        hasSoftDelete: false,
+      });
 
       const { data, error } = await scopedQuery.order("created_at", { ascending: false });
       if (error) throw error;
@@ -717,7 +723,7 @@ export function useCreateContractScan() {
           tenant_id: requiredOrganizationId,
           contract_id: contractId,
           file_path: scan.file_path ?? null,
-          file_url: scan.file_path ?? null,
+          file_url: scan.file_url ?? scan.file_path ?? null,
           file_name: scan.file_name ?? null,
           content_type: scan.content_type ?? null,
           file_size: scan.file_size ?? null,

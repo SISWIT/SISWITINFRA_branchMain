@@ -6,7 +6,7 @@ import { Upload, File as FileIcon, X, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/ui/shadcn/button";
 import { Progress } from "@/ui/shadcn/progress";
 import { useFileUpload } from "@/core/hooks/useFileUpload";
-import { validateFile, formatFileSize } from "@/core/utils/upload";
+import { validateFile } from "@/core/utils/upload";
 import type { UploadResult } from "@/core/utils/upload";
 import { toast } from "sonner";
 
@@ -21,6 +21,14 @@ interface FileUploadProps {
   existingFile?: { name: string; url: string; path?: string } | null;
   onDelete?: () => void;
   disabled?: boolean;
+}
+
+async function computeFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export function FileUpload({
@@ -54,8 +62,12 @@ export function FileUpload({
       }
 
       try {
-        const result = await upload(file, organizationId);
-        onUploadComplete(result);
+        const [result, fileHash] = await Promise.all([
+          upload(file, organizationId),
+          computeFileHash(file),
+        ]);
+
+        onUploadComplete({ ...result, fileHash });
         toast.success(`${file.name} uploaded successfully`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Upload failed";

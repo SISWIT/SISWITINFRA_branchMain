@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.create-razorpay-subscription]
 verify_jwt = false
+
+[functions.contract-scan-ai]
+verify_jwt = false

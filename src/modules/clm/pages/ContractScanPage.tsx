@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { 
-  FileText, AlertTriangle, CheckCircle, Clock, ArrowLeft, 
-  Sparkles, Shield, Calendar, DollarSign, Users, RefreshCw, Trash2, Link as LinkIcon 
+import {
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  ArrowLeft,
+  Sparkles,
+  Shield,
+  Calendar,
+  DollarSign,
+  Users,
+  RefreshCw,
+  Trash2,
+  Link as LinkIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
@@ -13,7 +24,8 @@ import { useModuleScope } from "@/core/hooks/useModuleScope";
 import { useContractScans, useCreateContractScan, useDeleteContractScan } from "@/modules/clm/hooks/useCLM";
 import { FileUpload } from "@/ui/file-upload";
 import { format, parseISO } from "date-fns";
-import { formatFileSize } from "@/core/utils/upload";
+import { supabase } from "@/core/api/client";
+import { formatFileSize, getSignedUrl } from "@/core/utils/upload";
 import type { UploadResult } from "@/core/utils/upload";
 
 interface ScanResult {
@@ -27,11 +39,167 @@ interface ScanResult {
   keyClausesClauses: { title: string; summary: string; risk: "low" | "medium" | "high" }[];
 }
 
+interface ContractScanAiResponse {
+  scan: ScanResult;
+  model?: string;
+  attempts?: string[];
+}
+
+interface FunctionsErrorWithContext extends Error {
+  context?: Response;
+}
+
+const LIVE_CONTRACT_SCAN_ENABLED = import.meta.env.VITE_ENABLE_LIVE_CONTRACT_SCAN === "true";
+const SCAN_CACHE_NAMESPACE = "clm-contract-scan-v2";
+
+const MOCK_SCAN_RESULT: ScanResult = {
+  parties: ["SISWIT Solutions", "Global Tech Corp"],
+  startDate: "2024-01-01",
+  endDate: "2025-01-01",
+  value: "EUR 45,000",
+  paymentTerms: "Net 30",
+  renewalClause: "Automatic 12-month renewal unless cancelled 60 days prior.",
+  riskFlags: [
+    { level: "low", message: "Standard termination clauses detected." },
+    { level: "medium", message: "Auto-renewal period is shorter than industry average." },
+  ],
+  keyClausesClauses: [
+    { title: "Indemnification", summary: "Standard mutual indemnification.", risk: "low" },
+    { title: "Liability Cap", summary: "Limited to 12 months of fees.", risk: "medium" },
+  ],
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getScanSignalScore(scan: ScanResult): number {
+  let score = 0;
+  if (scan.parties.length > 0) score += 1;
+  if (scan.startDate || scan.endDate) score += 1;
+  if (scan.value) score += 1;
+  if (scan.paymentTerms) score += 1;
+  if (scan.renewalClause) score += 1;
+  if (scan.keyClausesClauses.length > 0) score += 1;
+  return score;
+}
+
+function shouldCacheScan(scan: ScanResult): boolean {
+  // Avoid caching weak/hallucinated outputs (e.g. single random value).
+  return getScanSignalScore(scan) >= 3;
+}
+
+function getUploadFingerprint(result: UploadResult): string {
+  const hash = (result.fileHash ?? "").trim();
+  if (hash) {
+    return hash;
+  }
+  return `${result.name.toLowerCase()}::${result.size}`;
+}
+
+function buildScanCacheKey(result: UploadResult): string {
+  return `${SCAN_CACHE_NAMESPACE}:${getUploadFingerprint(result)}`;
+}
+
+function readCachedScan(result: UploadResult): ScanResult | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const cacheKey = buildScanCacheKey(result);
+    const raw = window.localStorage.getItem(cacheKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as { scan?: ScanResult };
+    if (!parsed.scan || !shouldCacheScan(parsed.scan)) {
+      return null;
+    }
+
+    return parsed.scan;
+  } catch (error) {
+    console.warn("Failed to read cached contract scan:", error);
+    return null;
+  }
+}
+
+function writeCachedScan(result: UploadResult, scan: ScanResult): void {
+  if (typeof window === "undefined" || !shouldCacheScan(scan)) {
+    return;
+  }
+
+  try {
+    const cacheKey = buildScanCacheKey(result);
+    window.localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        scan,
+        cachedAt: new Date().toISOString(),
+      }),
+    );
+  } catch (error) {
+    console.warn("Failed to write cached contract scan:", error);
+  }
+}
+
+async function runLiveContractScan(result: UploadResult): Promise<{ scan: ScanResult; model?: string; attempts?: string[] }> {
+  // Prefer signed URLs so private buckets can also be processed by OpenRouter.
+  let fileUrl = result.url;
+  try {
+    fileUrl = await getSignedUrl("contract-scans", result.path, 15 * 60);
+  } catch (error) {
+    console.warn("Falling back to public file URL for AI scan:", error);
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error("No active session. Please sign in again and retry.");
+  }
+
+  supabase.functions.setAuth(session.access_token);
+
+  const { data, error } = await supabase.functions.invoke<ContractScanAiResponse>("contract-scan-ai", {
+    body: {
+      fileUrl,
+      fileName: result.name,
+    },
+  });
+
+  if (error) {
+    const err = error as FunctionsErrorWithContext;
+    let detail = err.message || "Failed to run live contract scan";
+
+    if (err.context) {
+      try {
+        const payload = await err.context.clone().json() as { error?: string; detail?: string };
+        if (payload.error && payload.detail) {
+          detail = `${payload.error}: ${payload.detail}`;
+        } else if (payload.error) {
+          detail = payload.error;
+        }
+      } catch {
+        // Keep original error message if body is not JSON.
+      }
+    }
+
+    throw new Error(detail);
+  }
+
+  if (!data?.scan) {
+    throw new Error("Live contract scan returned an invalid response");
+  }
+
+  return { scan: data.scan, model: data.model, attempts: data.attempts };
+}
+
 export default function ContractScanPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const { organizationId } = useModuleScope();
-  
+
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -39,7 +207,7 @@ export default function ContractScanPage() {
 
   // Get current contract ID if available (optional for general scanner)
   const { contractId } = useParams<{ contractId: string }>();
-  
+
   const { data: scans = [], isLoading: isScansLoading } = useContractScans((contractId as string) || "global");
   const createScanMutation = useCreateContractScan();
   const deleteScanMutation = useDeleteContractScan();
@@ -47,48 +215,63 @@ export default function ContractScanPage() {
   const handleUploadComplete = async (result: UploadResult) => {
     setActiveFile({ name: result.name, url: result.url });
     setIsScanning(true);
+    setScanProgress(0);
     setScanResult(null);
 
-    // Simulate AI scanning process (since we don't have a real AI backend yet)
-    // In production, this would be a separate VPC/Edge Function call post-upload
-    for (let i = 0; i <= 100; i += 20) {
-      await new Promise((r) => setTimeout(r, 400));
-      setScanProgress(i);
-    }
-
-    // AI scan results mock
-    const scanResultData: ScanResult = {
-      parties: ["SISWIT Solutions", "Global Tech Corp"],
-      startDate: "2024-01-01",
-      endDate: "2025-01-01",
-      value: "€45,000",
-      paymentTerms: "Net 30",
-      renewalClause: "Automatic 12-month renewal unless cancelled 60 days prior.",
-      riskFlags: [
-        { level: "low", message: "Standard termination clauses detected." },
-        { level: "medium", message: "Auto-renewal period is shorter than industry average." }
-      ],
-      keyClausesClauses: [
-        { title: "Indemnification", summary: "Standard mutual indemnification.", risk: "low" },
-        { title: "Liability Cap", summary: "Limited to 12 months of fees.", risk: "medium" }
-      ],
-    };
-
     try {
+      let scanResultData = MOCK_SCAN_RESULT;
+      let scanMode: "live" | "mock" | "cache" = "mock";
+
+      const cachedScan = readCachedScan(result);
+      if (cachedScan) {
+        scanResultData = cachedScan;
+        scanMode = "cache";
+        setScanProgress(85);
+      } else if (LIVE_CONTRACT_SCAN_ENABLED) {
+        setScanProgress(20);
+        await wait(120);
+
+        const liveResult = await runLiveContractScan(result);
+        scanResultData = liveResult.scan;
+        scanMode = "live";
+        setScanProgress(85);
+
+        if (liveResult.model) {
+          toast.info(`Scanned with model: ${liveResult.model}`);
+        }
+        if (liveResult.attempts && liveResult.attempts.length > 0) {
+          console.info("Contract scan attempts:", liveResult.attempts);
+        }
+        writeCachedScan(result, scanResultData);
+      } else {
+        // Keep mock-mode animation so local demo behavior remains smooth.
+        for (let progress = 20; progress <= 85; progress += 15) {
+          await wait(160);
+          setScanProgress(progress);
+        }
+      }
+
       await createScanMutation.mutateAsync({
-        contract_id: contractId || null,
+        contract_id: contractId || undefined,
         file_name: result.name,
         file_path: result.path,
         file_url: result.url,
         file_size: result.size,
-        content_type: "application/pdf", // Simplified
+        content_type: "application/pdf",
         ocr_text: JSON.stringify(scanResultData),
         scan_date: new Date().toISOString(),
       });
 
+      setScanProgress(100);
       setScanResult(scanResultData);
       setIsScanning(false);
-      toast.success("Contract scan saved to history");
+      toast.success(
+        scanMode === "live"
+          ? "Contract analyzed with live AI and saved to history"
+          : scanMode === "cache"
+            ? "Reused cached scan result and saved to history"
+          : "Mock contract scan saved to history",
+      );
     } catch (err) {
       setIsScanning(false);
       console.error("Failed to save scan record:", err);
@@ -98,17 +281,23 @@ export default function ContractScanPage() {
 
   const getRiskColor = (level: "low" | "medium" | "high") => {
     switch (level) {
-      case "low": return "bg-success/20 text-success-foreground";
-      case "medium": return "bg-warning/20 text-warning-foreground";
-      case "high": return "bg-destructive/20 text-destructive";
+      case "low":
+        return "bg-success/20 text-success-foreground";
+      case "medium":
+        return "bg-warning/20 text-warning-foreground";
+      case "high":
+        return "bg-destructive/20 text-destructive";
     }
   };
 
   const getRiskIcon = (level: "low" | "medium" | "high") => {
     switch (level) {
-      case "low": return <CheckCircle className="h-4 w-4" />;
-      case "medium": return <Clock className="h-4 w-4" />;
-      case "high": return <AlertTriangle className="h-4 w-4" />;
+      case "low":
+        return <CheckCircle className="h-4 w-4" />;
+      case "medium":
+        return <Clock className="h-4 w-4" />;
+      case "high":
+        return <AlertTriangle className="h-4 w-4" />;
     }
   };
 
@@ -118,7 +307,7 @@ export default function ContractScanPage() {
     }
   };
 
-  const overallRisk = scanResult?.riskFlags.some((r) => r.level === "high")
+  const overallRisk: "low" | "medium" | "high" = scanResult?.riskFlags.some((r) => r.level === "high")
     ? "high"
     : scanResult?.riskFlags.some((r) => r.level === "medium")
       ? "medium"
@@ -157,20 +346,30 @@ export default function ContractScanPage() {
                 disabled={isScanning}
               />
 
-              {isScanning && (activeFile) && (
+              {isScanning && activeFile && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span>Analyzing {activeFile.name}...</span>
                     <span>{scanProgress}%</span>
                   </div>
                   <Progress value={scanProgress} />
-                  <p className="text-xs text-muted-foreground">Analyzing document structure, extracting clauses, identifying risks...</p>
+                  <p className="text-xs text-muted-foreground">
+                    Analyzing document structure, extracting clauses, identifying risks...
+                  </p>
                 </div>
               )}
 
               {scanResult && (
-                <Button variant="outline" className="w-full" onClick={() => { setScanResult(null); setActiveFile(null); }}>
-                  <RefreshCw className="h-4 w-4 mr-2" />Scan Another Contract
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setScanResult(null);
+                    setActiveFile(null);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Scan Another Contract
                 </Button>
               )}
             </CardContent>
@@ -193,7 +392,8 @@ export default function ContractScanPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{scan.file_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {scan.scan_date ? format(parseISO(scan.scan_date), "MMM d, HH:mm") : "Recently"} • {formatFileSize(scan.file_size || 0)}
+                          {scan.scan_date ? format(parseISO(scan.scan_date), "MMM d, HH:mm") : "Recently"} |{" "}
+                          {formatFileSize(scan.file_size || 0)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -202,7 +402,12 @@ export default function ContractScanPage() {
                             <LinkIcon className="h-3.5 w-3.5" />
                           </a>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteScan(scan.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleDeleteScan(scan.id)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -283,7 +488,9 @@ export default function ContractScanPage() {
                       <div>
                         <p className="text-sm text-muted-foreground">Parties</p>
                         {scanResult.parties.map((party, i) => (
-                          <p key={i} className="font-medium">{party}</p>
+                          <p key={i} className="font-medium">
+                            {party}
+                          </p>
                         ))}
                       </div>
                     </div>
@@ -298,7 +505,9 @@ export default function ContractScanPage() {
                       <Calendar className="h-5 w-5 text-primary mt-0.5" />
                       <div>
                         <p className="text-sm text-muted-foreground">Contract Period</p>
-                        <p className="font-medium">{scanResult.startDate} to {scanResult.endDate}</p>
+                        <p className="font-medium">
+                          {scanResult.startDate} to {scanResult.endDate}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
@@ -347,9 +556,13 @@ export default function ContractScanPage() {
                     <p className="text-sm text-muted-foreground">Ready to proceed with this contract?</p>
                     <div className="flex gap-2">
                       <Button variant="outline" asChild>
-                        <a href={activeFile?.url || "#"} target="_blank" rel="noopener noreferrer">Download Report</a>
+                        <a href={activeFile?.url || "#"} target="_blank" rel="noopener noreferrer">
+                          Download Report
+                        </a>
                       </Button>
-                      <Button onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/new`)}>Create Contract</Button>
+                      <Button onClick={() => navigate(`/${tenantSlug}/app/clm/contracts/new`)}>
+                        Create Contract
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
