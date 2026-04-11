@@ -214,13 +214,14 @@ export function useCreateDocumentTemplate() {
       toast.success("Document template created successfully");
 
       if (organization?.id) {
+        const workspaceSlug = organization.slug || organization.id;
         notify({
           userId: user?.id || "",
           organizationId: organization.id,
           type: "document_template_created",
           title: "New Document Template",
           message: `${data.name} template has been created`,
-          link: `/${organization.id}/app/documents/templates`,
+          link: `/${workspaceSlug}/app/documents/templates`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -475,13 +476,14 @@ export function useCreateAutoDocument() {
       toast.success("Document created successfully");
 
       if (organization?.id) {
+        const workspaceSlug = organization.slug || organization.id;
         notify({
           userId: user?.id || "",
           organizationId: organization.id,
           type: "auto_document_created",
           title: "New Document Created",
           message: `${data.name} has been generated`,
-          link: `/${organization.id}/app/documents/${data.id}`,
+          link: `/${workspaceSlug}/app/documents/${data.id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -958,13 +960,14 @@ export function useCreateDocumentVersion() {
       toast.success("Document version created successfully");
 
       if (organization?.id) {
+        const workspaceSlug = organization.slug || organization.id;
         notify({
           userId: user?.id || "",
           organizationId: organization.id,
           type: "document_version_created",
           title: "New Document Version",
           message: `Version ${data.version_number} has been created`,
-          link: `/${organization.id}/app/documents/${data.document_id}`,
+          link: `/${workspaceSlug}/app/documents/${data.document_id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }

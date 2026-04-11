@@ -116,3 +116,105 @@ All entity creations across CRM, CPQ, CLM, ERP, and Auto Documents now reliably 
 - Manually verified on April 11, 2026:
   - Created a lead/quote/contract/supplier/document as an employee.
   - Switched to the Organization/Admin workspace and confirmed the notification bell updates instantly in real-time via WebSocket.
+
+---
+
+## 4. Bug Fix: Notification Click Redirected to `/unauthorized` (Passed)
+
+**Date:** 2026-04-11  
+**Status:** PASSED
+
+**Issue:**  
+Clicking notifications from workspace bells was navigating users to `/unauthorized`.
+
+**Root Cause:**  
+Notification links were stored/generated using organization UUID paths (`/<org-id>/app/...`) while protected tenant routes require slug paths (`/<tenant-slug>/app/...`).
+
+**Implemented Fixes:**
+- Added notification link normalization for existing records to convert UUID-based app links to slug-based links at navigation time.
+- Updated bell click and realtime toast "View" navigation to use normalized links.
+- Updated notification link generation in CLM/CPQ/CRM/ERP/Documents flows to use slug-first paths.
+- Extended module scope output with `tenantSlug`/`organizationSlug` for safer route link creation.
+
+**Files Updated:**
+- `src/core/utils/notification-links.ts` [NEW]
+- `src/ui/notification-bell.tsx`
+- `src/core/hooks/useNotifications.ts`
+- `src/core/hooks/useModuleScope.ts`
+- `src/modules/clm/hooks/useCLM.ts`
+- `src/modules/cpq/hooks/useCPQ.ts`
+- `src/modules/crm/hooks/useCRM.ts`
+- `src/modules/erp/hooks/useERP.ts`
+- `src/modules/documents/hooks/useDocuments.ts`
+
+**Verification:**
+- Manually verified on April 11, 2026:
+  - Opened notification bell in workspace and clicked notifications.
+  - Confirmed links now route to intended module pages and no longer fall into `/unauthorized`.
+
+---
+
+## 5. Feature Fix: Subscription & Plan Activity Notifications (Passed)
+
+**Date:** 2026-04-11  
+**Status:** PASSED
+
+**Issue:**  
+Subscription-related actions (plan change, subscription activation/cancellation, payment status events) were not consistently notifying both Organization Owner and Organization Admin workspaces.
+
+**Root Cause:**  
+Subscription events were stored in `subscription_events`, but there was no centralized fan-out into `notifications` for owner/admin roles on every relevant event path. Also, manual plan updates via `upgrade_organization_plan` did not emit plan event rows for notification propagation.
+
+**Implemented Fixes:**
+- Added subscription notification types to frontend notification typing and bell icon mapping.
+- Added DB trigger-based notification fan-out from `subscription_events` to all active `owner` and `admin` members.
+- Added plan-change event emission (`plan_upgraded` / `plan_downgraded`) inside `upgrade_organization_plan`.
+- Standardized payment failure notification flow by removing direct owner-only insert in webhook and relying on event-driven fan-out.
+- Routed subscription notifications to workspace subscription page via slug path (`/:tenantSlug/app/subscription`).
+
+**Files Updated:**
+- `supabase/migrations/069_subscription_event_notifications.sql` [NEW]
+- `supabase/functions/razorpay-webhook/index.ts`
+- `src/core/types/notifications.ts`
+- `src/ui/notification-bell.tsx`
+
+**Validation:**
+- `npx tsc --noEmit` â€” clean.
+- `eslint` on updated files â€” clean.
+
+**Verification:**
+- Manually verified on April 11, 2026:
+  - Triggered subscription/plan activity.
+  - Confirmed notifications appear in both Organization Owner and Organization Admin workspaces.
+  - Confirmed notification click routes to subscription page correctly.
+
+---
+
+## 6. Bug Fix: CLM Recent Scan Delete Failing (Passed)
+
+**Date:** 2026-04-11  
+**Status:** PASSED
+
+**Issue:**  
+Deleting items from CLM "Recent Scans" failed with Supabase `400 Bad Request` and runtime error:
+`Could not find the 'deleted_at' column of 'contract_scans' in the schema cache`.
+
+**Root Cause:**  
+`useDeleteContractScan` incorrectly used `softDeleteRecord`, but `contract_scans` does not implement soft-delete columns (`deleted_at`, `deleted_by`).
+
+**Implemented Fixes:**
+- Replaced soft-delete call with scoped hard delete using `applyModuleMutationScope` on `contract_scans`.
+- Kept tenant/user access checks before delete.
+- Updated success message to reflect actual behavior ("Contract scan deleted").
+
+**Files Updated:**
+- `src/modules/clm/hooks/useCLM.ts`
+
+**Validation:**
+- `npx tsc --noEmit` â€” clean.
+- `npx.cmd eslint src/modules/clm/hooks/useCLM.ts` â€” clean.
+
+**Verification:**
+- Manually verified on April 11, 2026:
+  - Deleted scan entries from CLM Recent Scans.
+  - Confirmed records delete successfully and no `deleted_at` schema errors are thrown.

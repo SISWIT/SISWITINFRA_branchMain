@@ -292,7 +292,7 @@ export function useContract(id: string) {
 
 export function useCreateContract() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -368,13 +368,14 @@ export function useCreateContract() {
       // Notify all org admins (simplified: notify current user for demo, 
       // but requirement says all admins. We'll use organization owner for now.)
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "", // To current user
           organizationId: tenantId,
           type: "esignature_requested", // Placeholder type until we have one for generic contract
           title: "New Contract Created",
           message: `${data.name} has been created`,
-          link: `/${tenantId}/app/clm/contracts/${data.id}`,
+          link: `/${workspaceSlug}/app/clm/contracts/${data.id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -532,7 +533,7 @@ export function useESignatures(contractId: string) {
 
 export function useCreateESignature() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -607,13 +608,14 @@ export function useCreateESignature() {
       // Usually current user is the requester, notifying them for confirmation.
       // Requirement: "notify contract owner"
       if (tenantId && userId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId, 
           organizationId: tenantId,
           type: "esignature_requested",
           title: "E-Signature Requested",
           message: `${data.recipient_name} has been requested to sign`,
-          link: `/${tenantId}/app/clm/contracts/${data.contract_id}`,
+          link: `/${workspaceSlug}/app/clm/contracts/${data.contract_id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -782,14 +784,16 @@ export function useDeleteContractScan() {
         throw new Error("Contract scan not found or not accessible");
       }
 
-      const deleted = await softDeleteRecord({
-        table: "contract_scans",
-        id,
-        userId,
-        organizationId: tenantId || "",
-      });
+      // contract_scans does not use soft-delete columns (deleted_at/deleted_by),
+      // so this must be a scoped hard delete.
+      const deleteQuery = applyModuleMutationScope(
+        supabase.from("contract_scans").delete().eq("id", id),
+        scope,
+        ["created_by"],
+      );
 
-      if (!deleted) throw new Error("Failed to delete contract scan");
+      const { error } = await deleteQuery;
+      if (error) throw error;
 
       void safeWriteAuditLog({
         action: "contract_scan_delete",
@@ -801,7 +805,7 @@ export function useDeleteContractScan() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract_scans"] });
-      toast.success("Contract scan moved to recycle bin");
+      toast.success("Contract scan deleted");
     },
     onError: (error: unknown) => {
       toast.error("Error deleting contract scan: " + getErrorMessage(error));

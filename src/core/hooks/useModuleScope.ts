@@ -15,8 +15,10 @@ export function useModuleScope() {
   return {
     scope,
     organizationId: scope.organizationId,
+    organizationSlug: organization?.slug ?? null,
     // Compatibility alias to avoid touching downstream query keys yet.
     tenantId: scope.organizationId,
+    tenantSlug: organization?.slug ?? null,
     userId: scope.userId,
     enabled: isModuleScopeReady(scope, organizationLoading),
   };

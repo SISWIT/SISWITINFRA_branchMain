@@ -364,7 +364,7 @@ export function useLeads() {
 
 export function useCreateLead() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -416,13 +416,14 @@ export function useCreateLead() {
       toast.success("Lead created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "lead_created",
           title: "New Lead Created",
           message: `${data.first_name} ${data.last_name} added as a new lead`,
-          link: `/${tenantId}/app/crm/leads`,
+          link: `/${workspaceSlug}/app/crm/leads`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -555,7 +556,7 @@ export function useAccounts() {
 
 export function useCreateAccount() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -611,13 +612,14 @@ export function useCreateAccount() {
       toast.success("Account created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "account_created",
           title: "New Account Created",
           message: `${data.name} added as a new account`,
-          link: `/${tenantId}/app/crm/accounts`,
+          link: `/${workspaceSlug}/app/crm/accounts`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -758,7 +760,7 @@ export function useContacts(accountId?: string) {
 
 export function useCreateContact() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -814,13 +816,14 @@ export function useCreateContact() {
       toast.success("Contact created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "contact_created",
           title: "New Contact Created",
           message: `${data.first_name} ${data.last_name} added as a new contact`,
-          link: `/${tenantId}/app/crm/contacts`,
+          link: `/${workspaceSlug}/app/crm/contacts`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -961,7 +964,7 @@ export function useOpportunities(accountId?: string) {
 
 export function useCreateOpportunity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -1019,13 +1022,14 @@ export function useCreateOpportunity() {
       toast.success("Opportunity created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "member_joined",
           title: "New Opportunity",
           message: `${data.name} added to pipeline`,
-          link: `/${tenantId}/app/crm/opportunities`,
+          link: `/${workspaceSlug}/app/crm/opportunities`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -1181,7 +1185,7 @@ export function useActivities(filters?: { opportunityId?: string; leadId?: strin
 
 export function useCreateActivity() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { notify } = useCreateNotification();
 
   return useMutation({
@@ -1223,13 +1227,14 @@ export function useCreateActivity() {
       toast.success("Activity created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "activity_created",
           title: "New Activity Created",
           message: `${data.subject} has been scheduled`,
-          link: `/${tenantId}/app/crm/activities`,
+          link: `/${workspaceSlug}/app/crm/activities`,
           broadcastRoles: ["owner", "admin"],
         });
       }

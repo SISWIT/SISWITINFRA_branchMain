@@ -1,4 +1,4 @@
-import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X, Briefcase, Building, Phone, Calendar, Truck, Box, Wrench, DollarSign, Layers } from "lucide-react";
+import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X, Briefcase, Building, Phone, Calendar, Truck, Box, Wrench, DollarSign, Layers, ArrowUpCircle, ArrowDownCircle, CreditCard, Clock3 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -11,8 +11,10 @@ import { Button } from "@/ui/shadcn/button";
 import { ScrollArea } from "@/ui/shadcn/scroll-area";
 import { Badge } from "@/ui/shadcn/badge";
 import { useNotifications } from "@/core/hooks/useNotifications";
+import { useTenant } from "@/core/tenant/useTenant";
+import { resolveNotificationLink } from "@/core/utils/notification-links";
 import { cn } from "@/core/utils/utils";
-import type { NotificationType } from "@/core/types/notifications";
+import type { Notification, NotificationType } from "@/core/types/notifications";
 
 const NOTIFICATION_ICONS: Record<NotificationType, React.ReactNode> = {
   contract_signed: <FileCheck className="h-4 w-4 text-success" />,
@@ -38,16 +40,33 @@ const NOTIFICATION_ICONS: Record<NotificationType, React.ReactNode> = {
   document_template_created: <Layers className="h-4 w-4 text-primary" />,
   auto_document_created: <FileText className="h-4 w-4 text-primary" />,
   document_version_created: <FileCheck className="h-4 w-4 text-primary" />,
+  subscription_created: <CheckCircle className="h-4 w-4 text-success" />,
+  subscription_cancelled: <AlertTriangle className="h-4 w-4 text-warning" />,
+  plan_upgraded: <ArrowUpCircle className="h-4 w-4 text-success" />,
+  plan_downgraded: <ArrowDownCircle className="h-4 w-4 text-warning" />,
+  payment_success: <CreditCard className="h-4 w-4 text-success" />,
+  payment_failed: <CreditCard className="h-4 w-4 text-destructive" />,
+  trial_started: <Clock3 className="h-4 w-4 text-info" />,
+  trial_ended: <Clock3 className="h-4 w-4 text-warning" />,
 };
 
 export function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { memberships, activeTenantSlug } = useTenant();
   const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
 
-  const handleNotificationClick = (id: string, link?: string) => {
-    markAsRead(id);
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
     setOpen(false);
+
+    const link = resolveNotificationLink({
+      link: notification.link,
+      notificationOrganizationId: notification.organization_id,
+      activeTenantSlug,
+      memberships,
+    });
+
     if (link) {
       navigate(link);
     }
@@ -105,7 +124,7 @@ export function NotificationBell() {
                     "flex w-full items-start gap-3 border-b px-4 py-4 text-left transition-colors last:border-0 hover:bg-muted/50",
                     !notification.is_read && "bg-primary/5 hover:bg-primary/10"
                   )}
-                  onClick={() => handleNotificationClick(notification.id, notification.link)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background border">
                     {NOTIFICATION_ICONS[notification.type] || <Info className="h-4 w-4 text-muted-foreground" />}

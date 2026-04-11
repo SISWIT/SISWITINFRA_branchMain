@@ -198,29 +198,6 @@ async function handlePaymentFailed(
   if (error) {
     console.error("Failed to log payment_failed event:", error.message);
   }
-
-  try {
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("owner_user_id")
-      .eq("id", orgId)
-      .maybeSingle();
-
-    if (org?.owner_user_id) {
-      await supabase.from("notifications").insert({
-        user_id: org.owner_user_id,
-        organization_id: orgId,
-        type: "payment_failed",
-        title: "Payment Failed",
-        message:
-          `Your subscription payment of INR ${payment.amount / 100} failed. ` +
-          "Please update your payment method.",
-        metadata: { razorpay_payment_id: payment.id },
-      });
-    }
-  } catch (error) {
-    console.error("Failed to send payment failure notification:", error);
-  }
 }
 
 Deno.serve(async (req: Request) => {

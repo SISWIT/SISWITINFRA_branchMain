@@ -2,11 +2,14 @@ import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
+import { useTenant } from "@/core/tenant/useTenant";
+import { resolveNotificationLink } from "@/core/utils/notification-links";
 import { toast } from "sonner";
 import type { Notification } from "@/core/types/notifications";
 
 export function useNotifications() {
   const { user } = useAuth();
+  const { memberships, activeTenantSlug } = useTenant();
   const queryClient = useQueryClient();
   const userId = user?.id;
 
@@ -119,11 +122,20 @@ export function useNotifications() {
           const newNotification = payload.new as Notification;
           
           // Show toast
+          const link = resolveNotificationLink({
+            link: newNotification.link,
+            notificationOrganizationId: newNotification.organization_id,
+            activeTenantSlug,
+            memberships,
+          });
+
           toast(newNotification.title, {
             description: newNotification.message,
-            action: newNotification.link ? {
+            action: link ? {
               label: "View",
-              onClick: () => window.location.href = newNotification.link!,
+              onClick: () => {
+                window.location.href = link;
+              },
             } : undefined,
           });
 
@@ -140,7 +152,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, queryClient]);
+  }, [activeTenantSlug, memberships, userId, queryClient]);
 
   return {
     notifications,

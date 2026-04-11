@@ -21,7 +21,15 @@ export type NotificationType =
   | 'financial_record_created'
   | 'document_template_created'
   | 'auto_document_created'
-  | 'document_version_created';
+  | 'document_version_created'
+  | 'subscription_created'
+  | 'subscription_cancelled'
+  | 'plan_upgraded'
+  | 'plan_downgraded'
+  | 'payment_success'
+  | 'payment_failed'
+  | 'trial_started'
+  | 'trial_ended';
 
 export interface Notification {
   id: string;

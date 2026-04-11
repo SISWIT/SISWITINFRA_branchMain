@@ -221,7 +221,7 @@ export function useSuppliers() {
 
 export function useCreateSupplier() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -277,13 +277,14 @@ export function useCreateSupplier() {
       toast.success("Supplier created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "supplier_created",
           title: "New Supplier Created",
           message: `${data.name} added as a new supplier`,
-          link: `/${tenantId}/app/erp/suppliers`,
+          link: `/${workspaceSlug}/app/erp/suppliers`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -419,7 +420,7 @@ export function useInventoryItems() {
 
 export function useCreateInventoryItem() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { notify } = useCreateNotification();
 
   return useMutation({
@@ -482,13 +483,14 @@ export function useCreateInventoryItem() {
       toast.success("Inventory item created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "inventory_item_created",
           title: "New Inventory Item Created",
           message: `${data.name} added to inventory`,
-          link: `/${tenantId}/app/erp/inventory`,
+          link: `/${workspaceSlug}/app/erp/inventory`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -647,7 +649,7 @@ export function usePurchaseOrder(id: string) {
 
 export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -702,13 +704,14 @@ export function useCreatePurchaseOrder() {
       toast.success("Purchase order created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "purchase_order_created",
           title: "New Purchase Order Created",
           message: `Purchase Order ${data.po_number} has been created`,
-          link: `/${tenantId}/app/erp/purchase-orders/${data.id}`,
+          link: `/${workspaceSlug}/app/erp/purchase-orders/${data.id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -949,7 +952,7 @@ export function useProductionOrders() {
 
 export function useCreateProductionOrder() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { notify } = useCreateNotification();
 
   return useMutation({
@@ -988,13 +991,14 @@ export function useCreateProductionOrder() {
       toast.success("Production order created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "production_order_created",
           title: "New Production Order",
           message: `Production Order ${data.production_order_number} has been planned`,
-          link: `/${tenantId}/app/erp/production-orders`,
+          link: `/${workspaceSlug}/app/erp/production-orders`,
           broadcastRoles: ["owner", "admin"],
         });
       }
@@ -1121,7 +1125,7 @@ export function useFinancialRecords() {
 
 export function useCreateFinancialRecord() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { notify } = useCreateNotification();
 
   return useMutation({
@@ -1160,13 +1164,14 @@ export function useCreateFinancialRecord() {
       toast.success("Financial record created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "financial_record_created",
           title: "New Financial Record",
           message: `A new ${data.type} record for $${data.amount} has been added`,
-          link: `/${tenantId}/app/erp/financials`,
+          link: `/${workspaceSlug}/app/erp/financials`,
           broadcastRoles: ["owner", "admin"],
         });
       }

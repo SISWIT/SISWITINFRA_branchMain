@@ -603,7 +603,7 @@ export function useQuote(id: string) {
 
 export function useCreateQuote() {
   const queryClient = useQueryClient();
-  const { scope, tenantId, userId } = useModuleScope();
+  const { scope, tenantId, tenantSlug, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
   const { notify } = useCreateNotification();
 
@@ -698,13 +698,14 @@ export function useCreateQuote() {
       toast.success("Quote created successfully");
 
       if (tenantId) {
+        const workspaceSlug = tenantSlug ?? tenantId;
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "quote_accepted",
           title: "New Quote Created",
           message: `Quote ${data.quote_number} has been created`,
-          link: `/${tenantId}/app/cpq/quotes/${data.id}`,
+          link: `/${workspaceSlug}/app/cpq/quotes/${data.id}`,
           broadcastRoles: ["owner", "admin"],
         });
       }
