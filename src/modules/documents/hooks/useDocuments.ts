@@ -17,6 +17,7 @@ import { safeWriteAuditLog } from "@/core/utils/audit";
 import { applyModuleReadScope, buildModuleCreatePayload, type ModuleScopeContext } from "@/core/utils/module-scope";
 import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { isPlatformRole } from "@/core/types/roles";
+import { useCreateNotification } from "@/core/hooks/useCreateNotification";
 
 type DocumentESignatureWithDocument = DocumentESignature & {
   document?: Pick<AutoDocument, "id" | "name" | "type" | "status" | "created_at" | "updated_at"> | null;
@@ -153,6 +154,7 @@ export function useCreateDocumentTemplate() {
     userId: user?.id ?? null,
     role,
   };
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (template: Omit<Partial<DocumentTemplate>, "id" | "created_at" | "updated_at">) => {
@@ -207,9 +209,21 @@ export function useCreateDocumentTemplate() {
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["document_templates"] });
       toast.success("Document template created successfully");
+
+      if (organization?.id) {
+        notify({
+          userId: user?.id || "",
+          organizationId: organization.id,
+          type: "document_template_created",
+          title: "New Document Template",
+          message: `${data.name} template has been created`,
+          link: `/${organization.id}/app/documents/templates`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error) => {
       toast.error("Error creating document template: " + error.message);
@@ -384,6 +398,7 @@ export function useCreateAutoDocument() {
     userId: user?.id ?? null,
     role,
   };
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (doc: Omit<Partial<AutoDocument>, "id" | "created_at" | "updated_at">) => {
@@ -455,9 +470,21 @@ export function useCreateAutoDocument() {
 
       return data as AutoDocument;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
       toast.success("Document created successfully");
+
+      if (organization?.id) {
+        notify({
+          userId: user?.id || "",
+          organizationId: organization.id,
+          type: "auto_document_created",
+          title: "New Document Created",
+          message: `${data.name} has been generated`,
+          link: `/${organization.id}/app/documents/${data.id}`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error) => {
       toast.error("Error creating document: " + error.message);
@@ -601,6 +628,7 @@ export function useCreateDocumentESignature() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { organization } = useOrganization();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (signature: Omit<Partial<DocumentESignature>, "id" | "created_at" | "updated_at">) => {
@@ -891,6 +919,7 @@ export function useCreateDocumentVersion() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { organization } = useOrganization();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (version: Omit<Partial<DocumentVersion>, "id" | "created_at">) => {
@@ -924,9 +953,21 @@ export function useCreateDocumentVersion() {
 
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["document_versions", variables.document_id] });
       toast.success("Document version created successfully");
+
+      if (organization?.id) {
+        notify({
+          userId: user?.id || "",
+          organizationId: organization.id,
+          type: "document_version_created",
+          title: "New Document Version",
+          message: `Version ${data.version_number} has been created`,
+          link: `/${organization.id}/app/documents/${data.document_id}`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error) => {
       toast.error("Error creating document version: " + error.message);

@@ -1,4 +1,4 @@
-import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X } from "lucide-react";
+import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X, Briefcase, Building, Phone, Calendar, Truck, Box, Wrench, DollarSign, Layers } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -26,6 +26,18 @@ const NOTIFICATION_ICONS: Record<NotificationType, React.ReactNode> = {
   plan_limit_reached: <AlertTriangle className="h-4 w-4 text-destructive" />,
   purchase_order_approved: <ShoppingCart className="h-4 w-4 text-success" />,
   member_joined: <UserPlus className="h-4 w-4 text-primary" />,
+  lead_created: <Briefcase className="h-4 w-4 text-primary" />,
+  account_created: <Building className="h-4 w-4 text-primary" />,
+  contact_created: <Phone className="h-4 w-4 text-primary" />,
+  activity_created: <Calendar className="h-4 w-4 text-primary" />,
+  supplier_created: <Truck className="h-4 w-4 text-primary" />,
+  inventory_item_created: <Box className="h-4 w-4 text-primary" />,
+  purchase_order_created: <ShoppingCart className="h-4 w-4 text-primary" />,
+  production_order_created: <Wrench className="h-4 w-4 text-primary" />,
+  financial_record_created: <DollarSign className="h-4 w-4 text-success" />,
+  document_template_created: <Layers className="h-4 w-4 text-primary" />,
+  auto_document_created: <FileText className="h-4 w-4 text-primary" />,
+  document_version_created: <FileCheck className="h-4 w-4 text-primary" />,
 };
 
 export function NotificationBell() {

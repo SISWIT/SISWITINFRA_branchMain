@@ -701,10 +701,11 @@ export function useCreateQuote() {
         notify({
           userId: userId || "",
           organizationId: tenantId,
-          type: "quote_accepted", // Placeholder for quote_created
+          type: "quote_accepted",
           title: "New Quote Created",
           message: `Quote ${data.quote_number} has been created`,
           link: `/${tenantId}/app/cpq/quotes/${data.id}`,
+          broadcastRoles: ["owner", "admin"],
         });
       }
     },

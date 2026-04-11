@@ -23,7 +23,7 @@ import {
 import { softDeleteRecord } from "@/core/utils/soft-delete";
 import { safeWriteAuditLog } from "@/core/utils/audit";
 import { usePlanLimits } from "@/core/hooks/usePlanLimits";
-
+import { useCreateNotification } from "@/core/hooks/useCreateNotification";
 type SupplierRow = Database["public"]["Tables"]["suppliers"]["Row"];
 type SupplierInsert = Database["public"]["Tables"]["suppliers"]["Insert"];
 type SupplierUpdate = Database["public"]["Tables"]["suppliers"]["Update"];
@@ -223,6 +223,7 @@ export function useCreateSupplier() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (supplier: Omit<Partial<Supplier>, "id" | "created_at" | "updated_at">) => {
@@ -271,9 +272,21 @@ export function useCreateSupplier() {
 
       return mapSupplier(data as SupplierRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Supplier created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "supplier_created",
+          title: "New Supplier Created",
+          message: `${data.name} added as a new supplier`,
+          link: `/${tenantId}/app/erp/suppliers`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating supplier: " + getErrorMessage(error));
@@ -407,6 +420,7 @@ export function useInventoryItems() {
 export function useCreateInventoryItem() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (item: Omit<Partial<InventoryItem>, "id" | "created_at" | "updated_at" | "quantity_available">) => {
@@ -463,9 +477,21 @@ export function useCreateInventoryItem() {
 
       return mapInventoryItem(data as InventoryWithProduct);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["inventory_items"] });
       toast.success("Inventory item created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "inventory_item_created",
+          title: "New Inventory Item Created",
+          message: `${data.name} added to inventory`,
+          link: `/${tenantId}/app/erp/inventory`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating inventory item: " + getErrorMessage(error));
@@ -623,6 +649,7 @@ export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (po: Omit<Partial<PurchaseOrder>, "id" | "created_at" | "updated_at">) => {
@@ -670,9 +697,21 @@ export function useCreatePurchaseOrder() {
 
       return mapPurchaseOrder(data as PurchaseOrderWithSupplier);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       toast.success("Purchase order created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "purchase_order_created",
+          title: "New Purchase Order Created",
+          message: `Purchase Order ${data.po_number} has been created`,
+          link: `/${tenantId}/app/erp/purchase-orders/${data.id}`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating purchase order: " + getErrorMessage(error));
@@ -911,6 +950,7 @@ export function useProductionOrders() {
 export function useCreateProductionOrder() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (order: Omit<Partial<ProductionOrder>, "id" | "created_at" | "updated_at">) => {
@@ -943,9 +983,21 @@ export function useCreateProductionOrder() {
 
       return mapProductionOrder(data as ProductionOrderWithProduct);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["production_orders"] });
       toast.success("Production order created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "production_order_created",
+          title: "New Production Order",
+          message: `Production Order ${data.production_order_number} has been planned`,
+          link: `/${tenantId}/app/erp/production-orders`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating production order: " + getErrorMessage(error));
@@ -1070,6 +1122,7 @@ export function useFinancialRecords() {
 export function useCreateFinancialRecord() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (record: Omit<Partial<FinancialRecord>, "id" | "created_at" | "updated_at">) => {
@@ -1102,9 +1155,21 @@ export function useCreateFinancialRecord() {
 
       return mapFinancialRecord(data as FinancialRecordRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["financial_records"] });
       toast.success("Financial record created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "financial_record_created",
+          title: "New Financial Record",
+          message: `A new ${data.type} record for $${data.amount} has been added`,
+          link: `/${tenantId}/app/erp/financials`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating financial record: " + getErrorMessage(error));

@@ -125,6 +125,7 @@ export function usePlanLimits(): UsePlanLimitsReturn {
             type: percent >= 100 ? "plan_limit_reached" : "plan_limit_warning",
             title: percent >= 100 ? "Plan Limit Reached" : "Plan Limit Warning",
             message: `You are at ${percent.toFixed(0)}% of your ${resource} limit`,
+            broadcastRoles: ["owner", "admin"],
           });
         }
       }

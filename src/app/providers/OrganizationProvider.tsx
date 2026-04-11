@@ -211,20 +211,22 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     [fetchSubscriptionByOrganization, impersonation.active, impersonation.organizationId, impersonation.organizationSlug, impersonation.tenantSlug, role, unsafeSupabase],
   );
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && userId) {
       setOrganizationLoading(true);
-      void fetchOrganizationData(user.id);
+      void fetchOrganizationData(userId);
       return;
     }
 
-    if (!authLoading && !user) {
+    if (!authLoading && !userId) {
       setOrganization(null);
       setSubscription(null);
       setMemberships([]);
       setOrganizationLoading(false);
     }
-  }, [authLoading, fetchOrganizationData, user]);
+  }, [authLoading, fetchOrganizationData, userId]);
 
   const switchOrganization = useCallback(
     async (organizationId: string) => {

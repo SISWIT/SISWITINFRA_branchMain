@@ -137,9 +137,11 @@ const Dashboard = () => {
   ]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
 
+  const userId = user?.id;
+
   useEffect(() => {
     const initializeDashboard = async () => {
-      if (!user || !organizationId) return;
+      if (!userId || !organizationId) return;
       setDataLoading(true);
 
       try {
@@ -155,7 +157,7 @@ const Dashboard = () => {
           supabase
             .from("profiles")
             .select("first_name, last_name, company")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .maybeSingle(),
           supabase
             .from("quotes")
@@ -246,7 +248,7 @@ const Dashboard = () => {
     };
 
     initializeDashboard();
-  }, [user, toast]);
+  }, [userId, organizationId, toast]);
 
   if (authLoading || (dataLoading && !profile)) {
     return (

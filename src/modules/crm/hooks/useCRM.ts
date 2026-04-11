@@ -366,6 +366,7 @@ export function useCreateLead() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (lead: Omit<Partial<Lead>, "id" | "created_at" | "updated_at">) => {
@@ -410,9 +411,21 @@ export function useCreateLead() {
 
       return mapLead(data as LeadRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       toast.success("Lead created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "lead_created",
+          title: "New Lead Created",
+          message: `${data.first_name} ${data.last_name} added as a new lead`,
+          link: `/${tenantId}/app/crm/leads`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating lead: " + getErrorMessage(error));
@@ -544,6 +557,7 @@ export function useCreateAccount() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (account: Omit<Partial<Account>, "id" | "created_at" | "updated_at">) => {
@@ -592,9 +606,21 @@ export function useCreateAccount() {
 
       return mapAccount(data as AccountRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
       toast.success("Account created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "account_created",
+          title: "New Account Created",
+          message: `${data.name} added as a new account`,
+          link: `/${tenantId}/app/crm/accounts`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating account: " + getErrorMessage(error));
@@ -734,6 +760,7 @@ export function useCreateContact() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
   const { checkLimit, incrementUsage } = usePlanLimits();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (contact: Omit<Partial<Contact>, "id" | "created_at" | "updated_at">) => {
@@ -782,9 +809,21 @@ export function useCreateContact() {
 
       return mapContact(data as ContactRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       toast.success("Contact created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "contact_created",
+          title: "New Contact Created",
+          message: `${data.first_name} ${data.last_name} added as a new contact`,
+          link: `/${tenantId}/app/crm/contacts`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating contact: " + getErrorMessage(error));
@@ -981,12 +1020,13 @@ export function useCreateOpportunity() {
 
       if (tenantId) {
         notify({
-          userId: data.owner_id || userId || "",
+          userId: userId || "",
           organizationId: tenantId,
-          type: "member_joined", // Placeholder for opportunity_created
+          type: "member_joined",
           title: "New Opportunity",
           message: `${data.name} added to pipeline`,
           link: `/${tenantId}/app/crm/opportunities`,
+          broadcastRoles: ["owner", "admin"],
         });
       }
     },
@@ -1142,6 +1182,7 @@ export function useActivities(filters?: { opportunityId?: string; leadId?: strin
 export function useCreateActivity() {
   const queryClient = useQueryClient();
   const { scope, tenantId, userId } = useModuleScope();
+  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (activity: Omit<Partial<Activity>, "id" | "created_at" | "updated_at">) => {
@@ -1177,9 +1218,21 @@ export function useCreateActivity() {
 
       return mapActivity(data as ActivityRow);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["activities"] });
       toast.success("Activity created successfully");
+
+      if (tenantId) {
+        notify({
+          userId: userId || "",
+          organizationId: tenantId,
+          type: "activity_created",
+          title: "New Activity Created",
+          message: `${data.subject} has been scheduled`,
+          link: `/${tenantId}/app/crm/activities`,
+          broadcastRoles: ["owner", "admin"],
+        });
+      }
     },
     onError: (error: unknown) => {
       toast.error("Error creating activity: " + getErrorMessage(error));

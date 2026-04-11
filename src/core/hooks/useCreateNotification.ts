@@ -10,6 +10,10 @@ interface CreateNotificationParams {
   message: string;
   link?: string;
   metadata?: Record<string, unknown>;
+  /** If provided, the notification is broadcast to every active member
+   *  holding one of these roles (e.g. ["owner", "admin"]).
+   *  The actor (userId) is always included automatically. */
+  broadcastRoles?: string[];
 }
 
 export function useCreateNotification() {
@@ -24,7 +28,29 @@ export function useCreateNotification() {
       message,
       link,
       metadata = {},
+      broadcastRoles,
     }: CreateNotificationParams) => {
+      // --- Broadcast path ---
+      if (broadcastRoles && broadcastRoles.length > 0) {
+        const { data, error } = await supabase.rpc(
+          "broadcast_notification" as any,
+          {
+            p_organization_id: organizationId,
+            p_actor_user_id: userId,
+            p_target_roles: broadcastRoles,
+            p_type: type,
+            p_title: title,
+            p_message: message,
+            p_link: link,
+            p_metadata: metadata,
+          },
+        );
+
+        if (error) throw error;
+        return data;
+      }
+
+      // --- Single-user path (original behaviour) ---
       const { data, error } = await supabase.rpc("create_notification" as any, {
         p_organization_id: organizationId,
         p_user_id: userId,

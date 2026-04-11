@@ -375,6 +375,7 @@ export function useCreateContract() {
           title: "New Contract Created",
           message: `${data.name} has been created`,
           link: `/${tenantId}/app/clm/contracts/${data.id}`,
+          broadcastRoles: ["owner", "admin"],
         });
       }
     },
@@ -613,6 +614,7 @@ export function useCreateESignature() {
           title: "E-Signature Requested",
           message: `${data.recipient_name} has been requested to sign`,
           link: `/${tenantId}/app/clm/contracts/${data.contract_id}`,
+          broadcastRoles: ["owner", "admin"],
         });
       }
     },
