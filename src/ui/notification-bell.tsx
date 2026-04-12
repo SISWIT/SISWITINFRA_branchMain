@@ -1,6 +1,6 @@
 import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X, Briefcase, Building, Phone, Calendar, Truck, Box, Wrench, DollarSign, Layers, ArrowUpCircle, ArrowDownCircle, CreditCard, Clock3 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import {
   Popover,
@@ -10,9 +10,10 @@ import {
 import { Button } from "@/ui/shadcn/button";
 import { ScrollArea } from "@/ui/shadcn/scroll-area";
 import { Badge } from "@/ui/shadcn/badge";
+import { useAuth } from "@/core/auth/useAuth";
 import { useNotifications } from "@/core/hooks/useNotifications";
 import { useTenant } from "@/core/tenant/useTenant";
-import { resolveNotificationLink } from "@/core/utils/notification-links";
+import { resolveNotificationNavigationTarget } from "@/core/utils/notification-links";
 import { cn } from "@/core/utils/utils";
 import type { Notification, NotificationType } from "@/core/types/notifications";
 
@@ -52,7 +53,9 @@ const NOTIFICATION_ICONS: Record<NotificationType, React.ReactNode> = {
 
 export function NotificationBell() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const { role } = useAuth();
   const { memberships, activeTenantSlug } = useTenant();
   const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
 
@@ -60,11 +63,14 @@ export function NotificationBell() {
     markAsRead(notification.id);
     setOpen(false);
 
-    const link = resolveNotificationLink({
+    const link = resolveNotificationNavigationTarget({
       link: notification.link,
       notificationOrganizationId: notification.organization_id,
       activeTenantSlug,
       memberships,
+      role,
+      currentPathname: pathname,
+      notificationType: notification.type,
     });
 
     if (link) {

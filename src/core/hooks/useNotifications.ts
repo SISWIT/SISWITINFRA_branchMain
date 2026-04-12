@@ -3,12 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
 import { useTenant } from "@/core/tenant/useTenant";
-import { resolveNotificationLink } from "@/core/utils/notification-links";
+import { resolveNotificationNavigationTarget } from "@/core/utils/notification-links";
 import { toast } from "sonner";
 import type { Notification } from "@/core/types/notifications";
 
 export function useNotifications() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { memberships, activeTenantSlug } = useTenant();
   const queryClient = useQueryClient();
   const userId = user?.id;
@@ -122,11 +122,15 @@ export function useNotifications() {
           const newNotification = payload.new as Notification;
           
           // Show toast
-          const link = resolveNotificationLink({
+          const currentPathname = typeof window !== "undefined" ? window.location.pathname : null;
+          const link = resolveNotificationNavigationTarget({
             link: newNotification.link,
             notificationOrganizationId: newNotification.organization_id,
             activeTenantSlug,
             memberships,
+            role,
+            currentPathname,
+            notificationType: newNotification.type,
           });
 
           toast(newNotification.title, {
@@ -152,7 +156,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeTenantSlug, memberships, userId, queryClient]);
+  }, [activeTenantSlug, memberships, userId, queryClient, role]);
 
   return {
     notifications,
