@@ -37,6 +37,7 @@ export const leadershipData: LeadershipMember[] = [
     role: "CFO",
     description: "Owns financial planning, controls, and sustainable business performance.",
     imageUrl: "/Pooja.jpeg",
+    linkedIn: "https://www.linkedin.com/in/pooja-kumari-b77478270?utm_source=share_via&utm_content=profile&utm_medium=member_android",
     email: "kumaripooja062001@gmail.com",
     imagePosition: "center 16%",
   },
