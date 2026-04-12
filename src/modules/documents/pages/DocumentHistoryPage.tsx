@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
-import { useAutoDocuments, useDocumentESignatures } from "@/modules/documents/hooks/useDocuments";
+import { useAutoDocuments, useDeleteAutoDocument, useDocumentESignatures } from "@/modules/documents/hooks/useDocuments";
+import { useAuth } from "@/core/auth/useAuth";
+import { isTenantAdminRole } from "@/core/types/roles";
 import {
   Calendar,
   CheckCircle2,
@@ -14,6 +16,7 @@ import {
   FileText,
   Search,
   Send,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
@@ -34,8 +37,11 @@ const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: 
 const DocumentHistoryPage = () => {
   const navigate = useNavigate();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+  const { role } = useAuth();
   const { data: documents = [], isLoading } = useAutoDocuments();
   const { data: signatures = [] } = useDocumentESignatures();
+  const deleteDocumentMutation = useDeleteAutoDocument();
+  const canDelete = isTenantAdminRole(role);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -95,6 +101,14 @@ const DocumentHistoryPage = () => {
     link.download = `${(document.name || "untitled").replace(/\s+/g, "-").toLowerCase()}.txt`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteDocument = (id: string, name: string | null) => {
+    if (!canDelete) return;
+    const label = name || "this document";
+    const confirmed = globalThis.confirm(`Delete ${label}? This action cannot be undone.`);
+    if (!confirmed) return;
+    deleteDocumentMutation.mutate(id);
   };
 
   return (
@@ -234,6 +248,18 @@ const DocumentHistoryPage = () => {
                           >
                             E-Sign
                           </Button>
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={deleteDocumentMutation.isPending}
+                              onClick={() => handleDeleteDocument(document.id, document.name)}
+                              title="Delete document"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

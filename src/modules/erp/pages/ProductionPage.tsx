@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 import { useCRUD } from "@/core/rbac/usePermissions";
 
 // UI Components
@@ -93,15 +93,15 @@ export default function ProductionPage() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { organizationId, userId, enabled } = useModuleScope();
   const { canDelete } = useCRUD();
 
   // 1. FETCH DATA - UPDATED: Filter by current user
   const { data: orders, isLoading } = useQuery({
-    queryKey: ["production-orders", user?.id],
-    enabled: !!user,
+    queryKey: ["production-orders", organizationId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!organizationId || !userId) throw new Error("Organization context is required");
       const { data, error } = await supabase
         .from("production_orders")
         .select(`
@@ -111,7 +111,8 @@ export default function ProductionPage() {
             sku
           )
         `)
-        .eq("created_by", user.id)
+        .eq("organization_id", organizationId)
+        .eq("created_by", userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -121,7 +122,13 @@ export default function ProductionPage() {
   // 2. CREATE / UPDATE MUTATION - UPDATED: Include user ID
   const upsertOrderMutation = useMutation({
     mutationFn: async (orderData: ProductionOrderFormInput) => {
-      const payload = { ...orderData, created_by: user?.id };
+      if (!organizationId || !userId) throw new Error("Organization context is required");
+      const payload = {
+        ...orderData,
+        created_by: userId,
+        organization_id: organizationId,
+        tenant_id: organizationId,
+      };
 
       if (payload.id) {
         // Update
@@ -159,7 +166,12 @@ export default function ProductionPage() {
   // 3. DELETE MUTATION
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("production_orders").delete().eq('id', id);
+      if (!organizationId) throw new Error("Organization context is required");
+      const { error } = await supabase
+        .from("production_orders")
+        .delete()
+        .eq('id', id)
+        .eq("organization_id", organizationId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -172,10 +184,12 @@ export default function ProductionPage() {
   // 4. QUICK STATUS UPDATE (Mark Completed)
   const completeOrderMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (!organizationId) throw new Error("Organization context is required");
       const { error } = await supabase
         .from("production_orders")
         .update({ status: 'completed', completed_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .eq("organization_id", organizationId);
       if (error) throw error;
     },
     onSuccess: () => {

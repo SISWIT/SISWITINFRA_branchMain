@@ -95,14 +95,14 @@ export function AdminSidebar({
       label: "Logistics",
       items: [
         {
-          label: "ERP Hub",
-          href: tenantAppPath(tenantSlug, "erp"),
+          label: "ERP (All)",
+          href: tenantAppPath(tenantSlug, "erp/inventory"),
           icon: Truck,
           enabled: Boolean(subscription?.module_erp)
         },
         {
-          label: "Documents",
-          href: tenantAppPath(tenantSlug, "documents"),
+          label: "Documents (All)",
+          href: tenantAppPath(tenantSlug, "documents/history"),
           icon: FileText,
           enabled: Boolean(subscription?.module_documents)
         },

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
-import { useAuth } from "@/core/auth/useAuth";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
 
 // UI Components
 import { Button } from "@/ui/shadcn/button";
@@ -41,18 +41,19 @@ export default function FinancePage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { organizationId, userId, enabled } = useModuleScope();
 
   // 1. FETCH FINANCIAL DATA - UPDATED: Filter by current user
   const { data: records, isLoading } = useQuery({
-    queryKey: ["financial-records", user?.id],
-    enabled: !!user,
+    queryKey: ["financial-records", organizationId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!organizationId || !userId) throw new Error("Organization context is required");
       const { data, error } = await supabase
         .from("financial_records")
         .select("*")
-        .eq("created_by", user.id)
+        .eq("organization_id", organizationId)
+        .eq("created_by", userId)
         .order('transaction_date', { ascending: false });
       if (error) throw error;
       return data;
@@ -81,7 +82,13 @@ export default function FinancePage() {
   // 3. ADD TRANSACTION MUTATION - UPDATED: Include user ID
   const addTransactionMutation = useMutation({
     mutationFn: async (newRecord: TransactionFormData) => {
-      const recordWithUser = { ...newRecord, created_by: user?.id };
+      if (!organizationId || !userId) throw new Error("Organization context is required");
+      const recordWithUser = {
+        ...newRecord,
+        created_by: userId,
+        organization_id: organizationId,
+        tenant_id: organizationId,
+      };
       const { data, error } = await supabase.from("financial_records").insert([recordWithUser]).select();
       if (error) throw error;
       return data;

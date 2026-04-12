@@ -1,9 +1,11 @@
 import { getErrorMessage } from "@/core/utils/errors";
 import { useState, useEffect } from "react";
-import { Plus, AlertTriangle, Package, Search, Loader2, Warehouse } from "lucide-react";
+import { Plus, AlertTriangle, Package, Search, Loader2, Warehouse, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/core/api/client";
 import { useAuth } from "@/core/auth/useAuth";
+import { useModuleScope } from "@/core/hooks/useModuleScope";
+import { isTenantAdminRole } from "@/core/types/roles";
 
 // UI Components
 import { Button } from "@/ui/shadcn/button";
@@ -40,7 +42,9 @@ export default function InventoryPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { role } = useAuth();
+  const { organizationId, userId, enabled } = useModuleScope();
+  const canDelete = isTenantAdminRole(role);
 
   // SECTION: Real-time Sync
   // Listens for any changes to the inventory_items table and refreshes data
@@ -62,10 +66,10 @@ export default function InventoryPage() {
 
   // SECTION: Fast Data Fetching - UPDATED: Filter by current user
   const { data: inventory, isLoading } = useQuery({
-    queryKey: ["inventory-list", user?.id],
-    enabled: !!user,
+    queryKey: ["inventory-list", organizationId, userId],
+    enabled,
     queryFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (!organizationId) throw new Error("Organization context is required");
       const { data, error } = await supabase
         .from("inventory_items")
         .select(`
@@ -76,6 +80,7 @@ export default function InventoryPage() {
             category
           )
         `)
+        .eq("organization_id", organizationId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -86,9 +91,15 @@ export default function InventoryPage() {
   // SECTION: Add Item Mutation
   const addItemMutation = useMutation({
     mutationFn: async (newItem: InventoryFormData) => {
+      if (!organizationId) throw new Error("Organization context is required");
+      const payload = {
+        ...newItem,
+        organization_id: organizationId,
+        tenant_id: organizationId,
+      };
       const { data, error } = await supabase
         .from("inventory_items")
-        .insert([newItem])
+        .insert([payload])
         .select();
       if (error) throw error;
       return data;
@@ -102,6 +113,33 @@ export default function InventoryPage() {
       toast({ title: "Database Error", description: getErrorMessage(err), variant: "destructive" });
     }
   });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!organizationId) throw new Error("Organization context is required");
+      const { error } = await supabase
+        .from("inventory_items")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", organizationId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-list"] });
+      toast({ title: "Deleted", description: "Stock record deleted." });
+    },
+    onError: (err: unknown) => {
+      toast({ title: "Delete Failed", description: getErrorMessage(err), variant: "destructive" });
+    },
+  });
+
+  const handleDeleteItem = (item: InventoryListItem) => {
+    if (!canDelete) return;
+    const itemName = item.products?.name || "this inventory item";
+    const confirmed = globalThis.confirm(`Delete ${itemName}? This action cannot be undone.`);
+    if (!confirmed) return;
+    deleteItemMutation.mutate(item.id);
+  };
 
   const filteredItems = (inventory as InventoryListItem[] | undefined)?.filter((item) => 
     item.products?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -173,6 +211,7 @@ export default function InventoryPage() {
                     <TableHead>Location</TableHead>
                     <TableHead className="text-right">On Hand</TableHead>
                     <TableHead className="text-center">Status</TableHead>
+                    {canDelete && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -206,6 +245,20 @@ export default function InventoryPage() {
                             )}
                           </div>
                         </TableCell>
+                        {canDelete && (
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              disabled={deleteItemMutation.isPending}
+                              onClick={() => handleDeleteItem(item)}
+                              title="Delete stock item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

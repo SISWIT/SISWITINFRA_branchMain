@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { enqueueDocumentPdfJob, enqueueEmailSendJob, enqueueReminderJob, safeEnqueueJob } from "@/core/utils/jobs";
 import { softDeleteRecord } from "@/core/utils/soft-delete";
 import { safeWriteAuditLog } from "@/core/utils/audit";
-import { applyModuleReadScope, buildModuleCreatePayload, type ModuleScopeContext } from "@/core/utils/module-scope";
+import { applyModuleMutationScope, applyModuleReadScope, buildModuleCreatePayload, type ModuleScopeContext } from "@/core/utils/module-scope";
 import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { isPlatformRole } from "@/core/types/roles";
 import { useCreateNotification } from "@/core/hooks/useCreateNotification";
@@ -613,20 +613,41 @@ export function useUpdateAutoDocument() {
 
 export function useDeleteAutoDocument() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { organization } = useOrganization();
   const { decrementUsage } = usePlanLimits();
+  const scope: ModuleScopeContext = {
+    organizationId: organization?.id ?? null,
+    userId: user?.id ?? null,
+    role,
+  };
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const ok = await softDeleteRecord({
-        table: "auto_documents",
-        id,
-        userId: user?.id ?? null,
-        organizationId: organization?.id || "",
-      });
-      if (!ok) {
-        throw new Error("Failed to soft-delete document");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
+      }
+
+      // auto_documents does not implement deleted_at/deleted_by in this schema,
+      // so we perform a scoped hard delete after access verification.
+      const access = await applyModuleMutationScope(
+        supabase.from("auto_documents").select("id").eq("id", id),
+        scope,
+        { ownerColumns: ["owner_id", "created_by"] },
+      ).maybeSingle();
+
+      if (access.error || !access.data) {
+        throw new Error("Document not found or not accessible");
+      }
+
+      const { error } = await applyModuleMutationScope(
+        supabase.from("auto_documents").delete().eq("id", id),
+        scope,
+        { ownerColumns: ["owner_id", "created_by"] },
+      );
+
+      if (error) {
+        throw error;
       }
 
       // --- DECREMENT USAGE ---
@@ -637,7 +658,7 @@ export function useDeleteAutoDocument() {
       // --- END DECREMENT USAGE ---
 
       void safeWriteAuditLog({
-        action: "document_soft_deleted",
+        action: "document_deleted",
         entityType: "auto_documents",
         entityId: id,
         organizationId: organization?.id ?? null,
@@ -646,7 +667,7 @@ export function useDeleteAutoDocument() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["auto_documents"] });
-      toast.success("Document moved to recycle bin");
+      toast.success("Document deleted successfully");
     },
     onError: (error) => {
       toast.error("Error deleting document: " + error.message);
