@@ -50,6 +50,7 @@ const ADMIN_PAGES = [
   { label: "ERP Hub", path: "erp" },
   { label: "Document Management", path: "documents" },
   { label: "Invitations Control", path: "invitations" },
+  { label: "Notification History", path: "notifications" },
   { label: "Alerts & Notifications", path: "alerts" },
   { label: "System Settings", path: "settings" },
 ] as const;

@@ -3,6 +3,7 @@ import { NavLink, useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import type { ComponentType } from "react";
 import {
+  Bell,
   ChevronLeft,
   ChevronRight,
   FileSignature,
@@ -17,7 +18,7 @@ import { Button } from "@/ui/shadcn/button";
 import { cn } from "@/core/utils/utils";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
-import { tenantPortalPath } from "@/core/utils/routes";
+import { tenantPortalNotificationsPath, tenantPortalPath } from "@/core/utils/routes";
 
 interface CustomerSidebarProps {
   className?: string;
@@ -64,6 +65,12 @@ function buildSections(tenantSlug: string): SidebarSection[] {
       title: "E-Signatures",
       items: [
         { label: "Pending Signatures", icon: Send, href: tenantPortalPath(tenantSlug, "pending-signatures") },
+      ],
+    },
+    {
+      title: "Activity",
+      items: [
+        { label: "Notifications", icon: Bell, href: tenantPortalNotificationsPath(tenantSlug) },
       ],
     },
   ];

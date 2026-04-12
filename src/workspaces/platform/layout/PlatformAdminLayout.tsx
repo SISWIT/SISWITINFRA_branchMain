@@ -11,6 +11,7 @@ import {
   Menu,
   Settings,
   Shield,
+  Bell,
   Users,
   X,
   HeartPulse,
@@ -22,6 +23,7 @@ import { useAuth } from "@/core/auth/useAuth";
 import { platformPath } from "@/core/utils/routes";
 import { ImpersonationBanner } from "./ImpersonationBanner";
 import { ThemeToggle } from "@/ui/theme-toggle";
+import { NotificationBell } from "@/ui/notification-bell";
 
 const menuItems = [
   { title: "Overview", icon: LayoutDashboard, path: platformPath() },
@@ -29,6 +31,7 @@ const menuItems = [
   { title: "Users", icon: Users, path: platformPath("users") },
   { title: "Subscriptions", icon: CreditCard, path: platformPath("subscriptions") },
   { title: "Analytics", icon: BarChart4, path: platformPath("analytics") },
+  { title: "Notifications", icon: Bell, path: platformPath("notifications") },
   { title: "Audit Logs", icon: FileText, path: platformPath("audit-logs") },
   { title: "System Health", icon: HeartPulse, path: platformPath("health") },
   { title: "Security", icon: Shield, path: platformPath("security") },
@@ -179,6 +182,7 @@ export function PlatformAdminLayout({ children }: PlatformAdminLayoutProps) {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
+            <NotificationBell />
             <span className="text-sm text-muted-foreground">SaaS Owner Console</span>
           </div>
         </header>

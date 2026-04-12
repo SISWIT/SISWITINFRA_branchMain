@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/shadcn/dropdown-menu";
 import { RoleBadge } from "@/ui/shadcn/RoleBadge";
-import { Bell, ChevronDown, LogOut, Menu } from "lucide-react";
+import { ChevronDown, LogOut, Menu } from "lucide-react";
+import { NotificationBell } from "@/ui/notification-bell";
 import { useNavigate } from "react-router-dom";
 
 /* Map pathnames to readable page titles */
@@ -19,6 +20,7 @@ const PAGE_TITLES: Record<string, string> = {
   "contracts": "Contracts",
   "documents": "Documents",
   "pending-signatures": "Signatures",
+  "notifications": "Notifications",
 };
 
 function getInitials(email?: string | null, firstName?: string | null): string {
@@ -78,16 +80,7 @@ export function CustomerHeader({ onOpenSidebar }: CustomerHeaderProps) {
       {/* Right controls */}
       <div className="flex items-center gap-1.5">
 
-        {/* Notification bell */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-background" />
-        </Button>
+        <NotificationBell />
 
         {/* Profile chip */}
         <DropdownMenu>

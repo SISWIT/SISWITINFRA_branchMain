@@ -30,6 +30,8 @@ export const organizationOwnerPath = (path = ""): string => {
   return suffix ? `/organization/${suffix}` : "/organization";
 };
 
+export const organizationNotificationsPath = (): string => organizationOwnerPath("notifications");
+
 export const organizationAppPath = (organizationSlug: string, path = ""): string => {
   const slug = clean(organizationSlug);
   const suffix = clean(path);
@@ -42,6 +44,12 @@ export const organizationDashboardPath = (organizationSlug: string): string =>
 
 export const organizationPortalPath = (organizationSlug: string, path = ""): string =>
   organizationAppPath(organizationSlug, clean(`portal/${path}`));
+
+export const organizationWorkspaceNotificationsPath = (organizationSlug: string): string =>
+  organizationAppPath(organizationSlug, "notifications");
+
+export const organizationPortalNotificationsPath = (organizationSlug: string): string =>
+  organizationPortalPath(organizationSlug, "notifications");
 
 export const organizationModulePath = (
   organizationSlug: string,
@@ -65,6 +73,8 @@ export const tenantAppPath = organizationAppPath;
 export const tenantDashboardPath = organizationDashboardPath;
 export const tenantPortalPath = organizationPortalPath;
 export const tenantModulePath = organizationModulePath;
+export const tenantNotificationsPath = organizationWorkspaceNotificationsPath;
+export const tenantPortalNotificationsPath = organizationPortalNotificationsPath;
 
 // ---------------------------------------------------------------------------
 // Platform admin route helpers
@@ -95,4 +105,6 @@ export const platformSecurityPath = (): string => platformPath("security");
 export const platformHealthPath = (): string => platformPath("health");
 
 export const platformAnalyticsPath = (): string => platformPath("analytics");
+
+export const platformNotificationsPath = (): string => platformPath("notifications");
 

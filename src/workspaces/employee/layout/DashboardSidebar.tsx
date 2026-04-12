@@ -19,6 +19,7 @@ import {
   Truck,
   BarChart3,
   DollarSign,
+  BellRing,
   LogOut,
   Lock,
 } from "lucide-react";
@@ -293,6 +294,25 @@ export function DashboardSidebar({ collapsed = false, onCollapseToggle, classNam
 
       {/* Footer */}
       <div className="p-3 border-t border-border/40 space-y-2 mt-auto">
+        <NavLink
+          to={tenantAppPath(tenantSlug, "notifications")}
+          end
+          className={({ isActive }) => cn(
+            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all group relative",
+            isActive
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+            collapsed && "justify-center px-0"
+          )}
+          style={({ isActive }) => ({
+            backgroundColor: isActive ? `${primaryColor}15` : undefined,
+            color: isActive ? primaryColor : undefined,
+          })}
+        >
+          <BellRing className={cn("h-4 w-4 shrink-0 transition-transform group-hover:scale-110")} />
+          {!collapsed && <span className="text-sm font-medium">Notifications</span>}
+        </NavLink>
+
         <NavLink
           to={settingsPath}
           end

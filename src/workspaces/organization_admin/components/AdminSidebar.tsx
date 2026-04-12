@@ -7,6 +7,7 @@ import {
   CreditCard,
   Settings,
   Bell,
+  BellRing,
   MailPlus,
   ChevronLeft,
   ChevronRight,
@@ -111,6 +112,7 @@ export function AdminSidebar({
       label: "Control",
       items: [
         { label: "Invitations", href: tenantAppPath(tenantSlug, "invitations"), icon: MailPlus },
+        { label: "Notifications", href: tenantAppPath(tenantSlug, "notifications"), icon: BellRing },
         { label: "Alerts", href: tenantAppPath(tenantSlug, "alerts"), icon: Bell },
         { label: "Settings", href: tenantAppPath(tenantSlug, "settings"), icon: Settings },
       ]

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { NavLink, useParams } from "react-router-dom";
 import {
   Bell,
+  BellRing,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -70,6 +71,7 @@ export function OrganizationSidebar({
       label: "Control",
       items: [
         { label: "Subscription", href: `/organization/subscription`, icon: CreditCard },
+        { label: "Notifications", href: `/organization/notifications`, icon: BellRing },
         { label: "Alerts", href: `/organization/alerts`, icon: Bell },
         { label: "Settings", href: `/organization/settings`, icon: Settings },
       ]

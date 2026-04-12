@@ -1,4 +1,4 @@
-import { Bell, CheckCircle, FileText, Share2, AlertTriangle, UserPlus, FileCheck, ShoppingCart, Info, X, Briefcase, Building, Phone, Calendar, Truck, Box, Wrench, DollarSign, Layers, ArrowUpCircle, ArrowDownCircle, CreditCard, Clock3 } from "lucide-react";
+import { Bell, Info } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -13,43 +13,10 @@ import { Badge } from "@/ui/shadcn/badge";
 import { useAuth } from "@/core/auth/useAuth";
 import { useNotifications } from "@/core/hooks/useNotifications";
 import { useTenant } from "@/core/tenant/useTenant";
-import { resolveNotificationNavigationTarget } from "@/core/utils/notification-links";
+import { resolveNotificationHistoryRoute, resolveNotificationNavigationTarget } from "@/core/utils/notification-links";
 import { cn } from "@/core/utils/utils";
-import type { Notification, NotificationType } from "@/core/types/notifications";
-
-const NOTIFICATION_ICONS: Record<NotificationType, React.ReactNode> = {
-  contract_signed: <FileCheck className="h-4 w-4 text-success" />,
-  contract_expiring: <AlertTriangle className="h-4 w-4 text-warning" />,
-  quote_accepted: <CheckCircle className="h-4 w-4 text-success" />,
-  quote_rejected: <X className="h-4 w-4 text-destructive" />,
-  document_shared: <Share2 className="h-4 w-4 text-info" />,
-  esignature_requested: <FileText className="h-4 w-4 text-primary" />,
-  esignature_completed: <CheckCircle className="h-4 w-4 text-success" />,
-  plan_limit_warning: <AlertTriangle className="h-4 w-4 text-warning" />,
-  plan_limit_reached: <AlertTriangle className="h-4 w-4 text-destructive" />,
-  purchase_order_approved: <ShoppingCart className="h-4 w-4 text-success" />,
-  member_joined: <UserPlus className="h-4 w-4 text-primary" />,
-  lead_created: <Briefcase className="h-4 w-4 text-primary" />,
-  account_created: <Building className="h-4 w-4 text-primary" />,
-  contact_created: <Phone className="h-4 w-4 text-primary" />,
-  activity_created: <Calendar className="h-4 w-4 text-primary" />,
-  supplier_created: <Truck className="h-4 w-4 text-primary" />,
-  inventory_item_created: <Box className="h-4 w-4 text-primary" />,
-  purchase_order_created: <ShoppingCart className="h-4 w-4 text-primary" />,
-  production_order_created: <Wrench className="h-4 w-4 text-primary" />,
-  financial_record_created: <DollarSign className="h-4 w-4 text-success" />,
-  document_template_created: <Layers className="h-4 w-4 text-primary" />,
-  auto_document_created: <FileText className="h-4 w-4 text-primary" />,
-  document_version_created: <FileCheck className="h-4 w-4 text-primary" />,
-  subscription_created: <CheckCircle className="h-4 w-4 text-success" />,
-  subscription_cancelled: <AlertTriangle className="h-4 w-4 text-warning" />,
-  plan_upgraded: <ArrowUpCircle className="h-4 w-4 text-success" />,
-  plan_downgraded: <ArrowDownCircle className="h-4 w-4 text-warning" />,
-  payment_success: <CreditCard className="h-4 w-4 text-success" />,
-  payment_failed: <CreditCard className="h-4 w-4 text-destructive" />,
-  trial_started: <Clock3 className="h-4 w-4 text-info" />,
-  trial_ended: <Clock3 className="h-4 w-4 text-warning" />,
-};
+import { NOTIFICATION_ICONS } from "@/ui/notification-icons";
+import type { Notification } from "@/core/types/notifications";
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -58,6 +25,11 @@ export function NotificationBell() {
   const { role } = useAuth();
   const { memberships, activeTenantSlug } = useTenant();
   const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
+  const historyRoute = resolveNotificationHistoryRoute({
+    role,
+    currentPathname: pathname,
+    activeTenantSlug,
+  });
 
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
@@ -158,13 +130,19 @@ export function NotificationBell() {
           )}
         </ScrollArea>
         
-        {notifications.length > 0 && (
-          <div className="border-t p-2">
-            <Button variant="ghost" className="w-full text-xs text-muted-foreground" size="sm">
-              View all history (Soon)
-            </Button>
-          </div>
-        )}
+        <div className="border-t p-2">
+          <Button
+            variant="ghost"
+            className="w-full text-xs text-muted-foreground"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              navigate(historyRoute);
+            }}
+          >
+            View all history
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );

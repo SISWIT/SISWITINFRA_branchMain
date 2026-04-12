@@ -62,12 +62,17 @@ const OrganizationInvitationsPage = lazy(() => import("../workspaces/organizatio
 const OrganizationApprovalsPage = lazy(() => import("../workspaces/organization/pages/OrganizationApprovalsPage"));
 const OrganizationSubscriptionPage = lazy(() => import("../workspaces/organization/pages/OrganizationSubscriptionPage"));
 const OrganizationAlertsPage = lazy(() => import("../workspaces/organization_admin/pages/OrganizationAlertsPage"));
+const OrganizationNotificationsPage = lazy(() => import("../workspaces/organization/pages/OrganizationNotificationsPage"));
 const OrganizationSettingsPage = lazy(() => import("../workspaces/organization/pages/OrganizationSettingsPage"));
 const OrganizationPerformancePage = lazy(() => import("../workspaces/organization/pages/OrganizationPerformancePage"));
 
 const Dashboard = lazy(() => import("../workspaces/employee/pages/Dashboard"));
 const EmployeeAlertsPage = lazy(() => import("../workspaces/employee/pages/EmployeeAlertsPage"));
+const EmployeeNotificationsPage = lazy(() => import("../workspaces/employee/pages/EmployeeNotificationsPage"));
 const EmployeeSettingsPage = lazy(() => import("../workspaces/employee/pages/EmployeeSettingsPage"));
+const OrganizationAdminNotificationsPage = lazy(
+  () => import("../workspaces/organization_admin/pages/OrganizationAdminNotificationsPage"),
+);
 
 const OrganizationAdminDashboard = lazy(
   () => import("../workspaces/organization_admin/pages/OrganizationAdminDashboard"),
@@ -83,6 +88,7 @@ const CustomerPendingSignaturesPage = lazy(
 const CustomerQuoteDetailPage = lazy(() => import("../workspaces/portal/pages/CustomerQuoteDetailPage"));
 const CustomerContractDetailPage = lazy(() => import("../workspaces/portal/pages/CustomerContractDetailPage"));
 const CustomerSignaturePage = lazy(() => import("../workspaces/portal/pages/CustomerSignaturePage"));
+const PortalNotificationsPage = lazy(() => import("../workspaces/portal/pages/PortalNotificationsPage"));
 
 const DocumentsDashboard = lazy(() => import("../modules/documents/pages/DocumentsDashboard"));
 const DocumentTemplatesPage = lazy(() => import("../modules/documents/pages/DocumentTemplatesPage"));
@@ -208,6 +214,12 @@ function EmployeeSettingsRoute() {
   return <OrganizationSettingsPage />;
 }
 
+function TenantNotificationsRoute() {
+  const { role } = useAuth();
+  if (isTenantUserRole(role)) return <EmployeeNotificationsPage />;
+  return <OrganizationAdminNotificationsPage />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<RouteLoader />}>
@@ -262,6 +274,7 @@ function AppRoutes() {
           <Route path="plans" element={<Navigate to="/organization/subscription" replace />} />
           <Route path="billing" element={<Navigate to="/organization/subscription" replace />} />
           <Route path="alerts" element={<OrganizationAlertsPage />} />
+          <Route path="notifications" element={<OrganizationNotificationsPage />} />
           <Route path="settings" element={<OrganizationSettingsPage />} />
         </Route>
 
@@ -302,6 +315,7 @@ function AppRoutes() {
               </DocumentsRealtimeProvider>
             }
           />
+          <Route path="notifications" element={<PortalNotificationsPage />} />
           <Route path="pending-signatures" element={<CustomerPendingSignaturesPage />} />
           <Route path="pending-signatures/:id" element={<CustomerSignaturePage />} />
         </Route>
@@ -363,6 +377,7 @@ function AppRoutes() {
           <Route path="subscription" element={<OrganizationSubscriptionPage />} />
           <Route path="invitations" element={<OrganizationInvitationsPage />} />
           <Route path="alerts" element={<EmployeeAlertsRoute />} />
+          <Route path="notifications" element={<TenantNotificationsRoute />} />
           <Route path="approvals" element={<OrganizationApprovalsPage />} />
           <Route path="settings" element={<EmployeeSettingsRoute />} />
         </Route>

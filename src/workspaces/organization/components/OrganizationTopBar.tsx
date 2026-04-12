@@ -44,6 +44,7 @@ const PAGES = [
   { label: "Client Approvals", path: "/organization/approvals" },
   { label: "Plans and Billing", path: "/organization/plans" },
   { label: "Alerts", path: "/organization/alerts" },
+  { label: "Notifications", path: "/organization/notifications" },
   { label: "Settings", path: "/organization/settings" },
 ] as const;
 

@@ -20,8 +20,16 @@ interface ResolveNotificationNavigationTargetOptions extends ResolveNotification
   notificationType?: NotificationType | null;
 }
 
+interface ResolveNotificationHistoryRouteOptions {
+  role?: string | null;
+  currentPathname?: string | null;
+  activeTenantSlug?: string | null;
+}
+
 const INTERNAL_APP_LINK_PATTERN = /^\/([^/]+)\/app(?:\/|$)/i;
 const TENANT_APP_LINK_PATTERN = /^\/[^/]+\/app(?:\/(.*))?$/i;
+const TENANT_PORTAL_PATH_PATTERN = /^\/([^/]+)\/app\/portal(?:\/|$)/i;
+const PLATFORM_WORKSPACE_PATH_PATTERN = /^\/platform(?:\/|$)/i;
 const OWNER_WORKSPACE_PATH_PATTERN = /^\/organization(?:\/|$)/i;
 const UUID_SEGMENT_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -150,6 +158,48 @@ function mapTenantAppLinkToOwnerPath(link: string, notificationType?: Notificati
   }
 
   return ownerFallbackPathByNotificationType(notificationType);
+}
+
+/**
+ * Resolves where the bell "View all history" action should navigate for
+ * the current workspace context.
+ */
+export function resolveNotificationHistoryRoute(
+  options: ResolveNotificationHistoryRouteOptions,
+): string {
+  const { role, currentPathname, activeTenantSlug } = options;
+  const pathname = currentPathname ?? "";
+
+  if (OWNER_WORKSPACE_PATH_PATTERN.test(pathname)) {
+    return "/organization/notifications";
+  }
+
+  if (PLATFORM_WORKSPACE_PATH_PATTERN.test(pathname)) {
+    return "/platform/notifications";
+  }
+
+  const portalMatch = pathname.match(TENANT_PORTAL_PATH_PATTERN);
+  if (portalMatch?.[1]) {
+    return `/${portalMatch[1]}/app/portal/notifications`;
+  }
+
+  const tenantAppMatch = pathname.match(TENANT_APP_LINK_PATTERN);
+  if (tenantAppMatch?.[0]) {
+    const slugMatch = pathname.match(/^\/([^/]+)\/app(?:\/|$)/i);
+    const slug = slugMatch?.[1];
+    if (slug) return `/${slug}/app/notifications`;
+  }
+
+  if (activeTenantSlug) {
+    return `/${activeTenantSlug}/app/notifications`;
+  }
+
+  const normalizedRole = role?.toLowerCase();
+  if (normalizedRole === "platform_super_admin" || normalizedRole === "platform_admin") {
+    return "/platform/notifications";
+  }
+
+  return "/organization/notifications";
 }
 
 /**

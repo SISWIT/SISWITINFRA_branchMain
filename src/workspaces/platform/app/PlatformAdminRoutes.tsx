@@ -43,6 +43,9 @@ const AuditLogsPage = lazy(
 const AnalyticsPage = lazy(
   () => import("@/workspaces/platform/pages/AnalyticsPage"),
 );
+const PlatformNotificationsPage = lazy(
+  () => import("@/workspaces/platform/pages/PlatformNotificationsPage"),
+);
 
 function RouteLoader() {
   return (
@@ -80,6 +83,7 @@ export function PlatformAdminRoutes() {
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="notifications" element={<PlatformNotificationsPage />} />
 
             {/* Legacy route redirects */}
             <Route path="tenants" element={<Navigate to="/platform/organizations" replace />} />
