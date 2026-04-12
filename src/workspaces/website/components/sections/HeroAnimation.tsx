@@ -68,20 +68,22 @@ export const HeroAnimation = () => {
                         }}
                     >
                         <div
-                            className="relative p-4 rounded-2xl bg-card/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] hover:border-primary/50 transition-all duration-300 group cursor-default"
+                            className="relative flex min-w-[4.75rem] flex-col items-center justify-center rounded-2xl border border-white/10 bg-card/40 px-4 py-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl transition-all duration-300 group cursor-default hover:border-primary/50"
                             style={{ transform: 'rotate(0deg)' }} // Keep it upright
                         >
                             <div
-                                className="w-10 h-10 rounded-lg flex items-center justify-center mb-2 shadow-inner"
+                                className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg shadow-inner"
                                 style={{ backgroundColor: `${node.color}20` }}
                             >
                                 <node.icon size={20} color={node.color} className="group-hover:scale-110 transition-transform" />
                             </div>
-                            <div className="text-[11px] font-bold text-foreground/80 tracking-widest">{node.label}</div>
+                            <div className="text-center text-[11px] font-bold tracking-widest text-foreground/80">
+                                {node.label}
+                            </div>
 
                             {/* Glow bar at bottom */}
                             <div
-                                className="mt-2 h-0.5 w-0 group-hover:w-full transition-all duration-500 rounded-full"
+                                className="mt-2 h-0.5 w-0 rounded-full transition-all duration-500 group-hover:w-full"
                                 style={{ backgroundColor: node.color }}
                             />
                         </div>
