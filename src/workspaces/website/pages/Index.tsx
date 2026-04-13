@@ -3,7 +3,6 @@ import { Footer } from "@/workspaces/website/components/layout/Footer";
 import { HeroSection } from "@/workspaces/website/components/sections/HeroSection";
 import { FeaturesSection } from "@/workspaces/website/components/sections/FeaturesSection";
 import { WhySection } from "@/workspaces/website/components/sections/WhySection";
-import { LeadershipSection } from "@/workspaces/website/components/sections/LeadershipSection";
 import { CTASection } from "@/workspaces/website/components/sections/CTASection";
 
 const Index = () => {

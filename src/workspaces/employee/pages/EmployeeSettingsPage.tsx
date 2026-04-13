@@ -25,7 +25,7 @@ export default function EmployeeSettingsPage() {
         if (!user) return;
         
         // Fetch from profiles table
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from("profiles")
             .select("first_name, last_name")
             .eq("user_id", user.id)
@@ -77,10 +77,11 @@ export default function EmployeeSettingsPage() {
         title: "Profile updated",
         description: "Your personal details have been saved successfully.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to update profile.";
       toast({
         title: "Update failed",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {

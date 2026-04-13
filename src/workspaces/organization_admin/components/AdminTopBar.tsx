@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   Check,
@@ -33,6 +33,7 @@ import { useOrganization } from "@/workspaces/organization/hooks/useOrganization
 import { NotificationBell } from "@/ui/notification-bell";
 import { ThemeToggle } from "@/ui/theme-toggle";
 import { tenantAppPath } from "@/core/utils/routes";
+import { useWorkspaceDateFilter } from "@/core/hooks/useWorkspaceDateFilter";
 
 interface AdminTopBarProps {
   onOpenSidebar: () => void;
@@ -72,6 +73,7 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
   const { user, fullName, signOut, role } = useAuth();
   const { organization } = useOrganization();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   
   const displayName = fullName || getDisplayName(user?.email);
@@ -98,8 +100,34 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, []);
 
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const normalizedPathname = pathname.replace(/\/+$/, "");
+  const isDateFilterRoute = /\/app\/(dashboard|analytics)$/.test(normalizedPathname);
+
+  const {
+    selectedDate: urlSelectedDate,
+    setDate: setUrlDate,
+    resetToCurrent: resetUrlDate,
+  } = useWorkspaceDateFilter();
+  const [localSelectedDate, setLocalSelectedDate] = useState<Date | undefined>(undefined);
+  const selectedDate = isDateFilterRoute ? urlSelectedDate : localSelectedDate;
   const dateLabel = selectedDate ? formatSelectedDate(selectedDate) : "Current";
+  const handleDateSelect = useCallback(
+    (date: Date | undefined) => {
+      if (isDateFilterRoute) {
+        setUrlDate(date);
+        return;
+      }
+      setLocalSelectedDate(date);
+    },
+    [isDateFilterRoute, setUrlDate],
+  );
+  const handleDateReset = useCallback(() => {
+    if (isDateFilterRoute) {
+      resetUrlDate();
+      return;
+    }
+    setLocalSelectedDate(undefined);
+  }, [isDateFilterRoute, resetUrlDate]);
 
   const [selectedModule, setSelectedModule] = useState<string>("All");
   const handleModuleSelect = useCallback((label: string, path?: string) => {
@@ -193,7 +221,18 @@ export function AdminTopBar({ onOpenSidebar }: AdminTopBarProps) {
               </button>
             </PopoverTrigger>
             <PopoverContent align="center" className="w-auto p-0 border-border bg-card/95 backdrop-blur-xl shadow-2xl">
-              <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} />
+              <Calendar mode="single" selected={selectedDate} onSelect={handleDateSelect} />
+              <div className="border-t border-border/60 p-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-[10px] font-bold uppercase tracking-wider"
+                  onClick={handleDateReset}
+                >
+                  Reset to Current
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
 

@@ -724,7 +724,6 @@ export function useCreateDocumentESignature() {
   const queryClient = useQueryClient();
   const { user, session } = useAuth();
   const { organization } = useOrganization();
-  const { notify } = useCreateNotification();
 
   return useMutation({
     mutationFn: async (signature: Omit<Partial<DocumentESignature>, "id" | "created_at" | "updated_at">) => {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
   Check,
@@ -8,7 +8,6 @@ import {
   Grid2X2,
   LogOut,
   Menu,
-  Plus,
   Search,
   Settings,
 } from "lucide-react";
@@ -34,6 +33,7 @@ import { useOrganization } from "@/workspaces/organization/hooks/useOrganization
 import { NotificationBell } from "@/ui/notification-bell";
 import { ThemeToggle } from "@/ui/theme-toggle";
 import { tenantAppPath, tenantDashboardPath } from "@/core/utils/routes";
+import { useWorkspaceDateFilter } from "@/core/hooks/useWorkspaceDateFilter";
 
 interface EmployeeTopBarProps {
   onOpenSidebar: () => void;
@@ -59,7 +59,17 @@ const EMPLOYEE_PAGES = [
   { label: "Settings", path: "settings" },
 ] as const;
 
-function getDisplayName(user: any): string {
+function getDisplayName(
+  user:
+    | {
+        user_metadata?: {
+          first_name?: string | null;
+        };
+        email?: string | null;
+      }
+    | null
+    | undefined,
+): string {
   if (user?.user_metadata?.first_name) return user.user_metadata.first_name;
   if (!user?.email) return "Employee";
   return user.email.split("@")[0] || "Employee";
@@ -77,6 +87,7 @@ export function EmployeeTopBar({ onOpenSidebar }: EmployeeTopBarProps) {
   const { user, signOut, role } = useAuth();
   const { organization } = useOrganization();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   
   const displayName = getDisplayName(user);
@@ -103,8 +114,34 @@ export function EmployeeTopBar({ onOpenSidebar }: EmployeeTopBarProps) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, []);
 
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const normalizedPathname = pathname.replace(/\/+$/, "");
+  const isDateFilterRoute = /\/app\/(dashboard|analytics)$/.test(normalizedPathname);
+
+  const {
+    selectedDate: urlSelectedDate,
+    setDate: setUrlDate,
+    resetToCurrent: resetUrlDate,
+  } = useWorkspaceDateFilter();
+  const [localSelectedDate, setLocalSelectedDate] = useState<Date | undefined>(undefined);
+  const selectedDate = isDateFilterRoute ? urlSelectedDate : localSelectedDate;
   const dateLabel = selectedDate ? formatSelectedDate(selectedDate) : "Current";
+  const handleDateSelect = useCallback(
+    (date: Date | undefined) => {
+      if (isDateFilterRoute) {
+        setUrlDate(date);
+        return;
+      }
+      setLocalSelectedDate(date);
+    },
+    [isDateFilterRoute, setUrlDate],
+  );
+  const handleDateReset = useCallback(() => {
+    if (isDateFilterRoute) {
+      resetUrlDate();
+      return;
+    }
+    setLocalSelectedDate(undefined);
+  }, [isDateFilterRoute, resetUrlDate]);
 
   const [selectedModule, setSelectedModule] = useState<string>("All");
   const handleModuleSelect = useCallback((label: string, path?: string) => {
@@ -206,7 +243,18 @@ export function EmployeeTopBar({ onOpenSidebar }: EmployeeTopBarProps) {
               </button>
             </PopoverTrigger>
             <PopoverContent align="center" className="w-auto p-0 border-border bg-card/95 backdrop-blur-xl shadow-2xl">
-              <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} />
+              <Calendar mode="single" selected={selectedDate} onSelect={handleDateSelect} />
+              <div className="border-t border-border/60 p-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-[10px] font-bold uppercase tracking-wider"
+                  onClick={handleDateReset}
+                >
+                  Reset to Current
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
 

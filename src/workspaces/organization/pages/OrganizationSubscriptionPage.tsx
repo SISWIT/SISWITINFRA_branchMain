@@ -37,7 +37,6 @@ import { toast } from "sonner";
 import { cn } from "@/core/utils/utils";
 import {
   getResourceLabel,
-  formatLimit,
   isUnlimited,
   ADD_ONS,
   PLAN_MODULES,

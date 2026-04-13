@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, ComponentType } from "react";
-import { useNavigate, Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/ui/shadcn/button";
 import {
   DropdownMenu,
@@ -13,9 +13,14 @@ import {
 } from "@/ui/shadcn/dropdown-menu";
 import { useAuth } from "@/core/auth/useAuth";
 import { useModuleScope } from "@/core/hooks/useModuleScope";
+import { useWorkspaceDateFilter } from "@/core/hooks/useWorkspaceDateFilter";
 import { supabase } from "@/core/api/client";
 import { useToast } from "@/core/hooks/use-toast";
 import { tenantAppPath } from "@/core/utils/routes";
+import {
+  formatWorkspaceDateParam,
+  getWorkspaceDateBounds,
+} from "@/core/utils/workspace-date";
 import { Progress } from "@/ui/shadcn/progress";
 import {
   Calculator,
@@ -27,7 +32,6 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Loader2,
   FileStack,
   Boxes,
@@ -44,6 +48,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { format } from "date-fns";
 
 /* --- TYPES --- */
 
@@ -138,6 +143,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+  const { effectiveDate } = useWorkspaceDateFilter();
+  const dateBounds = useMemo(() => getWorkspaceDateBounds(effectiveDate), [effectiveDate]);
 
   const dashboardRoutes = useMemo(() => buildDashboardRoutes(tenantSlug), [tenantSlug]);
   const quickActions = useMemo(() => buildQuickActions(dashboardRoutes), [dashboardRoutes]);
@@ -161,6 +168,10 @@ const Dashboard = () => {
     const initializeDashboard = async () => {
       if (!userId || !organizationId) return;
       setDataLoading(true);
+      const dayStartIso = dateBounds.dayStart.toISOString();
+      const dayEndIso = dateBounds.dayEnd.toISOString();
+      const monthStartIso = dateBounds.monthStart.toISOString();
+      const selectedDayKey = formatWorkspaceDateParam(dateBounds.anchorDate);
 
       try {
         const [
@@ -181,44 +192,46 @@ const Dashboard = () => {
             .from("quotes")
             .select("id", { count: "exact" })
             .eq("organization_id", organizationId as string)
-            .in("status", ["draft", "pending_approval"]),
+            .in("status", ["draft", "pending_approval"])
+            .gte("created_at", dayStartIso)
+            .lte("created_at", dayEndIso),
           supabase
             .from("contracts")
             .select("id", { count: "exact" })
             .eq("organization_id", organizationId as string)
             .not("status", "eq", "expired")
-            .neq("status", "cancelled"),
+            .neq("status", "cancelled")
+            .lte("created_at", dayEndIso)
+            .or(`end_date.is.null,end_date.gte.${selectedDayKey}`),
           supabase
             .from("auto_documents")
             .select("id", { count: "exact" })
-            .eq("organization_id", organizationId as string),
+            .eq("organization_id", organizationId as string)
+            .gte("created_at", dayStartIso)
+            .lte("created_at", dayEndIso),
           supabase.rpc("get_inventory_value"),
-          supabase.rpc("get_revenue_mtd" as any, {
-            p_start_date: new Date(
-              new Date().getFullYear(),
-              new Date().getMonth(),
-              1
-            )
-              .toISOString()
-              .split("T")[0],
-            p_end_date: new Date().toISOString().split("T")[0],
+          supabase.rpc("get_revenue_mtd", {
+            p_start_date: monthStartIso,
+            p_end_date: dayEndIso,
             p_org_id: organizationId,
           }),
           supabase
             .from("activities")
             .select("subject, created_at, is_completed")
             .eq("organization_id", organizationId as string)
+            .gte("created_at", dayStartIso)
+            .lte("created_at", dayEndIso)
             .order("created_at", { ascending: false })
-            .limit(6) as any,
+            .limit(6),
         ]);
 
         if (profileRes.data) setProfile(profileRes.data as Profile);
 
         // --- CALCULATE PERFORMANCE TRENDS ---
         const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const now = new Date();
+        const anchorDate = dateBounds.anchorDate;
         const last6Months = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const d = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - i, 1);
           return {
             monthIndex: d.getMonth(),
             year: d.getFullYear(),
@@ -230,19 +243,21 @@ const Dashboard = () => {
         }).reverse();
 
         // Fetch all quotes and contracts from last 6 months for trend calculation
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString();
+        const sixMonthsAgo = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - 6, 1).toISOString();
         
         const [historicalQuotes, historicalContracts] = await Promise.all([
           supabase
             .from("quotes")
             .select("created_at")
             .eq("organization_id", organizationId as string)
-            .gte("created_at", sixMonthsAgo),
+            .gte("created_at", sixMonthsAgo)
+            .lte("created_at", dayEndIso),
           supabase
             .from("contracts")
             .select("created_at")
             .eq("organization_id", organizationId as string)
             .gte("created_at", sixMonthsAgo)
+            .lte("created_at", dayEndIso)
         ]);
 
         const qData = historicalQuotes.data || [];
@@ -266,18 +281,34 @@ const Dashboard = () => {
         const currentMonth = last6Months[last6Months.length - 1];
         const prevMonth = last6Months[last6Months.length - 2];
         
-        const qCurr = qData.filter(q => q.created_at && new Date(q.created_at).getMonth() === currentMonth.monthIndex).length;
-        const qPrev = qData.filter(q => q.created_at && new Date(q.created_at).getMonth() === prevMonth.monthIndex).length;
+        const qCurr = qData.filter((q) => {
+          if (!q.created_at) return false;
+          const createdAt = new Date(q.created_at);
+          return createdAt.getMonth() === currentMonth.monthIndex && createdAt.getFullYear() === currentMonth.year;
+        }).length;
+        const qPrev = qData.filter((q) => {
+          if (!q.created_at) return false;
+          const createdAt = new Date(q.created_at);
+          return createdAt.getMonth() === prevMonth.monthIndex && createdAt.getFullYear() === prevMonth.year;
+        }).length;
         const qChange = qPrev === 0 ? 100 : Math.round(((qCurr - qPrev) / qPrev) * 100);
 
-        const cCurr = cData.filter(c => c.created_at && new Date(c.created_at).getMonth() === currentMonth.monthIndex).length;
-        const cPrev = cData.filter(c => c.created_at && new Date(c.created_at).getMonth() === prevMonth.monthIndex).length;
+        const cCurr = cData.filter((c) => {
+          if (!c.created_at) return false;
+          const createdAt = new Date(c.created_at);
+          return createdAt.getMonth() === currentMonth.monthIndex && createdAt.getFullYear() === currentMonth.year;
+        }).length;
+        const cPrev = cData.filter((c) => {
+          if (!c.created_at) return false;
+          const createdAt = new Date(c.created_at);
+          return createdAt.getMonth() === prevMonth.monthIndex && createdAt.getFullYear() === prevMonth.year;
+        }).length;
         const cChange = cPrev === 0 ? 100 : Math.round(((cCurr - cPrev) / cPrev) * 100);
 
         setPerformanceData(chartAgg.slice(1)); // Show last 6 months on chart
 
-        const inventoryValue = Number((invRes as any).data ?? 0);
-        const revenueMTD = Number((revRes as any).data ?? 0);
+        const inventoryValue = Number(invRes.data ?? 0);
+        const revenueMTD = Number(revRes.data ?? 0);
 
         setStats((prev) =>
           prev.map((s) => {
@@ -318,13 +349,13 @@ const Dashboard = () => {
           })
         );
 
-        const activitiesData = (activitiesRes as any).data as DbActivity[] | null;
+        const activitiesData = activitiesRes.data as DbActivity[] | null;
         if (activitiesData) {
           setRecentActivity(
             activitiesData.map((a) => ({
               title: a.subject || "No Subject",
               time: a.created_at
-                ? new Date(a.created_at).toLocaleString()
+                ? format(new Date(a.created_at), "PPp")
                 : "Unknown",
               status: a.is_completed ? "completed" : "pending",
             }))
@@ -342,7 +373,7 @@ const Dashboard = () => {
     };
 
     initializeDashboard();
-  }, [userId, organizationId, toast]);
+  }, [dateBounds, organizationId, toast, userId]);
 
   if (authLoading || (dataLoading && !profile)) {
     return (
@@ -397,7 +428,7 @@ const Dashboard = () => {
                   <Activity className="w-3.5 h-3.5" /> Workspace: Employee
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
-                  <Calendar className="w-3.5 h-3.5" /> Updated: {new Date().toLocaleDateString()}
+                  <Calendar className="w-3.5 h-3.5" /> Updated: {format(effectiveDate, "PP")}
                 </div>
               </div>
             </div>
@@ -480,7 +511,7 @@ const Dashboard = () => {
 
             {/* STAT CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {stats.slice(0, 3).map((s, i) => (
+              {stats.slice(0, 3).map((s) => (
                 <div key={s.label} className="group relative rounded-xl bg-card border border-border p-3.5 hover:shadow-md transition-all duration-300 overflow-hidden">
                   <div className="flex justify-between items-start mb-3">
                     <div className={`p-2 rounded-lg bg-primary/10 border border-primary/20 ${s.color}`}>

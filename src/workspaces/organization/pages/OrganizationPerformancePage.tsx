@@ -14,13 +14,15 @@ import {
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { useOrganizationStats } from "@/workspaces/organization/hooks/useOrganizationStats";
 import { useOrganizationPerformance } from "@/workspaces/organization/hooks/useOrganizationPerformance";
+import { useWorkspaceDateFilter } from "@/core/hooks/useWorkspaceDateFilter";
 import { cn } from "@/core/utils/utils";
 import { Skeleton } from "@/ui/shadcn/skeleton";
 
 export default function OrganizationPerformancePage() {
   const { organization } = useOrganization();
+  const { effectiveDate } = useWorkspaceDateFilter();
   const { data: stats } = useOrganizationStats(organization?.id);
-  const { data: performance, isLoading: performanceLoading } = useOrganizationPerformance();
+  const { data: performance, isLoading: performanceLoading } = useOrganizationPerformance(effectiveDate);
   const primaryColor = organization?.primary_color || "var(--primary)";
 
   // Log stats to resolve unused warning if needed for future real-data binding
@@ -99,7 +101,7 @@ export default function OrganizationPerformancePage() {
 
       {/* Hero Stats */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((m: any) => (
+        {metrics.map((m) => (
           <div key={m.label} className="group relative overflow-hidden rounded-3xl border border-border/40 bg-card/40 backdrop-blur-md p-5 shadow-xl transition-all hover:scale-[1.02] hover:bg-card/60">
             <div className="flex items-start justify-between">
               <div 

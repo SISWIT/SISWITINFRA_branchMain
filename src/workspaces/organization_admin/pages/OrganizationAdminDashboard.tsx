@@ -20,10 +20,15 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { format, subDays, isAfter } from "date-fns";
+import { format } from "date-fns";
 import { useAuth } from "@/core/auth/useAuth";
 import { useOrganization } from "@/workspaces/organization/hooks/useOrganization";
 import { tenantAppPath } from "@/core/utils/routes";
+import { useWorkspaceDateFilter } from "@/core/hooks/useWorkspaceDateFilter";
+import {
+  formatWorkspaceDateParam,
+  getWorkspaceDateBounds,
+} from "@/core/utils/workspace-date";
 import { Badge } from "@/ui/shadcn/badge";
 import { Button } from "@/ui/shadcn/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/shadcn/card";
@@ -92,7 +97,9 @@ export default function OrganizationAdminDashboard() {
   const { organization, memberships, organizationLoading } = useOrganization();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { data: dashboardData, isLoading, isError, refetch } = useOrganizationAdminDashboard();
+  const { effectiveDate } = useWorkspaceDateFilter();
+  const dateBounds = useMemo(() => getWorkspaceDateBounds(effectiveDate), [effectiveDate]);
+  const { data: dashboardData, isLoading, isError, refetch } = useOrganizationAdminDashboard(effectiveDate);
 
   const primaryColor = organization?.primary_color || "var(--primary)";
   
@@ -111,44 +118,50 @@ export default function OrganizationAdminDashboard() {
   // Process operational data
   const barChartData = useMemo(() => {
     const days = Array.from({ length: 7 }).map((_, i) => {
-      const d = subDays(new Date(), 6 - i);
+      const d = new Date(dateBounds.rolling7Start);
+      d.setDate(dateBounds.rolling7Start.getDate() + i);
       return {
+        key: formatWorkspaceDateParam(d),
         name: format(d, "dd MMM"),
         leads: 0,
         contracts: 0,
-        total: 0
+        total: 0,
       };
     });
 
     if (!dashboardData?.charts) return days;
-    const sevenDaysAgo = subDays(new Date(), 7);
+    const dayIndexByKey = new Map(days.map((day, index) => [day.key, index]));
+    const windowStart = dateBounds.rolling7Start.getTime();
+    const windowEnd = dateBounds.dayEnd.getTime();
 
     dashboardData.charts.leads?.forEach((lead: DashboardChartItem) => {
       if (!lead.created_at) return;
-      const d = new Date(lead.created_at);
-      if (isAfter(d, sevenDaysAgo)) {
-        const entry = days.find(x => x.name === format(d, "dd MMM"));
-        if (entry) {
-          entry.leads += 1;
-          entry.total += 1;
-        }
+      const createdAt = new Date(lead.created_at);
+      const time = createdAt.getTime();
+      if (Number.isNaN(time) || time < windowStart || time > windowEnd) return;
+      const dayKey = formatWorkspaceDateParam(createdAt);
+      const index = dayIndexByKey.get(dayKey);
+      if (index !== undefined) {
+        days[index].leads += 1;
+        days[index].total += 1;
       }
     });
 
     dashboardData.charts.contracts?.forEach((contract: DashboardChartItem) => {
       if (!contract.created_at) return;
-      const d = new Date(contract.created_at);
-      if (isAfter(d, sevenDaysAgo)) {
-        const entry = days.find(x => x.name === format(d, "dd MMM"));
-        if (entry) {
-          entry.contracts += 1;
-          entry.total += 1;
-        }
+      const createdAt = new Date(contract.created_at);
+      const time = createdAt.getTime();
+      if (Number.isNaN(time) || time < windowStart || time > windowEnd) return;
+      const dayKey = formatWorkspaceDateParam(createdAt);
+      const index = dayIndexByKey.get(dayKey);
+      if (index !== undefined) {
+        days[index].contracts += 1;
+        days[index].total += 1;
       }
     });
 
     return days;
-  }, [dashboardData?.charts]);
+  }, [dashboardData?.charts, dateBounds.dayEnd, dateBounds.rolling7Start]);
 
   if (isDashboardHydrating) {
     return (
@@ -447,7 +460,7 @@ export default function OrganizationAdminDashboard() {
                   Targeted {log.entity_type} {log.entity_type === 'user' ? 'Management' : 'Operation'}
                 </p>
                 <p className="text-[10px] text-muted-foreground/60 font-medium">
-                  {log.created_at ? format(new Date(log.created_at), "MMM dd • h:mm a") : "Just now"}
+                  {log.created_at ? format(new Date(log.created_at), "MMM dd 'at' h:mm a") : "Just now"}
                 </p>
               </div>
             )) : (
