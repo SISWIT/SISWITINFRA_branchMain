@@ -1165,12 +1165,16 @@ export function useCreateFinancialRecord() {
 
       if (tenantId) {
         const workspaceSlug = tenantSlug ?? tenantId;
+        const amountLabel = Number(data.amount ?? 0).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
         notify({
           userId: userId || "",
           organizationId: tenantId,
           type: "financial_record_created",
           title: "New Financial Record",
-          message: `A new ${data.type} record for $${data.amount} has been added`,
+          message: `A new ${data.type} record for ₹${amountLabel} has been added`,
           link: `/${workspaceSlug}/app/erp/financials`,
           broadcastRoles: ["owner", "admin"],
         });

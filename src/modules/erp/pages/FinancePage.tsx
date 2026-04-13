@@ -109,7 +109,7 @@ export default function FinancePage() {
   );
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount);
   };
 
   return (
@@ -302,7 +302,7 @@ function TransactionForm({ onSubmit, isLoading }: { onSubmit: (data: Transaction
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Amount ($)</Label>
+          <Label>Amount (₹)</Label>
           <Input
             type="number"
             step="0.01"

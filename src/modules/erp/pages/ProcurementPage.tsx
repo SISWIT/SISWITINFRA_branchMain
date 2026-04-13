@@ -231,6 +231,10 @@ export default function ProcurementPage() {
     filterDefs: PO_FILTERS,
   });
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount);
+  };
+
   return (
     <div className="space-y-6">
       <PlanLimitBanner resource="suppliers" className="mb-4" />
@@ -346,7 +350,7 @@ export default function ProcurementPage() {
                         <span className="text-xs text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-semibold">${order.total_amount?.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">{formatCurrency(Number(order.total_amount ?? 0))}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={STATUS_STYLES[order.status || "draft"] || ""}>
                         {order.status}
@@ -480,7 +484,7 @@ function PurchaseOrderForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Total Amount ($)</Label>
+        <Label>Total Amount (₹)</Label>
         <Input
           type="number"
           step="0.01"

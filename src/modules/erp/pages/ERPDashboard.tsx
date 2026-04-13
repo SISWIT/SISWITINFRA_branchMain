@@ -89,9 +89,9 @@ export default function ERPDashboard() {
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", { 
+    return new Intl.NumberFormat("en-IN", { 
         style: "currency", 
-        currency: "USD", 
+        currency: "INR", 
         notation: "compact", 
         maximumFractionDigits: 1 
     }).format(value);
