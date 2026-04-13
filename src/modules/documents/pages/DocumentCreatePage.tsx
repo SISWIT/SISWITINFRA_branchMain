@@ -21,7 +21,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
-  Calendar,
+  Calendar as CalendarIcon,
   Check,
   FileStack,
   FileText,
@@ -30,6 +30,10 @@ import {
 } from "lucide-react";
 import { FileUpload } from "@/ui/file-upload";
 import { tenantAppPath } from "@/core/utils/routes";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 
 const steps = [
   { id: 1, title: "Select Template", icon: FileText },
@@ -292,23 +296,67 @@ const DocumentCreatePage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="effectiveDate">Effective Date</Label>
-                <Input
-                  id="effectiveDate"
-                  type="date"
-                  value={formData.effectiveDate}
-                  onChange={(event) => handleInputChange("effectiveDate", event.target.value)}
-                />
+                <Label>Effective Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.effectiveDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.effectiveDate ? (
+                        format(parseISO(formData.effectiveDate), "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.effectiveDate ? parseISO(formData.effectiveDate) : undefined}
+                      onSelect={(date) =>
+                        handleInputChange("effectiveDate", date ? format(date, "yyyy-MM-dd") : "")
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                <Input
-                  id="expiryDate"
-                  type="date"
-                  value={formData.expiryDate}
-                  onChange={(event) => handleInputChange("expiryDate", event.target.value)}
-                />
+                <Label>Expiry Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.expiryDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.expiryDate ? (
+                        format(parseISO(formData.expiryDate), "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.expiryDate ? parseISO(formData.expiryDate) : undefined}
+                      onSelect={(date) =>
+                        handleInputChange("expiryDate", date ? format(date, "yyyy-MM-dd") : "")
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2 sm:col-span-2">
@@ -375,14 +423,14 @@ const DocumentCreatePage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <CalendarIcon className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <div className="text-sm text-muted-foreground">Effective Date</div>
                     <div className="font-medium text-foreground">{formData.effectiveDate || "Not specified"}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <CalendarIcon className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <div className="text-sm text-muted-foreground">Expiry Date</div>
                     <div className="font-medium text-foreground">{formData.expiryDate || "Not specified"}</div>

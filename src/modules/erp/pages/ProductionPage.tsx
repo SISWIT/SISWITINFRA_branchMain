@@ -8,7 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  Calendar,
+  Calendar as CalendarIcon,
   CheckCircle2,
   AlertTriangle
 } from "lucide-react";
@@ -26,6 +26,8 @@ import { Input } from "@/ui/shadcn/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/ui/shadcn/sheet";
 import { Label } from "@/ui/shadcn/label";
 import { useToast } from "@/core/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +45,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/shadcn/alert-dialog";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 
 interface ProductionOrderRow {
   id: string;
@@ -318,7 +322,7 @@ export default function ProductionPage() {
                     <TableCell>
                       {order.due_date ? (
                         <div className="flex items-center text-sm text-muted-foreground">
-                          <Calendar className="mr-1 h-3 w-3" />
+                          <CalendarIcon className="mr-1 h-3 w-3" />
                           {new Date(order.due_date).toLocaleDateString()}
                         </div>
                       ) : "-"}
@@ -454,20 +458,53 @@ function ProductionOrderForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Start Date</Label>
-          <Input
-            type="date"
-            required
-            value={formData.start_date}
-            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !formData.start_date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.start_date ? format(parseISO(formData.start_date), "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.start_date ? parseISO(formData.start_date) : undefined}
+                onSelect={(date) => setFormData({ ...formData, start_date: date ? format(date, "yyyy-MM-dd") : "" })}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2">
           <Label>Due Date</Label>
-          <Input
-            type="date"
-            value={formData.due_date}
-            onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !formData.due_date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.due_date ? format(parseISO(formData.due_date), "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.due_date ? parseISO(formData.due_date) : undefined}
+                onSelect={(date) => setFormData({ ...formData, due_date: date ? format(date, "yyyy-MM-dd") : "" })}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

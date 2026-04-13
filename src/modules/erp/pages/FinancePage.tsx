@@ -5,6 +5,7 @@ import {
   Search,
   Loader2,
   DollarSign,
+  Calendar as CalendarIcon,
   TrendingUp,
   TrendingDown,
   PieChart,
@@ -26,6 +27,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Label } from "@/ui/shadcn/label";
 import { useToast } from "@/core/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 
 interface TransactionFormData {
   description: string;
@@ -345,12 +350,30 @@ function TransactionForm({ onSubmit, isLoading }: { onSubmit: (data: Transaction
 
       <div className="space-y-2">
         <Label>Date</Label>
-        <Input
-          type="date"
-          required
-          value={formData.transaction_date}
-          onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !formData.transaction_date && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {formData.transaction_date ? format(parseISO(formData.transaction_date), "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={formData.transaction_date ? parseISO(formData.transaction_date) : undefined}
+              onSelect={(date) =>
+                setFormData({ ...formData, transaction_date: date ? format(date, "yyyy-MM-dd") : "" })
+              }
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       <Button type="submit" className="w-full h-11" disabled={isLoading}>

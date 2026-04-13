@@ -8,7 +8,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  Calendar,
+  Calendar as CalendarIcon,
   AlertTriangle
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,6 +25,8 @@ import { Input } from "@/ui/shadcn/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/ui/shadcn/sheet";
 import { Label } from "@/ui/shadcn/label";
 import { useToast } from "@/core/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/shadcn/popover";
+import { Calendar } from "@/ui/shadcn/calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +34,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/ui/shadcn/dropdown-menu";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/core/utils/utils";
 
 // NEW: Proper Alert System imports
 import {
@@ -336,14 +340,14 @@ export default function ProcurementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData?.map((order: any) => (
+                {filteredData?.map((order) => (
                   <TableRow key={order.id} className="group hover:bg-muted/5">
                     <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
                     <TableCell>{order.accounts?.name || "Unknown"}</TableCell>
                     <TableCell>
                       {order.expected_delivery_date ? (
                         <div className="flex items-center text-sm text-muted-foreground">
-                          <Calendar className="mr-1 h-3 w-3" />
+                          <CalendarIcon className="mr-1 h-3 w-3" />
                           {new Date(order.expected_delivery_date).toLocaleDateString()}
                         </div>
                       ) : (
@@ -466,20 +470,55 @@ function PurchaseOrderForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Order Date</Label>
-          <Input
-            type="date"
-            required
-            value={formData.order_date}
-            onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !formData.order_date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.order_date ? format(parseISO(formData.order_date), "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.order_date ? parseISO(formData.order_date) : undefined}
+                onSelect={(date) => setFormData({ ...formData, order_date: date ? format(date, "yyyy-MM-dd") : "" })}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2">
           <Label>Delivery Date</Label>
-          <Input
-            type="date"
-            value={formData.expected_delivery_date}
-            onChange={(e) => setFormData({ ...formData, expected_delivery_date: e.target.value })}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !formData.expected_delivery_date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {formData.expected_delivery_date ? format(parseISO(formData.expected_delivery_date), "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={formData.expected_delivery_date ? parseISO(formData.expected_delivery_date) : undefined}
+                onSelect={(date) =>
+                  setFormData({ ...formData, expected_delivery_date: date ? format(date, "yyyy-MM-dd") : "" })
+                }
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
