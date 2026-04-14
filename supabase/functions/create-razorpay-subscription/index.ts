@@ -274,7 +274,21 @@ Deno.serve(async (req: Request) => {
       }
 
       const verifyErrorBody = await verifyResponse.text();
-      if (verifyResponse.status !== 404) {
+      let idDoesNotExist = verifyResponse.status === 404;
+
+      // Handle Razorpay returning 400 "The id provided does not exist" for environment mismatches
+      if (verifyResponse.status === 400) {
+        try {
+          const errorJson = JSON.parse(verifyErrorBody);
+          if (errorJson.error?.description?.toLowerCase().includes("does not exist")) {
+            idDoesNotExist = true;
+          }
+        } catch {
+          // Fallback to strict status check
+        }
+      }
+
+      if (!idDoesNotExist) {
         return jsonResponse(
           502,
           {
