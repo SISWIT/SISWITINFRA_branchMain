@@ -186,8 +186,9 @@ export function useDocumentTemplates() {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       const scopedQuery = applyModuleReadScope(
@@ -197,7 +198,7 @@ export function useDocumentTemplates() {
       );
 
       const query = scopedQuery
-        .or(`created_by.eq.${user.id},is_public.eq.true`)
+        .or(`created_by.eq.${user?.id},is_public.eq.true`)
         .order("updated_at", { ascending: false });
 
       const { data, error } = await query;
@@ -390,7 +391,7 @@ export function useDeleteDocumentTemplate() {
 }
 
 // ===== AUTO DOCUMENTS =====
-export function useAutoDocuments() {
+export function useAutoDocuments(mode = "internal") {
   const { user, role } = useAuth();
   const { organization, organizationLoading } = useOrganization();
   const scope: ModuleScopeContext = {
@@ -400,13 +401,56 @@ export function useAutoDocuments() {
   };
 
   return useQuery({
-    queryKey: ["auto_documents", user?.id, organization?.id],
+    queryKey: ["auto_documents", mode, user?.id, organization?.id],
     enabled: !!user?.id && !!organization?.id && !organizationLoading,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+      if (mode === "portal" && user?.email && organization) {
+        const { data: createdDocsRes, error: createdDocsError } = await supabase
+          .from("auto_documents")
+          .select("*")
+          .eq("organization_id", organization.id)
+          .eq("created_by", user.id)
+          .order("created_at", { ascending: false });
+
+        const { data: assignedDocsRes, error: assignedDocsError } = await supabase
+          .from("document_esignatures")
+          .select("id, document:auto_documents(*)")
+          .eq("organization_id", organization.id)
+          .or(`recipient_email.ilike.${user.email},signer_email.ilike.${user.email}`);
+
+        if (createdDocsError || assignedDocsError) {
+          throw createdDocsError || assignedDocsError;
+        }
+
+        const merged = new Map();
+
+        (createdDocsRes || []).forEach((doc) => {
+          merged.set(doc.id, { ...doc, signature_id: null });
+        });
+
+        (assignedDocsRes || []).forEach((row) => {
+          const doc = row.document;
+          if (doc) {
+            const existing = merged.get(doc.id);
+            if (!existing) {
+              merged.set(doc.id, { ...doc, signature_id: row.id });
+            } else if (!existing.signature_id) {
+              merged.set(doc.id, { ...existing, signature_id: row.id });
+            }
+          }
+        });
+
+        return Array.from(merged.values()).sort((a: any, b: any) => {
+          const aTs = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTs = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bTs - aTs;
+        });
+      }
+
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       const scopedQuery = applyModuleReadScope(
@@ -421,7 +465,7 @@ export function useAutoDocuments() {
         throw error;
       }
 
-      return (data || []) as AutoDocument[];
+      return (data || []) as any[];
     },
   });
 }
@@ -440,8 +484,8 @@ export function useAutoDocument(id: string) {
     enabled: !!id && !!user?.id && !!organization?.id && !organizationLoading,
     staleTime: 30_000,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       const scopedQuery = applyModuleReadScope(
@@ -686,8 +730,8 @@ export function useDocumentESignatures(documentId?: string) {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       let query = supabase
@@ -1005,10 +1049,10 @@ export function useSendDocumentReminder() {
           current?.map((signature) =>
             signature.id === signatureId
               ? {
-                  ...signature,
-                  reminder_count: (signature.reminder_count || 0) + 1,
-                  last_reminder_at: optimisticTimestamp,
-                }
+                ...signature,
+                reminder_count: (signature.reminder_count || 0) + 1,
+                last_reminder_at: optimisticTimestamp,
+              }
               : signature,
           ) ?? current,
       );
@@ -1022,10 +1066,10 @@ export function useSendDocumentReminder() {
           current?.map((signature) =>
             signature.id === data.id
               ? {
-                  ...signature,
-                  reminder_count: data.reminder_count,
-                  last_reminder_at: data.last_reminder_at,
-                }
+                ...signature,
+                reminder_count: data.reminder_count,
+                last_reminder_at: data.last_reminder_at,
+              }
               : signature,
           ) ?? current,
       );
@@ -1053,8 +1097,8 @@ export function useDocumentVersions(documentId: string) {
     enabled: !!documentId && !!user?.id && !!organization?.id && !organizationLoading,
     staleTime: 30_000,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
       if (!organization?.id) {
         throw new Error("Organization context is required");
@@ -1161,8 +1205,8 @@ export function useDocumentPermissions(documentId: string) {
     enabled: !!documentId && !!user?.id && !!organization?.id && !organizationLoading,
     staleTime: 30_000,
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
+      if (!organization?.id) {
+        throw new Error("Organization context is required");
       }
 
       const { data, error } = await supabase

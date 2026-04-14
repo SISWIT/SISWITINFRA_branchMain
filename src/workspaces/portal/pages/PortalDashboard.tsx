@@ -19,6 +19,7 @@ import {
   FilePlus2,
   TrendingUp,
 } from "lucide-react";
+import { useAutoDocuments } from "@/modules/documents/hooks/useDocuments";
 import { cn } from "@/core/utils/utils";
 
 /* ─── Types ─────────────────────────────────── */
@@ -141,6 +142,8 @@ const PortalDashboard = () => {
     { icon: FileText, title: "Pending Signatures", description: "Sign pending documents", route: tenantPortalPath(tenantSlug, "pending-signatures") },
   ], [tenantSlug]);
 
+  const { data: documents = [] } = useAutoDocuments("portal");
+
   useEffect(() => {
     const fetchAll = async () => {
       setDataLoading(true);
@@ -154,17 +157,13 @@ const PortalDashboard = () => {
         const withScope = <T extends { eq: (column: string, value: string) => T }>(query: T): T => {
           if (contactId) return query.eq("contact_id", contactId);
           if (accountId) return query.eq("account_id", accountId);
-          // If neither ID is available, we must NOT fall back to email for primary data objects
-          // to prevent cross-org leaks. We return a query that will yield no results.
-          // Using a non-existent UUID as a safety break
           return query.eq("id", "00000000-0000-0000-0000-000000000000");
         };
 
         /* ── Stats ── */
-        const [quotesRes, contractsRes, docsRes] = await Promise.all([
+        const [quotesRes, contractsRes] = await Promise.all([
           withScope(supabase.from("quotes").select("id", { count: "exact", head: true }).eq("organization_id", organizationId)),
           withScope(supabase.from("contracts").select("id", { count: "exact", head: true }).eq("organization_id", organizationId)),
-          supabase.from("auto_documents").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("created_by", userId),
         ]);
 
         let pendingCount = 0;
@@ -179,12 +178,13 @@ const PortalDashboard = () => {
           pendingCount = count ?? 0;
         }
 
-        setStats({
+        setStats((prev) => ({
+          ...prev,
           quotes: quotesRes.count ?? 0,
           contracts: contractsRes.count ?? 0,
-          documents: docsRes.count ?? 0,
           pendingSignatures: pendingCount,
-        });
+          documents: documents.length,
+        }));
 
         /* ── Recent activity (quotes + contracts, latest 6) ── */
         const activityItems: ActivityItem[] = [];
@@ -233,7 +233,7 @@ const PortalDashboard = () => {
     };
 
     if (!organizationLoading) void fetchAll();
-  }, [organizationId, organizationLoading, portalEmail, userId, accountId, contactId]);
+  }, [organizationId, organizationLoading, portalEmail, userId, accountId, contactId, documents]);
 
   if (organizationLoading || dataLoading || !isReady) {
     return (

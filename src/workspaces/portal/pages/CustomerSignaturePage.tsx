@@ -35,7 +35,7 @@ function normalizeSignatureType(value: string | null): SignatureKind | null {
 }
 
 export default function CustomerSignaturePage() {
-  const { organizationId, portalEmail, isReady } = usePortalScope();
+  const { organizationId, portalEmail, userId, isReady } = usePortalScope();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const selectedType = normalizeSignatureType(searchParams.get("type"));
@@ -77,43 +77,54 @@ export default function CustomerSignaturePage() {
       const fetchDocumentSignature = async (): Promise<PortalSignatureRecord | null> => {
         const { data, error } = await supabase
           .from("document_esignatures")
-          .select("id, status, signed_at, created_at, document:auto_documents(name,content,file_path,file_name)")
+          .select("id, status, signed_at, created_at, document:auto_documents(id, name,content,file_path,file_name,created_by)")
           .eq("id", id)
           .eq("organization_id", organizationId)
           .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`)
           .maybeSingle();
 
         if (error) throw error;
-        if (!data) return null;
+        
+        let sigId = data?.id || "";
+        let sigStatus = data?.status || "preview";
+        let docRef = (data as any)?.document;
 
-        const document = (data as {
-          document?: {
-            name?: string | null;
-            content?: string | null;
-            file_path?: string | null;
-            file_name?: string | null;
-          } | null;
-        }).document;
+        if (!data) {
+          // Try fetching document directly by ID if user is creator
+          const { data: directDoc, error: docError } = await supabase
+            .from("auto_documents")
+            .select("id, name,content,file_path,file_name,created_by,status,created_at")
+            .eq("id", id)
+            .eq("organization_id", organizationId)
+            .eq("created_by", userId ?? "")
+            .maybeSingle();
+          
+          if (docError) throw docError;
+          if (!directDoc) return null;
+          docRef = directDoc;
+          sigStatus = "preview";
+          sigId = directDoc.id;
+        }
+
         let previewFileUrl: string | null = null;
-
-        if (document?.file_path) {
+        if (docRef?.file_path) {
           try {
-            previewFileUrl = await getSignedUrl("documents", document.file_path);
+            previewFileUrl = await getSignedUrl("documents", docRef.file_path);
           } catch (previewError) {
             console.error("Failed to build signed URL for document preview", previewError);
           }
         }
 
         return {
-          id: data.id,
+          id: sigId,
           kind: "document",
-          status: data.status || "pending",
-          createdAt: data.created_at,
-          signedAt: data.signed_at,
-          title: document?.name || "Document",
-          previewContent: document?.content || null,
+          status: sigStatus,
+          createdAt: ((data?.created_at || (docRef as any)?.created_at) as string) || null,
+          signedAt: data?.signed_at || null,
+          title: docRef?.name || "Document",
+          previewContent: docRef?.content || null,
           previewFileUrl,
-          previewFileName: document?.file_name || null,
+          previewFileName: docRef?.file_name || null,
         };
       };
 

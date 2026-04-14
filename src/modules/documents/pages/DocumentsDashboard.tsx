@@ -3,8 +3,8 @@ import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/ui/shadcn/button";
 import { StatsCard } from "@/modules/crm/components/StatsCard";
 import { useAutoDocuments, useDocumentESignatures } from "@/modules/documents/hooks/useDocuments";
-import { DOCUMENT_STATUS_COLORS } from "@/core/types/documents";
-import { ArrowRight, CheckCircle2, FilePlus, FileStack, FileText, History, Paperclip, Send, Zap } from "lucide-react";
+import { DOCUMENT_STATUS_COLORS, type DocumentStatus } from "@/core/types/documents";
+import { ArrowRight, CheckCircle2, FilePlus, FileSignature, FileStack, FileText, History, Paperclip, Send, Zap } from "lucide-react";
 import { PlanLimitBanner } from "@/ui/plan-limit-banner";
 import { ExportButton } from "@/ui/export-button";
 import { useSearch } from "@/core/hooks/useSearch";
@@ -118,7 +118,7 @@ const DocumentsDashboard = () => {
         <div className="flex items-center gap-2">
           <Link to={tenantAppPath(tenantSlug, "documents/create")}>
             <Button variant="hero">
-              <FilePlus className="mr-2 h-4 w-4" />
+              <FileSignature className="mr-2 h-4 w-4" />
               Create Document
             </Button>
           </Link>
@@ -200,7 +200,7 @@ const DocumentsDashboard = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${DOCUMENT_STATUS_COLORS[document.status]}`}>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${DOCUMENT_STATUS_COLORS[document.status as DocumentStatus]}`}>
                       {document.status}
                     </span>
                     {document.file_path && (
@@ -210,7 +210,7 @@ const DocumentsDashboard = () => {
                     )}
                     <Link to={tenantAppPath(tenantSlug, `documents/${document.id}/esign`)}>
                       <Button size="sm" variant="outline">
-                        <Send className="mr-1 h-3.5 w-3.5" />
+                        <FileSignature className="mr-1 h-3.5 w-3.5" />
                         E-Sign
                       </Button>
                     </Link>

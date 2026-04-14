@@ -5,15 +5,19 @@ import { useOrganization } from "@/workspaces/organization/hooks/useOrganization
 import { usePlanLimits } from "@/core/hooks/usePlanLimits";
 import { UpgradePrompt } from "@/ui/upgrade-prompt";
 import { useAuth } from "@/core/auth/useAuth";
-import { isTenantUserRole } from "@/core/types/roles";
+import { isTenantUserRole, type AppRole, RoleHierarchy } from "@/core/types/roles";
 import type { ModuleType } from "@/core/types/modules";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 
 interface ModuleGateProps {
   module: ModuleType;
   children: ReactNode;
   /** Optional custom label for the module (defaults to uppercased moduleId) */
   moduleLabel?: string;
+  /** Optional specific roles allowed to access this module */
+  allowedRoles?: AppRole[];
+  /** Optional minimum hierarchy level required to access this module */
+  minRole?: AppRole;
 }
 
 const MODULE_LABELS: Record<ModuleType, string> = {
@@ -42,14 +46,36 @@ const MODULE_DESCRIPTIONS: Record<ModuleType, string> = {
  * For employees, shows "ask your admin" messaging.
  * For admins/owners, shows upgrade options.
  */
-export function ModuleGate({ module, children, moduleLabel }: ModuleGateProps) {
+export function ModuleGate({ 
+  module, 
+  children, 
+  moduleLabel,
+  allowedRoles,
+  minRole 
+}: ModuleGateProps) {
   const { hasModule } = useOrganization();
   const { role } = useAuth();
   const { planType } = usePlanLimits();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const navigate = useNavigate();
 
+  const userRole = role as AppRole;
   const isEmployee = isTenantUserRole(role);
+
+  // RBAC Check
+  let isAuthorized = true;
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    isAuthorized = allowedRoles.includes(userRole);
+  } else if (minRole) {
+    const userLevel = RoleHierarchy[userRole]?.level ?? 0;
+    const minLevel = RoleHierarchy[minRole]?.level ?? 0;
+    isAuthorized = userLevel >= minLevel;
+  }
+
+  if (!isAuthorized) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   // If module is enabled, render children directly
   if (hasModule(module)) {

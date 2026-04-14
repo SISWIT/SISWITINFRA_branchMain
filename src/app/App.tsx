@@ -373,12 +373,12 @@ function AppRoutes() {
           <Route path="erp/procurement" element={<ModuleGate module="erp"><ProcurementPage /></ModuleGate>} />
           <Route path="erp/production" element={<ModuleGate module="erp"><ProductionPage /></ModuleGate>} />
           <Route path="erp/finance" element={<ModuleGate module="erp"><FinancePage /></ModuleGate>} />
-          <Route path="users" element={<OrganizationUsersPage />} />
-          <Route path="subscription" element={<OrganizationSubscriptionPage />} />
-          <Route path="invitations" element={<OrganizationInvitationsPage />} />
+          <Route path="users" element={<OrganizationOwnerRoute><OrganizationUsersPage /></OrganizationOwnerRoute>} />
+          <Route path="subscription" element={<OrganizationOwnerRoute><OrganizationSubscriptionPage /></OrganizationOwnerRoute>} />
+          <Route path="invitations" element={<OrganizationOwnerRoute><OrganizationInvitationsPage /></OrganizationOwnerRoute>} />
           <Route path="alerts" element={<EmployeeAlertsRoute />} />
           <Route path="notifications" element={<TenantNotificationsRoute />} />
-          <Route path="approvals" element={<OrganizationApprovalsPage />} />
+          <Route path="approvals" element={<OrganizationOwnerRoute><OrganizationApprovalsPage /></OrganizationOwnerRoute>} />
           <Route path="settings" element={<EmployeeSettingsRoute />} />
         </Route>
 

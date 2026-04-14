@@ -1,97 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Eye, FileStack, Loader2, Search } from "lucide-react";
 import { Card, CardContent } from "@/ui/shadcn/card";
 import { Button } from "@/ui/shadcn/button";
 import { Input } from "@/ui/shadcn/input";
 import { Badge } from "@/ui/shadcn/badge";
-import { supabase } from "@/core/api/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/shadcn/table";
 import { usePortalScope } from "@/workspaces/portal/hooks/usePortalScope";
-
-interface CustomerDocument {
-  id: string;
-  name: string | null;
-  type: string | null;
-  status: string | null;
-  created_at: string | null;
-}
+import { tenantPortalPath } from "@/core/utils/routes";
+import { useAutoDocuments } from "@/modules/documents/hooks/useDocuments";
 
 export default function CustomerDocumentsPage() {
-  const { organizationId, organizationLoading, userId, portalEmail, isReady } = usePortalScope();
+  const navigate = useNavigate();
+  const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
+  const { organizationLoading, isReady } = usePortalScope();
   const [searchQuery, setSearchQuery] = useState("");
-  const [documents, setDocuments] = useState<CustomerDocument[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      setIsLoading(true);
-
-      if (!organizationId || !userId) {
-        setDocuments([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const createdDocsPromise = supabase
-        .from("auto_documents")
-        .select("id,name,type,status,created_at")
-        .eq("organization_id", organizationId)
-        .eq("created_by", userId)
-        .order("created_at", { ascending: false });
-
-      const assignedDocsPromise = portalEmail
-        ? supabase
-            .from("document_esignatures")
-            .select("document:auto_documents(id,name,type,status,created_at)")
-            .eq("organization_id", organizationId)
-            .or(`recipient_email.ilike.${portalEmail},signer_email.ilike.${portalEmail}`)
-        : Promise.resolve({ data: [], error: null });
-
-      const [createdDocsRes, assignedDocsRes] = await Promise.all([createdDocsPromise, assignedDocsPromise]);
-
-      if (createdDocsRes.error || assignedDocsRes.error) {
-        setDocuments([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const merged = new Map<string, CustomerDocument>();
-
-      (createdDocsRes.data || []).forEach((doc) => {
-        merged.set(doc.id, {
-          id: doc.id,
-          name: doc.name,
-          type: doc.type,
-          status: doc.status,
-          created_at: doc.created_at,
-        });
-      });
-
-      (assignedDocsRes.data || []).forEach((row) => {
-        const doc = (row as { document?: CustomerDocument | null }).document;
-        if (!doc) return;
-        if (!merged.has(doc.id)) {
-          merged.set(doc.id, doc);
-        }
-      });
-
-      const sorted = Array.from(merged.values()).sort((a, b) => {
-        const aTs = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bTs = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return bTs - aTs;
-      });
-
-      setDocuments(sorted);
-      setIsLoading(false);
-    };
-
-    if (!organizationLoading) {
-      void fetchDocuments();
-    }
-  }, [organizationId, organizationLoading, userId, portalEmail]);
-
+  const { data: documents = [], isLoading } = useAutoDocuments("portal");
   const filteredDocuments = useMemo(
     () =>
       documents.filter((doc) => {
@@ -112,6 +39,18 @@ export default function CustomerDocumentsPage() {
       </div>
     );
   }
+
+  const handleView = (doc: any) => {
+    if (doc.signature_id) {
+      navigate(tenantPortalPath(tenantSlug, `pending-signatures/${doc.signature_id}`));
+    } else {
+      // For documents they created but no signature is assigned to them
+      // We could link to a document viewer if we had one, but for now
+      // we'll try to use the signature page with just the ID and hope it handles it
+      // or show a neutral viewer.
+      navigate(tenantPortalPath(tenantSlug, `pending-signatures/${doc.id}?type=document&view_only=true`));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -163,7 +102,11 @@ export default function CustomerDocumentsPage() {
                     </TableCell>
                     <TableCell>{doc.created_at ? new Date(doc.created_at).toLocaleDateString() : "N/A"}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" disabled>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleView(doc)}
+                      >
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>

@@ -35,6 +35,7 @@ import { supabase } from "@/core/api/client";
 import { toast } from "sonner";
 import { useOrganizationOwnerData, type OrganizationOwnerMembership } from "@/workspaces/organization/hooks/useOrganizationOwnerData";
 import { useAuth } from "@/core/auth/useAuth";
+import { RoleHierarchy, type AppRole } from "@/core/types/roles";
 
 type RoleFilter = "all" | "owner" | "admin" | "manager" | "employee" | "client";
 type StateFilter = "all" | "active" | "pending_approval" | "rejected" | "disabled";
@@ -43,9 +44,16 @@ const roleFilters: RoleFilter[] = ["all", "owner", "admin", "manager", "employee
 const stateFilters: StateFilter[] = ["all", "active", "pending_approval", "rejected", "disabled"];
 const editableRoles = ["admin", "manager", "employee", "client"];
 
+const canManageRole = (current: AppRole | null | undefined, target: AppRole | null | undefined) => {
+  if (!current || !target) return false;
+  const currentLevel = RoleHierarchy[current as keyof typeof RoleHierarchy]?.level ?? 0;
+  const targetLevel = RoleHierarchy[target as keyof typeof RoleHierarchy]?.level ?? 0;
+  return currentLevel > targetLevel;
+};
+
 export default function OrganizationUsersPage() {
   const { organization, loading, memberships, roleDistribution, refresh } = useOrganizationOwnerData();
-  const { inviteEmployee, inviteClient } = useAuth();
+  const { role: currentUserRole, inviteEmployee, inviteClient } = useAuth();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
@@ -271,7 +279,8 @@ export default function OrganizationUsersPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      {member.role !== "owner" && (
+                      {/* Only allow editing roles if current user has strictly higher rank than target */}
+                      {canManageRole(currentUserRole as AppRole, member.role as AppRole) && (
                         <DropdownMenuItem
                           onClick={() => {
                             setMemberToEdit(member);
@@ -281,10 +290,13 @@ export default function OrganizationUsersPage() {
                           <Pencil className="mr-2 h-4 w-4" /> Edit Role
                         </DropdownMenuItem>
                       )}
+                      
                       <DropdownMenuItem onClick={() => handleResendInvite(member)}>
                         <Send className="mr-2 h-4 w-4" /> Resend Invite
                       </DropdownMenuItem>
-                      {member.role !== "owner" && (
+
+                      {/* Only allow removing if current user has strictly higher rank than target */}
+                      {canManageRole(currentUserRole as AppRole, member.role as AppRole) && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

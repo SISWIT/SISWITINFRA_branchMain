@@ -20,7 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/shadcn/select";
-import { tenantAppPath } from "@/core/utils/routes";
+import { tenantPortalPath, tenantAppPath } from "@/core/utils/routes";
 
 const statusConfig: Record<string, { icon: React.ElementType; bg: string; text: string; label: string }> = {
   draft: { icon: FileText, bg: "bg-secondary", text: "text-secondary-foreground", label: "Draft" },
@@ -38,10 +38,11 @@ const DocumentHistoryPage = () => {
   const navigate = useNavigate();
   const { tenantSlug = "" } = useParams<{ tenantSlug: string }>();
   const { role } = useAuth();
-  const { data: documents = [], isLoading } = useAutoDocuments();
+  const isPortal = globalThis.location?.pathname.includes("/portal");
+  const { data: documents = [], isLoading } = useAutoDocuments(isPortal ? "portal" : "internal");
   const { data: signatures = [] } = useDocumentESignatures();
   const deleteDocumentMutation = useDeleteAutoDocument();
-  const canDelete = isTenantAdminRole(role);
+  const canDelete = isTenantAdminRole(role) && !isPortal;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -111,17 +112,32 @@ const DocumentHistoryPage = () => {
     deleteDocumentMutation.mutate(id);
   };
 
+  const handleView = (document: any) => {
+    if (isPortal) {
+      const sigId = (document as any).signature_id;
+      if (sigId) {
+        navigate(tenantPortalPath(tenantSlug, `pending-signatures/${sigId}`));
+      } else {
+        navigate(tenantPortalPath(tenantSlug, `pending-signatures/${document.id}?type=document&view_only=true`));
+      }
+    } else {
+      navigate(tenantAppPath(tenantSlug, `documents/${document.id}/esign`));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Document History</h1>
-          <p className="text-muted-foreground">Track generated documents and signing progress.</p>
+          <p className="text-muted-foreground mr-2">Track generated documents and signing progress.</p>
         </div>
-        <Button variant="outline" onClick={handleExportList}>
-          <Download className="mr-2 h-4 w-4" />
-          Export List
-        </Button>
+        {!isPortal && (
+          <Button variant="outline" onClick={handleExportList}>
+            <Download className="mr-2 h-4 w-4" />
+            Export List
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -218,7 +234,7 @@ const DocumentHistoryPage = () => {
                             <StatusIcon className="h-3 w-3" />
                             {status.label}
                           </span>
-                          {pendingCount > 0 ? (
+                          {!isPortal && pendingCount > 0 ? (
                             <span className="text-xs text-muted-foreground">{pendingCount} pending signer(s)</span>
                           ) : null}
                         </div>
@@ -234,7 +250,7 @@ const DocumentHistoryPage = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(tenantAppPath(tenantSlug, `documents/${document.id}/esign`))}
+                            onClick={() => handleView(document)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -244,9 +260,9 @@ const DocumentHistoryPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate(tenantAppPath(tenantSlug, `documents/${document.id}/esign`))}
+                            onClick={() => handleView(document)}
                           >
-                            E-Sign
+                            {isPortal ? "View" : "E-Sign"}
                           </Button>
                           {canDelete && (
                             <Button

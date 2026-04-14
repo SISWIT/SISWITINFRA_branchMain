@@ -41,6 +41,7 @@ interface OrganizationTopBarProps {
 const PAGES = [
   { label: "Dashboard", path: "/organization/overview" },
   { label: "User Management", path: "/organization/users" },
+  { label: "Auto Documents", path: "/organization/documents" },
   { label: "Invitations", path: "/organization/invitations" },
   { label: "Client Approvals", path: "/organization/approvals" },
   { label: "Plans and Billing", path: "/organization/plans" },
