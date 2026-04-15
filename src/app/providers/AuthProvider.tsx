@@ -17,6 +17,8 @@ import { normalizeRole, PlatformRole } from "@/core/types/roles";
 const ROLE_CACHE_KEY_PREFIX = "org_role_";
 const AUTH_ROLE_LOOKUP_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_ROLE_LOOKUP_TIMEOUT_MS ?? "5000");
 const AUTH_SESSION_RECOVERY_TIMEOUT_MS = Number(import.meta.env.VITE_AUTH_SESSION_RECOVERY_TIMEOUT_MS ?? "10000");
+const INVITATION_EXISTING_ACCOUNT_ERROR =
+  "An account already exists for this email. Sign in with your existing password to accept this invitation.";
 const INVITE_EMAILS_DISABLED = (() => {
   const raw = String(import.meta.env.VITE_DISABLE_INVITE_EMAILS ?? "").trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes";
@@ -175,6 +177,20 @@ function getAuthUrl(path: string): string {
 
 function getAuthEmailRedirectTo(): string {
   return getAuthUrl("/auth/verify-success");
+}
+
+function isAlreadyRegisteredMessage(message: string | null | undefined): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+  return normalized.includes("already registered") || normalized.includes("already exists");
+}
+
+function isExistingAccountMembershipError(message: string | null | undefined): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+  return normalized.includes("user account not found") || isAlreadyRegisteredMessage(normalized);
+}
+
+function isObfuscatedExistingSignupResponse(user: User | null | undefined, session: Session | null | undefined): boolean {
+  return !session && Array.isArray(user?.identities) && user.identities.length === 0;
 }
 
 
@@ -598,7 +614,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (error) {
+          if (isAlreadyRegisteredMessage(error.message)) {
+            return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
+          }
           return { error: error.message };
+        }
+
+        if (isObfuscatedExistingSignupResponse(data.user, data.session)) {
+          return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
         }
 
         if (!data.user?.id) {
@@ -614,6 +637,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (membershipError) {
+          if (isExistingAccountMembershipError(membershipError.message)) {
+            return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
+          }
           return { error: `Unable to create employee membership: ${membershipError.message}` };
         }
 
@@ -654,7 +680,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (error) {
+          if (isAlreadyRegisteredMessage(error.message)) {
+            return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
+          }
           return { error: error.message };
+        }
+
+        if (isObfuscatedExistingSignupResponse(data.user, data.session)) {
+          return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
         }
 
         if (!data.user?.id) {
@@ -669,6 +702,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (membershipError) {
+          if (isExistingAccountMembershipError(membershipError.message)) {
+            return { error: INVITATION_EXISTING_ACCOUNT_ERROR };
+          }
           return { error: `Unable to create client membership: ${membershipError.message}` };
         }
 

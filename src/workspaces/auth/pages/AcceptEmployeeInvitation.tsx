@@ -30,6 +30,15 @@ function formatRole(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function isExistingAccountError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("account already exists") ||
+    normalized.includes("already registered") ||
+    normalized.includes("already exists")
+  );
+}
+
 export default function AcceptEmployeeInvitation() {
   const [params] = useSearchParams();
   const token = useMemo(() => params.get("token") ?? "", [params]);
@@ -143,7 +152,11 @@ export default function AcceptEmployeeInvitation() {
     setSubmitting(false);
 
     if (error) {
-      toast({ variant: "destructive", title: "Unable to accept invitation", description: error });
+      toast({
+        variant: "destructive",
+        title: isExistingAccountError(error) ? "Account already exists" : "Unable to accept invitation",
+        description: error,
+      });
       return;
     }
 

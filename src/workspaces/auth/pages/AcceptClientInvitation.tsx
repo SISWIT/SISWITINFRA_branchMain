@@ -25,6 +25,15 @@ const secondaryButtonClassName =
 const submitButtonClassName =
   "h-14 w-full rounded-[20px] border-0 bg-[linear-gradient(90deg,#8d58ff_0%,#a865ff_52%,#877bff_100%)] text-base font-semibold text-white shadow-[0_20px_44px_rgba(141,88,255,0.34)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:brightness-100";
 
+function isExistingAccountError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("account already exists") ||
+    normalized.includes("already registered") ||
+    normalized.includes("already exists")
+  );
+}
+
 export default function AcceptClientInvitation() {
   const [params] = useSearchParams();
   const token = useMemo(() => params.get("token") ?? "", [params]);
@@ -134,7 +143,11 @@ export default function AcceptClientInvitation() {
     setSubmitting(false);
 
     if (error) {
-      toast({ variant: "destructive", title: "Unable to accept invitation", description: error });
+      toast({
+        variant: "destructive",
+        title: isExistingAccountError(error) ? "Account already exists" : "Unable to accept invitation",
+        description: error,
+      });
       return;
     }
 
